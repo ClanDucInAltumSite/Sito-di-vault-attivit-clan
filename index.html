@@ -21,6 +21,10 @@
 
     <link rel="icon" type="image/x-icon" href="./favicon.ico" />
     <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+
+    <!-- Preload LCP Image per prestazione massima Lighthouse (scoperta immediata nel documento iniziale) -->
+    <link rel="preload" as="image" href="./photos/home-400.webp" type="image/webp" fetchpriority="high" media="(max-width: 600px)" />
+    <link rel="preload" as="image" href="./photos/home-800.webp" type="image/webp" fetchpriority="high" media="(min-width: 601px)" />
   </head>
   <body>
     <div id="app"></div>
