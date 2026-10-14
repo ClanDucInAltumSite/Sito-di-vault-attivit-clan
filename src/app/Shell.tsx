@@ -4,7 +4,7 @@ import { useRoute, navigate, RouteName } from './router';
 import { useAdmin } from '../lib/auth';
 import { AdminLoginModal } from '../features/admin/AdminLoginModal';
 import { Icon, IconName } from '../ui/Icon';
-import logoSrc from '../../assets/favicon.png';
+import { BrandLogo } from '../ui/BrandLogo';
 
 export interface ShellProps {
   isOnline: boolean;
@@ -24,6 +24,17 @@ export function Shell({
   const { route } = useRoute();
   const { isAdmin } = useAdmin();
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+
+  const routeTitles: Record<RouteName, string> = {
+    home: I18N.app.shortTitle,
+    giochi: I18N.nav.giochi,
+    bans: I18N.nav.bans,
+    canti: I18N.nav.canti,
+    calendario: I18N.nav.calendario,
+    stampa: I18N.stampa.title,
+    admin: I18N.nav.admin,
+    design: 'Sistema di Design',
+  };
 
   const navItems: { id: RouteName; label: string; icon: IconName }[] = [
     { id: 'home', label: I18N.nav.home, icon: 'home' },
@@ -66,20 +77,28 @@ export function Shell({
           <a
             href="#/"
             className="ios-top-bar-brand"
-            style={{ display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none', color: 'inherit' }}
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', color: 'inherit' }}
             onClick={(e) => {
               e.preventDefault();
               navigate('home');
             }}
+            aria-label="Torna alla Home"
           >
-            <img
-              src={logoSrc}
-              alt="Logo Clan Duc In Altum"
-              width="28"
-              height="28"
-              style={{ borderRadius: '6px', objectFit: 'contain' }}
-            />
-            <span className="ios-top-bar-title">{I18N.app.shortTitle}</span>
+            <div
+              style={{
+                backgroundColor: 'var(--color-targa-bg)',
+                borderRadius: '8px',
+                padding: '3px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: 'var(--shadow-rest)',
+                border: '1px solid var(--color-targa-border)',
+              }}
+            >
+              <BrandLogo variant="emblema" size={26} />
+            </div>
+            <span className="ios-top-bar-title">{routeTitles[route] || I18N.app.shortTitle}</span>
           </a>
         </div>
 

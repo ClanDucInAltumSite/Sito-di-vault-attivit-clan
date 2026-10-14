@@ -1,44 +1,26 @@
-
-
-import logoSrc from '../../assets/favicon.png';
-
 /**
- * Motivo 1: Logo Reveal all'avvio / Home
- * Appare con transizione di scala morbida e leggero anello d'accento pulsante
+ * I Tre Motivi Scout Vettoriali — FASE 1B (FINALE) Sezione 7
+ * Tratto sottile come le icone (1.75px), al massimo uno per schermata:
+ * 1. La Rivelazione del Logo (su Targa Bianca)
+ * 2. Il Sentiero (linea tratteggiata che si disegna con punto giallo finale)
+ * 3. La Bussola di Sincronizzazione (ago oscillante durante il sync)
  */
+
+import { BrandLogo } from './BrandLogo';
+
 export interface LogoRevealProps {
   size?: number;
   className?: string;
-  subtle?: boolean;
 }
 
-export function LogoReveal({
-  size = 56,
-  className = '',
-  subtle = false,
-}: LogoRevealProps) {
+export function LogoReveal({ size = 56, className = '' }: LogoRevealProps) {
   return (
-    <div
-      className={`scout-logo-reveal ${subtle ? 'scout-logo-subtle' : ''} ${className}`.trim()}
-      style={{ width: `${size}px`, height: `${size}px` }}
-    >
-      <div className="scout-logo-halo" aria-hidden="true" />
-      <img
-        src={logoSrc}
-        alt="Logo Clan Duc In Altum"
-        className="scout-logo-img"
-        width={size}
-        height={size}
-      />
+    <div className={`scout-logo-reveal brand-targa ${className}`.trim()} role="presentation">
+      <BrandLogo variant="completo" size={size} />
     </div>
   );
 }
 
-/**
- * Motivo 2: The Trail (Il Sentiero)
- * Linea tratteggiata vettoriale sottile con un minuscolo punto giallo scout
- * che si sposta delicatamente lungo il tracciato.
- */
 export interface TheTrailProps {
   className?: string;
   compact?: boolean;
@@ -51,27 +33,23 @@ export function TheTrail({ className = '', compact = false }: TheTrailProps) {
       aria-hidden="true"
     >
       <svg
-        viewBox="0 0 320 24"
+        viewBox="0 0 320 20"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
         className="scout-trail-svg"
         preserveAspectRatio="none"
       >
         <path
-          d="M 4 12 C 60 4, 100 20, 160 12 C 220 4, 260 20, 316 12"
+          d="M 6 10 C 60 2, 100 18, 160 10 C 220 2, 260 18, 308 10"
           className="scout-trail-path"
         />
-        <circle className="scout-trail-dot" r="3.5" />
+        {/* Punto giallo scout al termine della traccia */}
+        <circle cx="312" cy="10" r="3.5" className="scout-trail-end-dot" />
       </svg>
     </div>
   );
 }
 
-/**
- * Motivo 3: Bussola di sincronizzazione
- * L'ago vettoriale oscilla dolcemente durante la sincronizzazione attiva
- * e si allinea al Nord (0°) una volta completata la sincronizzazione.
- */
 export interface CompassSyncProps {
   isSyncing: boolean;
   size?: number;
@@ -90,7 +68,7 @@ export function CompassSync({
       className={`scout-compass-widget ${isSyncing ? 'scout-compass-syncing' : 'scout-compass-idle'} ${className}`.trim()}
       style={{ width: `${size}px`, height: `${size}px` }}
       aria-label={ariaLabel}
-      title={isSyncing ? 'Sincronizzazione in corso...' : 'Dati allineati'}
+      title={isSyncing ? 'Sincronizzazione in corso...' : 'Dati sincronizzati'}
     >
       <svg
         width={size}
@@ -110,7 +88,7 @@ export function CompassSync({
         <line x1="2" y1="12" x2="4" y2="12" />
         <line x1="20" y1="12" x2="22" y2="12" />
       </svg>
-      {/* Ago della bussola: punta nord con accento/giallo, punta sud neutra */}
+      {/* Ago della bussola: punta nord con colore di sezione / accento, punta sud neutra */}
       <svg
         width={size}
         height={size}

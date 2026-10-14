@@ -1,6 +1,12 @@
 /* ==============================================================================
-   Design Tokens — Sistema OKLCH Apple-Grade per Vault Clan
-   Tutti i colori sono espressi in OKLCH. Nessun colore fuori da questo file.
+   Design Tokens — Sistema OKLCH con Anima e Identità (FASE 1B FINALE)
+   Tutti i colori sono espressi in coordinate OKLCH.
+   Campionamento rigoroso dal logo:
+     - Viola profondo (#462679): "Inchiostro" dell'app e accento nobile
+     - Azzurro (#00BDFF): Colore interattivo (link, selezione, pulsante primario, tab)
+     - Giallo (#FDC500): Sezione Giochi, evidenziazioni ricerca, badge Nuovo, ritornelli
+     - Rosso (#E8442D / #FD3000): Sezione Bans, scadenze, oggi, distruttivo
+     - Azzurro Scuro: Sezione Calendario
    ============================================================================== */
 
 @font-face {
@@ -23,42 +29,93 @@
 
 :root {
   /* --- PALETTE COLORI IN OKLCH (TEMA CHIARO) --- */
-  /* Campionamento reale dal logo (#00BDFF / #FDC500 / #E8442D) */
-  --color-bg: oklch(0.975 0.003 260);
-  --color-surface: oklch(1 0 0);
-  --color-surface-hover: oklch(0.96 0.005 260);
-  --color-surface-active: oklch(0.93 0.008 260);
-  --color-surface-card: oklch(1 0 0);
-  --color-border: oklch(0.90 0.005 260);
-  --color-border-subtle: oklch(0.93 0.004 260);
+  /* Campionamento reale dal logo (#462679 / #00BDFF / #FDC500 / #E8442D) */
 
-  /* Tipografia */
-  --color-text: oklch(0.18 0.02 260);
+  /* Sfondo pagina e superfici (profondità data da card bianche su grigio caldo chiaro) */
+  --color-bg: oklch(0.975 0.006 80);
+  --color-surface: oklch(1 0 0);
+  --color-surface-hover: oklch(0.96 0.006 80);
+  --color-surface-active: oklch(0.93 0.008 80);
+  --color-surface-card: oklch(1 0 0);
+  --color-border: oklch(0.89 0.006 80);
+  --color-border-subtle: oklch(0.93 0.004 80);
+
+  /* Viola del marchio = "Inchiostro" dell'app (sostituisce il nero generico) */
+  --color-ink: oklch(0.28 0.10 305);
+  --color-ink-display: oklch(0.25 0.12 305);
+  --color-brand-purple: oklch(0.33 0.13 305);
+  --color-brand-purple-tenue: oklch(0.95 0.03 305);
+  --color-brand-purple-text: oklch(0.28 0.10 305);
+
+  /* Tipografia standard */
+  --color-text: oklch(0.22 0.02 260);
   --color-text-secondary: oklch(0.48 0.02 260);
   --color-text-tertiary: oklch(0.65 0.015 260);
   --color-text-inverse: oklch(1 0 0);
 
-  /* Azzurro = colore guida e unico accento */
+  /* Azzurro = colore interattivo e accento (link, selezione, pulsante primario, tab attiva) */
   --color-accent: oklch(0.53 0.18 245);
-  --color-accent-hover: oklch(0.48 0.19 245);
-  --color-accent-active: oklch(0.44 0.20 245);
-  --color-accent-subtle: oklch(0.95 0.035 245);
-  --color-accent-contrast: oklch(1 0 0);
+  --color-interactive: oklch(0.53 0.18 245);
+  --color-interactive-hover: oklch(0.48 0.19 245);
+  --color-interactive-active: oklch(0.44 0.20 245);
+  --color-interactive-tenue: oklch(0.95 0.035 245);
+  --color-interactive-contrast: oklch(1 0 0);
 
-  /* Giallo = SOLO piccole evidenziazioni e tocco scout */
+  /* Alias compatibilità accento */
+  --color-accent-hover: var(--color-interactive-hover);
+  --color-accent-active: var(--color-interactive-active);
+  --color-accent-subtle: var(--color-interactive-tenue);
+  --color-accent-contrast: var(--color-interactive-contrast);
+
+  /* COLORI DI SEZIONE FUNZIONALI (PIENO, TENUE, TESTO-SU-TENUE) */
+  /* 1. Giochi = Giallo (#FDC500) */
   --color-giallo: oklch(0.83 0.18 85);
-  --color-giallo-subtle: oklch(0.96 0.04 85);
-  --color-giallo-text: oklch(0.18 0.02 260); /* Sempre scuro su giallo */
+  --color-giochi: oklch(0.83 0.18 85);
+  --color-giochi-hover: oklch(0.79 0.19 85);
+  --color-giochi-tenue: oklch(0.96 0.05 85);
+  --color-giochi-text: oklch(0.22 0.08 305); /* Viola scuro su giallo: contrasto > 10:1 AAA */
+  --color-giallo-subtle: var(--color-giochi-tenue);
+  --color-giallo-text: var(--color-giochi-text);
 
-  /* Rosso = SOLO distruttivo e data odierna */
+  /* 2. Bans = Rosso (#E8442D) */
   --color-rosso: oklch(0.55 0.22 27);
-  --color-rosso-hover: oklch(0.49 0.23 27);
-  --color-rosso-subtle: oklch(0.96 0.03 27);
+  --color-bans: oklch(0.55 0.22 27);
+  --color-bans-hover: oklch(0.49 0.23 27);
+  --color-bans-tenue: oklch(0.96 0.035 27);
+  --color-bans-text: oklch(0.45 0.22 27);
+  --color-rosso-hover: var(--color-bans-hover);
+  --color-rosso-subtle: var(--color-bans-tenue);
 
-  /* Traslucenze & Vetro */
-  --color-glass-bg: oklch(0.98 0.003 260 / 0.82);
-  --color-glass-border: oklch(0.88 0.005 260 / 0.6);
-  --color-backdrop: oklch(0.10 0.01 260 / 0.45);
+  /* 3. Canti = Azzurro */
+  --color-canti: oklch(0.53 0.18 245);
+  --color-canti-hover: oklch(0.48 0.19 245);
+  --color-canti-tenue: oklch(0.95 0.035 245);
+  --color-canti-text: oklch(0.38 0.16 245);
+
+  /* 4. Calendario = Azzurro Scuro */
+  --color-calendario: oklch(0.42 0.15 255);
+  --color-calendario-hover: oklch(0.37 0.16 255);
+  --color-calendario-tenue: oklch(0.94 0.03 255);
+  --color-calendario-text: oklch(0.28 0.14 255);
+
+  /* 5. Stampa / Admin / Neutro */
+  --color-neutral: oklch(0.48 0.02 260);
+  --color-neutral-tenue: oklch(0.95 0.005 260);
+  --color-neutral-text: oklch(0.30 0.02 260);
+
+  /* Targa Bianca del Logo (fondamentale per logo sempre su fondo chiaro) */
+  --color-targa-bg: oklch(1 0 0);
+  --color-targa-border: oklch(0.92 0.005 80);
+  --shadow-targa: 0 10px 32px oklch(0 0 0 / 0.14), 0 2px 6px oklch(0 0 0 / 0.06);
+
+  /* Scrim Viola Funzionale sulle Fotografie */
+  --color-photo-scrim: oklch(0.22 0.09 305 / 0.60);
+  --color-photo-scrim-deep: oklch(0.18 0.10 305 / 0.88);
+
+  /* Barre Traslucide & Vetro */
+  --color-glass-bg: oklch(0.985 0.004 80 / 0.85);
+  --color-glass-border: oklch(0.88 0.005 80 / 0.65);
+  --color-backdrop: oklch(0.10 0.02 305 / 0.45);
 
   /* --- TIPOGRAFIA INTER --- */
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
@@ -71,7 +128,7 @@
   --font-size-lg: 1.0625rem;   /* 17px - Headline */
   --font-size-xl: 1.25rem;     /* 20px - Title 3 */
   --font-size-2xl: 1.5rem;     /* 24px - Title 2 */
-  --font-size-3xl: 2.125rem;   /* 34px - Large Title */
+  --font-size-3xl: 2.125rem;   /* 34px - Large Display Title */
 
   /* --- SPAZIATURE GRIGLIA 8PT --- */
   --space-1: 4px;
@@ -87,18 +144,21 @@
   /* --- RAGGI DI CURVATURA --- */
   --radius-xs: 6px;
   --radius-sm: 8px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-  --radius-xl: 18px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-targa: 28px;
   --radius-full: 9999px;
 
   /* --- TOUCH TARGET --- */
   --touch-target: 44px;
 
-  /* --- OMBRE NEUTRE APPLE-STYLE --- */
-  --shadow-subtle: 0 1px 2px oklch(0 0 0 / 0.04);
-  --shadow-sheet: 0 -4px 24px oklch(0 0 0 / 0.12);
-  --shadow-float: 0 6px 20px oklch(0 0 0 / 0.08);
+  /* --- OMBRE NEUTRE APPLE-STYLE (DUE LIVELLI: RIPOSO, SOLLEVATO) --- */
+  --shadow-rest: 0 1px 3px oklch(0 0 0 / 0.05), 0 1px 2px oklch(0 0 0 / 0.03);
+  --shadow-lifted: 0 8px 24px oklch(0 0 0 / 0.09), 0 2px 6px oklch(0 0 0 / 0.04);
+  --shadow-sheet: 0 -4px 32px oklch(0 0 0 / 0.15);
+  --shadow-subtle: var(--shadow-rest);
+  --shadow-float: var(--shadow-lifted);
 
   /* --- ANIMAZIONI & MOVIMENTO --- */
   --ease-ios: cubic-bezier(0.32, 0.72, 0, 1);
@@ -106,81 +166,152 @@
   --duration-fast: 200ms;
   --duration-normal: 280ms;
   --duration-sheet: 320ms;
+  --duration-reveal: 550ms;
 }
 
-/* --- TEMA SCURO (DARK MODE) --- */
+/* --- TEMA SCURO (DARK MODE) CON GRIGIO-VIOLA PROFONDO --- */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --color-bg: oklch(0.15 0.01 260); /* Grigio profondo iOS */
-    --color-surface: oklch(0.22 0.015 260);
-    --color-surface-hover: oklch(0.26 0.015 260);
-    --color-surface-active: oklch(0.30 0.015 260);
-    --color-surface-card: oklch(0.22 0.015 260);
-    --color-border: oklch(0.28 0.01 260);
-    --color-border-subtle: oklch(0.25 0.01 260);
+    /* Sfondo grigio-viola molto profondo (tinta del marchio a bassissima saturazione) */
+    --color-bg: oklch(0.14 0.015 305);
+    --color-surface: oklch(0.20 0.02 305);
+    --color-surface-hover: oklch(0.24 0.02 305);
+    --color-surface-active: oklch(0.28 0.02 305);
+    --color-surface-card: oklch(0.20 0.02 305);
+    --color-border: oklch(0.28 0.015 305);
+    --color-border-subtle: oklch(0.24 0.012 305);
 
-    --color-text: oklch(0.96 0.005 260);
-    --color-text-secondary: oklch(0.68 0.01 260);
-    --color-text-tertiary: oklch(0.48 0.01 260);
-    --color-text-inverse: oklch(0.15 0.01 260);
+    /* Inchiostro nel tema scuro */
+    --color-ink: oklch(0.96 0.01 305);
+    --color-ink-display: oklch(0.98 0.01 305);
+    --color-brand-purple: oklch(0.72 0.11 305);
+    --color-brand-purple-tenue: oklch(0.26 0.04 305);
+    --color-brand-purple-text: oklch(0.90 0.06 305);
 
+    --color-text: oklch(0.95 0.005 305);
+    --color-text-secondary: oklch(0.70 0.01 305);
+    --color-text-tertiary: oklch(0.50 0.01 305);
+    --color-text-inverse: oklch(0.14 0.015 305);
+
+    /* Azzurro interattivo in dark mode */
     --color-accent: oklch(0.68 0.16 240);
-    --color-accent-hover: oklch(0.72 0.15 240);
-    --color-accent-active: oklch(0.76 0.14 240);
-    --color-accent-subtle: oklch(0.26 0.04 245);
-    --color-accent-contrast: oklch(0.12 0.01 260);
+    --color-interactive: oklch(0.68 0.16 240);
+    --color-interactive-hover: oklch(0.72 0.15 240);
+    --color-interactive-active: oklch(0.76 0.14 240);
+    --color-interactive-tenue: oklch(0.26 0.04 245);
+    --color-interactive-contrast: oklch(0.12 0.01 260);
 
+    /* Colori di sezione in dark mode */
     --color-giallo: oklch(0.85 0.17 85);
-    --color-giallo-subtle: oklch(0.28 0.045 85);
-    --color-giallo-text: oklch(0.15 0.01 260);
+    --color-giochi: oklch(0.85 0.17 85);
+    --color-giochi-hover: oklch(0.89 0.16 85);
+    --color-giochi-tenue: oklch(0.28 0.045 85);
+    --color-giochi-text: oklch(0.15 0.01 260);
 
-    --color-rosso: oklch(0.62 0.21 27);
-    --color-rosso-hover: oklch(0.66 0.20 27);
-    --color-rosso-subtle: oklch(0.26 0.04 27);
+    --color-rosso: oklch(0.64 0.20 27);
+    --color-bans: oklch(0.64 0.20 27);
+    --color-bans-hover: oklch(0.68 0.19 27);
+    --color-bans-tenue: oklch(0.28 0.045 27);
+    --color-bans-text: oklch(0.94 0.06 27);
 
-    --color-glass-bg: oklch(0.18 0.01 260 / 0.82);
-    --color-glass-border: oklch(0.30 0.01 260 / 0.6);
-    --color-backdrop: oklch(0 0 0 / 0.65);
+    --color-canti: oklch(0.68 0.16 240);
+    --color-canti-hover: oklch(0.72 0.15 240);
+    --color-canti-tenue: oklch(0.26 0.04 245);
+    --color-canti-text: oklch(0.88 0.08 240);
 
-    --shadow-subtle: 0 1px 2px oklch(0 0 0 / 0.25);
-    --shadow-sheet: 0 -4px 32px oklch(0 0 0 / 0.5);
-    --shadow-float: 0 6px 24px oklch(0 0 0 / 0.4);
+    --color-calendario: oklch(0.62 0.15 255);
+    --color-calendario-hover: oklch(0.66 0.14 255);
+    --color-calendario-tenue: oklch(0.25 0.035 255);
+    --color-calendario-text: oklch(0.88 0.08 255);
+
+    --color-neutral: oklch(0.70 0.015 260);
+    --color-neutral-tenue: oklch(0.24 0.01 260);
+    --color-neutral-text: oklch(0.88 0.01 260);
+
+    /* Targa Bianca del Logo: resta BIANCA OPACA anche in tema scuro */
+    --color-targa-bg: oklch(1 0 0);
+    --color-targa-border: oklch(0.90 0.005 80);
+    --shadow-targa: 0 12px 36px oklch(0 0 0 / 0.45);
+
+    /* Scrim foto più profondo per attenuazione */
+    --color-photo-scrim: oklch(0.12 0.05 305 / 0.72);
+    --color-photo-scrim-deep: oklch(0.08 0.04 305 / 0.92);
+
+    --color-glass-bg: oklch(0.18 0.015 305 / 0.85);
+    --color-glass-border: oklch(0.30 0.015 305 / 0.60);
+    --color-backdrop: oklch(0 0 0 / 0.70);
+
+    --shadow-rest: 0 1px 3px oklch(0 0 0 / 0.25);
+    --shadow-lifted: 0 8px 24px oklch(0 0 0 / 0.40);
+    --shadow-sheet: 0 -4px 32px oklch(0 0 0 / 0.55);
   }
 }
 
 :root[data-theme="dark"] {
-  --color-bg: oklch(0.15 0.01 260);
-  --color-surface: oklch(0.22 0.015 260);
-  --color-surface-hover: oklch(0.26 0.015 260);
-  --color-surface-active: oklch(0.30 0.015 260);
-  --color-surface-card: oklch(0.22 0.015 260);
-  --color-border: oklch(0.28 0.01 260);
-  --color-border-subtle: oklch(0.25 0.01 260);
+  --color-bg: oklch(0.14 0.015 305);
+  --color-surface: oklch(0.20 0.02 305);
+  --color-surface-hover: oklch(0.24 0.02 305);
+  --color-surface-active: oklch(0.28 0.02 305);
+  --color-surface-card: oklch(0.20 0.02 305);
+  --color-border: oklch(0.28 0.015 305);
+  --color-border-subtle: oklch(0.24 0.012 305);
 
-  --color-text: oklch(0.96 0.005 260);
-  --color-text-secondary: oklch(0.68 0.01 260);
-  --color-text-tertiary: oklch(0.48 0.01 260);
-  --color-text-inverse: oklch(0.15 0.01 260);
+  --color-ink: oklch(0.96 0.01 305);
+  --color-ink-display: oklch(0.98 0.01 305);
+  --color-brand-purple: oklch(0.72 0.11 305);
+  --color-brand-purple-tenue: oklch(0.26 0.04 305);
+  --color-brand-purple-text: oklch(0.90 0.06 305);
+
+  --color-text: oklch(0.95 0.005 305);
+  --color-text-secondary: oklch(0.70 0.01 305);
+  --color-text-tertiary: oklch(0.50 0.01 305);
+  --color-text-inverse: oklch(0.14 0.015 305);
 
   --color-accent: oklch(0.68 0.16 240);
-  --color-accent-hover: oklch(0.72 0.15 240);
-  --color-accent-active: oklch(0.76 0.14 240);
-  --color-accent-subtle: oklch(0.26 0.04 245);
-  --color-accent-contrast: oklch(0.12 0.01 260);
+  --color-interactive: oklch(0.68 0.16 240);
+  --color-interactive-hover: oklch(0.72 0.15 240);
+  --color-interactive-active: oklch(0.76 0.14 240);
+  --color-interactive-tenue: oklch(0.26 0.04 245);
+  --color-interactive-contrast: oklch(0.12 0.01 260);
 
   --color-giallo: oklch(0.85 0.17 85);
-  --color-giallo-subtle: oklch(0.28 0.045 85);
-  --color-giallo-text: oklch(0.15 0.01 260);
+  --color-giochi: oklch(0.85 0.17 85);
+  --color-giochi-hover: oklch(0.89 0.16 85);
+  --color-giochi-tenue: oklch(0.28 0.045 85);
+  --color-giochi-text: oklch(0.15 0.01 260);
 
-  --color-rosso: oklch(0.62 0.21 27);
-  --color-rosso-hover: oklch(0.66 0.20 27);
-  --color-rosso-subtle: oklch(0.26 0.04 27);
+  --color-rosso: oklch(0.64 0.20 27);
+  --color-bans: oklch(0.64 0.20 27);
+  --color-bans-hover: oklch(0.68 0.19 27);
+  --color-bans-tenue: oklch(0.28 0.045 27);
+  --color-bans-text: oklch(0.94 0.06 27);
 
-  --color-glass-bg: oklch(0.18 0.01 260 / 0.82);
-  --color-glass-border: oklch(0.30 0.01 260 / 0.6);
-  --color-backdrop: oklch(0 0 0 / 0.65);
+  --color-canti: oklch(0.68 0.16 240);
+  --color-canti-hover: oklch(0.72 0.15 240);
+  --color-canti-tenue: oklch(0.26 0.04 245);
+  --color-canti-text: oklch(0.88 0.08 240);
 
-  --shadow-subtle: 0 1px 2px oklch(0 0 0 / 0.25);
-  --shadow-sheet: 0 -4px 32px oklch(0 0 0 / 0.5);
-  --shadow-float: 0 6px 24px oklch(0 0 0 / 0.4);
+  --color-calendario: oklch(0.62 0.15 255);
+  --color-calendario-hover: oklch(0.66 0.14 255);
+  --color-calendario-tenue: oklch(0.25 0.035 255);
+  --color-calendario-text: oklch(0.88 0.08 255);
+
+  --color-neutral: oklch(0.70 0.015 260);
+  --color-neutral-tenue: oklch(0.24 0.01 260);
+  --color-neutral-text: oklch(0.88 0.01 260);
+
+  --color-targa-bg: oklch(1 0 0);
+  --color-targa-border: oklch(0.90 0.005 80);
+  --shadow-targa: 0 12px 36px oklch(0 0 0 / 0.45);
+
+  --color-photo-scrim: oklch(0.12 0.05 305 / 0.72);
+  --color-photo-scrim-deep: oklch(0.08 0.04 305 / 0.92);
+
+  --color-glass-bg: oklch(0.18 0.015 305 / 0.85);
+  --color-glass-border: oklch(0.30 0.015 305 / 0.60);
+  --color-backdrop: oklch(0 0 0 / 0.70);
+
+  --shadow-rest: 0 1px 3px oklch(0 0 0 / 0.25);
+  --shadow-lifted: 0 8px 24px oklch(0 0 0 / 0.40);
+  --shadow-sheet: 0 -4px 32px oklch(0 0 0 / 0.55);
 }

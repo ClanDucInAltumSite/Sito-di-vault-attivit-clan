@@ -157,19 +157,29 @@ Questo documento raccoglie tutte le decisioni architetturali, i vincoli e le mot
 
 ---
 
-## ADR-016: Design System Apple-Grade in OKLCH con Componenti Nativi e Tocco Scout Vettoriale
-- **Stato:** Approvato (Fase 1B)
-- **Decisione:** Rifacimento completo dell'interfaccia eliminando qualsiasi impostazione "da template generato" e adottando il linguaggio visivo delle app native Apple (Note, Promemoria, Libri, Impostazioni) arricchito da tre motivi scout vettoriali sottili.
+## ADR-016: Redesign Professionale con Anima e Identità (Logo Protagonista, 5 Fotografie, Targa Bianca e Movimento Sobrio)
+- **Stato:** Approvato (Fase 1B Finale — Sostituisce tutte le bozze precedenti 1B/1C/1D)
+- **Decisione:** Rifacimento completo dell'interfaccia basato su qualità di classe Apple (Note, Promemoria, Libri, Impostazioni) mettendo al centro il logo del gruppo AGESCI Ponte San Giovanni 1, arricchito da cinque fotografie suggestate e movimento vettoriale sobrio.
 - **Scelte implementative:**
-  1. **Palette cromatica OKLCH:** Campionata dai colori reali del logo scout (`assets/favicon.png`): Azzurro Guida `oklch(0.53 0.18 245)`, Giallo Scout `oklch(0.83 0.18 85)`, Rosso `oklch(0.55 0.22 27)`, Sfondi e superfici neutre Apple (chiaro `oklch(0.975 0.003 260)`, scuro `oklch(0.15 0.01 260)`). Nessun colore hardcoded al di fuori di `tokens.css`.
-  2. **Tipografia Inter:** Carattere variabile woff2 self-hosted in `public/fonts/`, supporto a `tabular-nums` per date, orari e BPM.
-  3. **Componenti Nativi:** Liste raggruppate (iOS Grouped Table Views), Bottom Sheet a comparsa dal basso con maniglia e trappola del focus, Toggle Switch nativo iOS 51x31px, Segmented Control a pillola, Search pill con tasto di pulizia, Barre traslucide con `backdrop-filter: blur(20px)` e supporto a Safe Area insets.
-  4. **Iconografia Vettoriale Inline:** Zero emoji nella UI; libreria di icone SVG inline a tratto sottile 1.75px (`src/ui/Icon.tsx`).
-  5. **Tre Motivi Scout Vettoriali:**
-     - *Logo Reveal*: dissolvenza e scala con alone di accento pulsante all'avvio.
-     - *The Trail (Il Sentiero)*: tracciato SVG sinusoidale tratteggiato con punto giallo animato.
-     - *Bussola di Sincronizzazione*: ago bicolore che oscilla delicatamente durante il sync e punta a Nord (0°) a dati allineati.
-  6. **Suite di Test Reattiva Permanente:** Configurato `playwright test test/verify_ui.spec.ts` su 7 viewport (iPhone SE, 13/14/15, Max, Landscape, iPad Portrait, Landscape, Desktop) con audit continuo di accessibilità axe-core WCAG AA e screenshot salvati in `docs/design-review/screenshots/`.
+  1. **Il Logo è il Protagonista Assoluto sulla Targa Bianca:**
+     - Campionato dai pixel reali del file originale `assets/favicon.png`.
+     - Derivate due versioni per ritaglio geometrico (nessun ridisegno o alterazione): `logo-completo.png` (540×543px) e `logo-emblema.png` (540×468px).
+     - **Regola inderogabile:** Poiché la scritta viola "PONTE SAN GIOVANNI 1" scompare su fondi scuri o azzurri, il logo appare SEMPRE su fondo chiaro o all'interno della **Targa Bianca** opaca (`--color-targa-bg: oklch(1 0 0)`), anche in dark mode, con raggio morbido e ombra a sbalzo. Area di rispetto minima $\ge 12\%$.
+     - Icone PWA (`icon-192`, `icon-512`, `maskable-512`, `apple-touch-icon`, `favicon.ico`) rigenerate su sfondo bianco solido `#FFFFFF`.
+  2. **Cinque Fotografie d'Intestazione (e non una di più):**
+     - Sourced 5 immagini CC0/Unsplash di paesaggi e natura scout senza persone riconoscibili (Home, Giochi, Bans, Canti, Calendario).
+     - Formato WebP responsive (1200w, 800w, 400w) con peso totale di **486.2 KB** (budget rigoroso $\le 500\text{ KB}$).
+     - Velo scrim di leggibilità tinto del viola del logo `#462679` (`var(--color-photo-scrim)` e `var(--color-photo-scrim-deep)`).
+     - Precached nel Service Worker di Workbox per funzionamento offline al 100%. Collocate esclusivamente nelle testate, mai dentro le liste dei singoli elementi.
+  3. **Palette Funzionale OKLCH e Inchiostro del Marchio:**
+     - Inchiostro primario: Viola profondo del logo (`--color-ink`: `oklch(0.28 0.10 305)`).
+     - Azzurro Interattivo: unico accento guida per controlli, link e selezione (`--color-interactive`: `oklch(0.53 0.18 245)`).
+     - Quadratini pieni di sezione (iOS Settings style): Giochi Giallo (`oklch(0.83 0.18 85)`) con glifo scuro; Bans Rosso (`oklch(0.55 0.22 27)`) con glifo bianco; Canti Azzurro (`oklch(0.53 0.18 245)`); Calendario Blu Notte (`oklch(0.42 0.15 255)`); Stampa/Admin Grigio (`oklch(0.48 0.02 260)`).
+     - Canzoniere: ritornello con barra gialla sinistra di 4px e sfondo tenue; accordi in blu notte in grassetto con numeri tabulari.
+     - Calendario: card prossimo evento con blocco data calendario da parete (`.calendar-date-block`), chip colorati per tipologia e giorno odierno in rosso.
+  4. **Profondità Fisica a 3 Livelli:** Livello 0 (sfondo), Livello 1 (card, tessere 2x2, targa), Livello 2 (barre traslucide blur 20px, bottom sheet, modali).
+  5. **Movimento Sobrio Vettoriale:** Solo `transform` e `opacity` con curva `cubic-bezier(0.32, 0.72, 0, 1)` a 60fps. Il Sentiero (`TheTrail`) con linea curva tratteggiata e punto giallo; La Bussola (`CompassSync`) con ago oscillante durante il sync; disattivazione con `prefers-reduced-motion`.
+  6. **Suite di Test Reattiva Permanente:** 13 test Playwright eseguiti su 7 viewport con zero scroll orizzontale, audit Axe-Core WCAG AA (0 violazioni critiche/serie), touch target $\ge 44\times 44\text{ px}$, zoom 200% conforme e screenshot salvati in `docs/design-review/screenshots/`.
 
 ---
 

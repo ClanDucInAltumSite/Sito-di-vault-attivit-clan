@@ -3,62 +3,116 @@ import { I18N } from '../../lib/i18n';
 import { GroupedList } from '../../ui/GroupedList';
 import { GroupedRow } from '../../ui/GroupedRow';
 import { SegmentedControl } from '../../ui/SegmentedControl';
-import { Icon } from '../../ui/Icon';
-import { Badge } from '../../ui/Badge';
+import { HeaderBanner } from '../../ui/HeaderBanner';
 
 export function CalendarioView() {
-  const [viewMode, setViewMode] = useState<'lista' | 'mese'>('lista');
+  const [viewMode, setViewMode] = useState<'prossimi' | 'passati' | 'tutti'>('prossimi');
 
   return (
-    <div className="container">
-      {/* Intestazione Sezione */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0 12px' }}>
-        <div>
-          <h1 style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 700, letterSpacing: '-0.02em' }}>
-            {I18N.calendario.title}
-          </h1>
-          <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-xs)', marginTop: '2px' }}>
-            Attività, uscite, campi e Ordine del Giorno
-          </p>
+    <div>
+      {/* 1. FASCIA FOTOGRAFICA D'INTESTAZIONE */}
+      <HeaderBanner
+        photoId="calendario"
+        title={I18N.calendario.title}
+        count="6 attività in programma"
+        section="calendario"
+      />
+
+      <div className="container" style={{ paddingTop: 'var(--space-4)' }}>
+        {/* 2. FILTRI VISTA */}
+        <div style={{ marginBottom: 'var(--space-6)' }}>
+          <SegmentedControl
+            options={[
+              { value: 'prossimi', label: 'Prossimi Eventi' },
+              { value: 'passati', label: 'Eventi Passati' },
+              { value: 'tutti', label: 'Anno Completo' },
+            ]}
+            value={viewMode}
+            onChange={(val) => setViewMode(val as any)}
+          />
         </div>
-      </div>
 
-      {/* Switch Mese / Lista */}
-      <div style={{ marginBottom: '20px' }}>
-        <SegmentedControl
-          options={[
-            { value: 'lista', label: I18N.calendario.vistaLista },
-            { value: 'mese', label: I18N.calendario.vistaMese },
-          ]}
-          value={viewMode}
-          onChange={(val) => setViewMode(val as any)}
-        />
-      </div>
+        {/* 3. LISTA EVENTI CON BLOCCO DATA CALENDARIO DA PARETE E CHIP TIPO EVENTO */}
+        <GroupedList
+          header="ATTIVITÀ E ORDINE DEL GIORNO"
+          footer="Tocca un evento per visualizzare i dettagli logistici e l'Ordine del Giorno (ODG)."
+        >
+          {/* Evento 1: Oggi (Riunione) */}
+          <GroupedRow
+            leading={
+              <div className="calendar-date-block calendar-date-block-today">
+                <div className="calendar-date-month">OTT</div>
+                <div className="calendar-date-day">14</div>
+                <div className="calendar-date-weekday">OGGI</div>
+              </div>
+            }
+            title="Riunione di Clan e Verifica Fasi"
+            subtitle="18:30 - 20:30 • Sede Clan • 4 punti ODG"
+            trailing={<span className="event-type-chip event-chip-riunione">Riunione</span>}
+            chevron
+          />
 
-      {/* Lista Eventi */}
-      <GroupedList header="PROSSIMI EVENTI IN PROGRAMMA" footer="Tocca un evento per visualizzare i dettagli completi e l'Ordine del Giorno.">
-        <GroupedRow
-          leading={<Icon name="calendario" size={20} />}
-          title="Riunione di Clan e Verifica"
-          subtitle="Sabato 18 Ottobre • 16:30 - 19:00 • Sede Clan"
-          trailing={<Badge variant="rosso" size="sm">Oggi</Badge>}
-          chevron
-        />
-        <GroupedRow
-          leading={<Icon name="map-pin" size={20} />}
-          title="Uscita sui Monti Sibillini"
-          subtitle="25 - 26 Ottobre • Partenza ore 08:00 • Zaino spalla"
-          trailing={<Badge variant="azzurro" size="sm">Uscita</Badge>}
-          chevron
-        />
-        <GroupedRow
-          leading={<Icon name="file-text" size={20} />}
-          title="Consiglio Capi / Pattuglia"
-          subtitle="Mercoledì 29 Ottobre • 21:00 • Online"
-          trailing={<Badge variant="neutral" size="sm">ODG</Badge>}
-          chevron
-        />
-      </GroupedList>
+          {/* Evento 2: Uscita dei Passaggi */}
+          <GroupedRow
+            leading={
+              <div className="calendar-date-block">
+                <div className="calendar-date-month">OTT</div>
+                <div className="calendar-date-day">19</div>
+                <div className="calendar-date-weekday">SAB</div>
+              </div>
+            }
+            title="Uscita dei Passaggi sui Sibillini"
+            subtitle="Partenza 08:30 • Monte Vettore • Zaino spalla"
+            trailing={<span className="event-type-chip event-chip-uscita">Uscita</span>}
+            chevron
+          />
+
+          {/* Evento 3: Scadenza Iscrizioni */}
+          <GroupedRow
+            leading={
+              <div className="calendar-date-block">
+                <div className="calendar-date-month">OTT</div>
+                <div className="calendar-date-day">31</div>
+                <div className="calendar-date-weekday">GIO</div>
+              </div>
+            }
+            title="Scadenza Iscrizioni Route Invernale"
+            subtitle="Invio quota caparra e adesione definitiva"
+            trailing={<span className="event-type-chip event-chip-scadenza">Scadenza</span>}
+            chevron
+          />
+
+          {/* Evento 4: Evento di Gruppo */}
+          <GroupedRow
+            leading={
+              <div className="calendar-date-block">
+                <div className="calendar-date-month">NOV</div>
+                <div className="calendar-date-day">08</div>
+                <div className="calendar-date-weekday">VEN</div>
+              </div>
+            }
+            title="Veglia d'Armi e Rinnovo Promessa"
+            subtitle="21:00 • Chiesa Parrocchiale di San Giovanni"
+            trailing={<span className="event-type-chip event-chip-evento">Evento</span>}
+            chevron
+          />
+
+          {/* Evento 5: Altro / Manutenzione */}
+          <GroupedRow
+            leading={
+              <div className="calendar-date-block">
+                <div className="calendar-date-month">NOV</div>
+                <div className="calendar-date-day">15</div>
+                <div className="calendar-date-weekday">SAB</div>
+              </div>
+            }
+            title="Manutenzione Tende e Materiali"
+            subtitle="15:00 - 18:00 • Magazzino di Gruppo"
+            trailing={<span className="event-type-chip event-chip-altro">Altro</span>}
+            chevron
+          />
+        </GroupedList>
+      </div>
     </div>
   );
 }
