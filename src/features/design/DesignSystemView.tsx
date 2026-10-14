@@ -12,6 +12,7 @@ import { Icon } from '../../ui/Icon';
 import { BrandLogo } from '../../ui/BrandLogo';
 import { SectionIcon } from '../../ui/SectionIcon';
 import { TheTrail, CompassSync } from '../../ui/ScoutMotifs';
+import { TopographicBackground } from '../../ui/TopographicBackground';
 import { PHOTOS } from '../../lib/photos';
 
 export function DesignSystemView() {
@@ -396,6 +397,9 @@ export function DesignSystemView() {
           onClose={() => setShowToast(false)}
         />
       ) : null}
+
+      {/* SFONDO TOPOGRAFICO CON ISOIPSE CARTOGRAFICHE */}
+      <TopographicBackground />
     </div>
   );
 }
