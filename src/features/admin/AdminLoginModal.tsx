@@ -1,6 +1,6 @@
 import { useState } from 'preact/hooks';
 import { I18N } from '../../lib/i18n';
-import { Modal } from '../../ui/Modal';
+import { BottomSheet } from '../../ui/BottomSheet';
 import { Button } from '../../ui/Button';
 import { loginAdmin } from '../../lib/auth';
 
@@ -16,8 +16,8 @@ export function AdminLoginModal({ isOpen, onClose, onSuccess }: AdminLoginModalP
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const handleSubmit = async (e: Event) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: Event) => {
+    if (e) e.preventDefault();
     if (!email || !password) return;
 
     setIsLoading(true);
@@ -37,10 +37,11 @@ export function AdminLoginModal({ isOpen, onClose, onSuccess }: AdminLoginModalP
   };
 
   return (
-    <Modal
+    <BottomSheet
       isOpen={isOpen}
       onClose={onClose}
       title={I18N.auth.loginTitle}
+      subtitle={I18N.auth.loginDescription}
       footer={
         <div style={{ display: 'flex', gap: '8px', width: '100%', justifyContent: 'flex-end' }}>
           <Button variant="ghost" onClick={onClose} disabled={isLoading}>
@@ -48,7 +49,7 @@ export function AdminLoginModal({ isOpen, onClose, onSuccess }: AdminLoginModalP
           </Button>
           <Button
             variant="primary"
-            onClick={handleSubmit as any}
+            onClick={() => handleSubmit()}
             isLoading={isLoading}
             disabled={!email || !password}
           >
@@ -57,11 +58,7 @@ export function AdminLoginModal({ isOpen, onClose, onSuccess }: AdminLoginModalP
         </div>
       }
     >
-      <form onSubmit={handleSubmit}>
-        <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', marginBottom: '16px' }}>
-          {I18N.auth.loginDescription}
-        </p>
-
+      <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
         {errorMessage ? (
           <div
             style={{
@@ -73,19 +70,20 @@ export function AdminLoginModal({ isOpen, onClose, onSuccess }: AdminLoginModalP
               borderRadius: 'var(--radius-sm)',
               marginBottom: '16px',
             }}
+            role="alert"
           >
             {errorMessage}
           </div>
         ) : null}
 
-        <div className="form-group">
-          <label className="form-label" htmlFor="admin-email">
+        <div className="ios-form-group">
+          <label className="ios-form-label" htmlFor="admin-email">
             {I18N.auth.emailLabel}
           </label>
           <input
             id="admin-email"
             type="email"
-            className="form-input"
+            className="ios-form-input"
             required
             autoComplete="email"
             placeholder={I18N.auth.emailPlaceholder}
@@ -95,14 +93,14 @@ export function AdminLoginModal({ isOpen, onClose, onSuccess }: AdminLoginModalP
           />
         </div>
 
-        <div className="form-group">
-          <label className="form-label" htmlFor="admin-password">
+        <div className="ios-form-group">
+          <label className="ios-form-label" htmlFor="admin-password">
             {I18N.auth.passwordLabel}
           </label>
           <input
             id="admin-password"
             type="password"
-            className="form-input"
+            className="ios-form-input"
             required
             autoComplete="current-password"
             placeholder={I18N.auth.passwordPlaceholder}
@@ -112,6 +110,6 @@ export function AdminLoginModal({ isOpen, onClose, onSuccess }: AdminLoginModalP
           />
         </div>
       </form>
-    </Modal>
+    </BottomSheet>
   );
 }

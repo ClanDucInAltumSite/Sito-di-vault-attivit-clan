@@ -1,5 +1,6 @@
 /* ==============================================================================
    Stili di Stampa (@media print) — Formato A4, Nero su Bianco, Alto Contrasto
+   Espresso in OKLCH con massimo contrasto e risparmio inchiostro
    ============================================================================== */
 
 @media print {
@@ -11,13 +12,13 @@
   /* Reset generale per risparmio inchiostro e leggibilità */
   *, *::before, *::after {
     background: transparent !important;
-    color: #000000 !important;
+    color: oklch(0 0 0) !important;
     box-shadow: none !important;
     text-shadow: none !important;
   }
 
   html, body {
-    background: #ffffff !important;
+    background: oklch(1 0 0) !important;
     font-size: 11pt !important;
     line-height: 1.35 !important;
   }
@@ -32,8 +33,13 @@
   .no-print,
   .bottom-nav,
   .top-bar,
+  .ios-tab-bar,
+  .ios-top-bar,
+  .ios-banner-offline,
+  .ios-banner-pwa,
   .offline-banner,
   .pwa-update-banner,
+  .ios-search-container,
   .search-container,
   button:not(.print-keep),
   input,
@@ -53,7 +59,7 @@
     page-break-inside: avoid;
     margin-bottom: 12pt;
     padding-bottom: 8pt;
-    border-bottom: 0.5pt solid #888888;
+    border-bottom: 0.5pt solid oklch(0.5 0 0);
   }
 
   .print-item-long {
@@ -62,7 +68,7 @@
     page-break-inside: auto;
     margin-bottom: 14pt;
     padding-bottom: 8pt;
-    border-bottom: 0.5pt solid #888888;
+    border-bottom: 0.5pt solid oklch(0.5 0 0);
   }
 
   .print-title {
@@ -92,7 +98,7 @@
   }
 
   .print-song-header {
-    border-bottom: 1pt solid #000;
+    border-bottom: 1pt solid oklch(0 0 0);
     margin-bottom: 8pt;
     padding-bottom: 4pt;
   }
@@ -119,7 +125,7 @@
     font-size: 8pt;
     font-weight: 700;
     line-height: 1;
-    color: #000 !important;
+    color: oklch(0 0 0) !important;
   }
 
   .chord-syllable-pair .syllable {
@@ -140,7 +146,7 @@
     display: inline-block;
     width: 11pt;
     height: 11pt;
-    border: 1.2pt solid #000;
+    border: 1.2pt solid oklch(0 0 0);
     border-radius: 2pt;
     flex-shrink: 0;
     margin-top: 2pt;

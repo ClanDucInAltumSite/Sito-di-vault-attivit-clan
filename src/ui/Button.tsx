@@ -1,7 +1,7 @@
 import { JSX } from 'preact';
 
 export interface ButtonProps extends JSX.HTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'accent' | 'outline' | 'ghost' | 'danger';
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
   size?: 'sm' | 'md' | 'lg';
   fullWidth?: boolean;
   isLoading?: boolean;
@@ -18,11 +18,11 @@ export function Button({
   className = '',
   ...props
 }: ButtonProps) {
-  const baseClasses = 'btn';
-  const variantClass = `btn-${variant}`;
-  const sizeClass = `btn-${size}`;
-  const widthClass = fullWidth ? 'btn-block' : '';
-  const loadingClass = isLoading ? 'btn-loading' : '';
+  const baseClasses = 'ios-btn';
+  const variantClass = `ios-btn-${variant}`;
+  const sizeClass = `ios-btn-${size}`;
+  const widthClass = fullWidth ? 'ios-btn-full' : '';
+  const loadingClass = isLoading ? 'ios-btn-loading' : '';
 
   return (
     <button
@@ -31,9 +31,9 @@ export function Button({
       {...props}
     >
       {isLoading ? (
-        <span className="btn-spinner" aria-hidden="true" />
+        <span className="ios-btn-spinner" aria-hidden="true" />
       ) : null}
-      <span className="btn-content">{children}</span>
+      <span className="ios-btn-label">{children}</span>
     </button>
   );
 }

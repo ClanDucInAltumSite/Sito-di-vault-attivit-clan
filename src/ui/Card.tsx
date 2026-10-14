@@ -1,23 +1,20 @@
 import { JSX } from 'preact';
 
 export interface CardProps extends JSX.HTMLAttributes<HTMLDivElement> {
-  stitch?: boolean;
   interactive?: boolean;
 }
 
 export function Card({
-  stitch = false,
   interactive = false,
   children,
   className = '',
   ...props
 }: CardProps) {
-  const stitchClass = stitch ? 'scout-stitch' : '';
-  const interactiveClass = interactive ? 'scout-card-interactive' : '';
+  const interactiveClass = interactive ? 'ios-card-interactive' : '';
 
   return (
     <div
-      className={`scout-card ${stitchClass} ${interactiveClass} ${className}`.trim()}
+      className={`ios-card ${interactiveClass} ${className}`.trim()}
       {...props}
     >
       {children}

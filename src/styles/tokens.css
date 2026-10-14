@@ -1,121 +1,186 @@
 /* ==============================================================================
-   Design Tokens — Identità Scout Clan (Giallo, Azzurro, Rosso)
-   WCAG AA Conforme, Mobile-First, Touch Target >= 44px
+   Design Tokens — Sistema OKLCH Apple-Grade per Vault Clan
+   Tutti i colori sono espressi in OKLCH. Nessun colore fuori da questo file.
    ============================================================================== */
 
 @font-face {
-  font-family: 'Outfit';
+  font-family: 'Inter';
   font-style: normal;
   font-weight: 400 700;
   font-display: swap;
-  src: url('/fonts/outfit-regular.woff2') format('woff2');
+  src: url('/fonts/inter-latin.woff2') format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
 @font-face {
-  font-family: 'Outfit';
+  font-family: 'Inter';
   font-style: normal;
   font-weight: 400 700;
   font-display: swap;
-  src: url('/fonts/outfit-ext.woff2') format('woff2');
+  src: url('/fonts/inter-latin-ext.woff2') format('woff2');
   unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 
 :root {
-  /* --- PALETTE IDENTITARIA SCOUT --- */
-  --color-giallo: #FFC93C;        /* Badge, accenti, highlight */
-  --color-giallo-dark: #D49B00;   /* Bordo/testo per giallo */
-  --color-giallo-subtle: #FFF5D6; /* Sfondo chiaro per avvisi */
-  
-  --color-azzurro: #1E74A6;       /* Struttura, navigazione, link (WCAG AA > 4.5:1 su sfondo chiaro) */
-  --color-azzurro-active: #2F8FC7;/* Focus, bottoni attivi */
-  --color-azzurro-subtle: #E8F4FA;
-  
-  --color-rosso: #D9381E;         /* Azioni primarie, conferme distruttive (WCAG AA > 4.5:1 su bianco) */
-  --color-rosso-hover: #B82810;
-  --color-rosso-subtle: #FDF0ED;
+  /* --- PALETTE COLORI IN OKLCH (TEMA CHIARO) --- */
+  /* Campionamento reale dal logo (#00BDFF / #FDC500 / #E8442D) */
+  --color-bg: oklch(0.975 0.003 260);
+  --color-surface: oklch(1 0 0);
+  --color-surface-hover: oklch(0.96 0.005 260);
+  --color-surface-active: oklch(0.93 0.008 260);
+  --color-surface-card: oklch(1 0 0);
+  --color-border: oklch(0.90 0.005 260);
+  --color-border-subtle: oklch(0.93 0.004 260);
 
-  /* --- TEMA CHIARO (Default) --- */
-  --color-bg: #FAF6EC;            /* Caldo tela scout */
-  --color-surface: #FFFFFF;       /* Superficie card */
-  --color-surface-hover: #F7F3E6;
-  --color-surface-alt: #F2EBD9;   /* Barre, header, bottom nav */
-  --color-border: #E2D7C3;        /* Bordi card */
-  --color-border-scout: #C4B599;  /* "Cucitura" scout */
-  --color-text: #21262B;          /* Contrasto 13.5:1 su sfondo chiaro */
-  --color-text-muted: #596573;    /* Testo secondario */
+  /* Tipografia */
+  --color-text: oklch(0.18 0.02 260);
+  --color-text-secondary: oklch(0.48 0.02 260);
+  --color-text-tertiary: oklch(0.65 0.015 260);
+  --color-text-inverse: oklch(1 0 0);
 
-  /* --- TIPOGRAFIA --- */
-  --font-family: 'Outfit', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-size-xs: clamp(0.75rem, 0.7rem + 0.25vw, 0.8125rem);
-  --font-size-sm: clamp(0.875rem, 0.825rem + 0.25vw, 0.9375rem);
-  --font-size-base: clamp(1rem, 0.95rem + 0.25vw, 1.0625rem);
-  --font-size-lg: clamp(1.125rem, 1.05rem + 0.35vw, 1.25rem);
-  --font-size-xl: clamp(1.35rem, 1.25rem + 0.5vw, 1.55rem);
-  --font-size-2xl: clamp(1.65rem, 1.5rem + 0.75vw, 2rem);
+  /* Azzurro = colore guida e unico accento */
+  --color-accent: oklch(0.53 0.18 245);
+  --color-accent-hover: oklch(0.48 0.19 245);
+  --color-accent-active: oklch(0.44 0.20 245);
+  --color-accent-subtle: oklch(0.95 0.035 245);
+  --color-accent-contrast: oklch(1 0 0);
 
-  /* --- SPAZIATURE & TOUCH TARGET --- */
-  --touch-target-min: 44px;
-  --spacing-xs: 4px;
-  --spacing-sm: 8px;
-  --spacing-md: 16px;
-  --spacing-lg: 24px;
-  --spacing-xl: 32px;
-  --radius-sm: 6px;
+  /* Giallo = SOLO piccole evidenziazioni e tocco scout */
+  --color-giallo: oklch(0.83 0.18 85);
+  --color-giallo-subtle: oklch(0.96 0.04 85);
+  --color-giallo-text: oklch(0.18 0.02 260); /* Sempre scuro su giallo */
+
+  /* Rosso = SOLO distruttivo e data odierna */
+  --color-rosso: oklch(0.55 0.22 27);
+  --color-rosso-hover: oklch(0.49 0.23 27);
+  --color-rosso-subtle: oklch(0.96 0.03 27);
+
+  /* Traslucenze & Vetro */
+  --color-glass-bg: oklch(0.98 0.003 260 / 0.82);
+  --color-glass-border: oklch(0.88 0.005 260 / 0.6);
+  --color-backdrop: oklch(0.10 0.01 260 / 0.45);
+
+  /* --- TIPOGRAFIA INTER --- */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  --font-size-2xs: 0.75rem;    /* 12px */
+  --font-size-xs: 0.8125rem;   /* 13px - Footnote */
+  --font-size-sm: 0.9375rem;   /* 15px - Subheadline */
+  --font-size-base: 1rem;      /* 16px - Body */
+  --font-size-lg: 1.0625rem;   /* 17px - Headline */
+  --font-size-xl: 1.25rem;     /* 20px - Title 3 */
+  --font-size-2xl: 1.5rem;     /* 24px - Title 2 */
+  --font-size-3xl: 2.125rem;   /* 34px - Large Title */
+
+  /* --- SPAZIATURE GRIGLIA 8PT --- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* --- RAGGI DI CURVATURA --- */
+  --radius-xs: 6px;
+  --radius-sm: 8px;
   --radius-md: 10px;
-  --radius-lg: 16px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
   --radius-full: 9999px;
 
-  /* --- OMBRE & TRANSIZIONI --- */
-  --shadow-sm: 0 1px 3px rgba(33, 38, 43, 0.08);
-  --shadow-md: 0 4px 8px rgba(33, 38, 43, 0.1);
-  --shadow-lg: 0 8px 20px rgba(33, 38, 43, 0.14);
-  --transition-fast: 150ms ease;
-  --transition-normal: 250ms ease;
+  /* --- TOUCH TARGET --- */
+  --touch-target: 44px;
+
+  /* --- OMBRE NEUTRE APPLE-STYLE --- */
+  --shadow-subtle: 0 1px 2px oklch(0 0 0 / 0.04);
+  --shadow-sheet: 0 -4px 24px oklch(0 0 0 / 0.12);
+  --shadow-float: 0 6px 20px oklch(0 0 0 / 0.08);
+
+  /* --- ANIMAZIONI & MOVIMENTO --- */
+  --ease-ios: cubic-bezier(0.32, 0.72, 0, 1);
+  --duration-tap: 150ms;
+  --duration-fast: 200ms;
+  --duration-normal: 280ms;
+  --duration-sheet: 320ms;
 }
 
-/* --- TEMA SCURO (prefers-color-scheme o override data-theme="dark") --- */
+/* --- TEMA SCURO (DARK MODE) --- */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --color-bg: #141B20;
-    --color-surface: #1E272F;
-    --color-surface-hover: #26323C;
-    --color-surface-alt: #192128;
-    --color-border: #2D3A45;
-    --color-border-scout: #3C4D5C;
-    --color-text: #F3F4F6;
-    --color-text-muted: #9CA3AF;
-    --color-azzurro: #3CA5E8;
-    --color-azzurro-active: #5BB6EE;
-    --color-azzurro-subtle: #1C3345;
-    --color-giallo: #FFD566;
-    --color-giallo-dark: #FFC93C;
-    --color-giallo-subtle: #3D351B;
-    --color-rosso: #F25A44;
-    --color-rosso-hover: #FF725C;
-    --color-rosso-subtle: #3E211E;
-    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35);
-    --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.45);
-    --shadow-lg: 0 8px 20px rgba(0, 0, 0, 0.6);
+    --color-bg: oklch(0.15 0.01 260); /* Grigio profondo iOS */
+    --color-surface: oklch(0.22 0.015 260);
+    --color-surface-hover: oklch(0.26 0.015 260);
+    --color-surface-active: oklch(0.30 0.015 260);
+    --color-surface-card: oklch(0.22 0.015 260);
+    --color-border: oklch(0.28 0.01 260);
+    --color-border-subtle: oklch(0.25 0.01 260);
+
+    --color-text: oklch(0.96 0.005 260);
+    --color-text-secondary: oklch(0.68 0.01 260);
+    --color-text-tertiary: oklch(0.48 0.01 260);
+    --color-text-inverse: oklch(0.15 0.01 260);
+
+    --color-accent: oklch(0.68 0.16 240);
+    --color-accent-hover: oklch(0.72 0.15 240);
+    --color-accent-active: oklch(0.76 0.14 240);
+    --color-accent-subtle: oklch(0.26 0.04 245);
+    --color-accent-contrast: oklch(0.12 0.01 260);
+
+    --color-giallo: oklch(0.85 0.17 85);
+    --color-giallo-subtle: oklch(0.28 0.045 85);
+    --color-giallo-text: oklch(0.15 0.01 260);
+
+    --color-rosso: oklch(0.62 0.21 27);
+    --color-rosso-hover: oklch(0.66 0.20 27);
+    --color-rosso-subtle: oklch(0.26 0.04 27);
+
+    --color-glass-bg: oklch(0.18 0.01 260 / 0.82);
+    --color-glass-border: oklch(0.30 0.01 260 / 0.6);
+    --color-backdrop: oklch(0 0 0 / 0.65);
+
+    --shadow-subtle: 0 1px 2px oklch(0 0 0 / 0.25);
+    --shadow-sheet: 0 -4px 32px oklch(0 0 0 / 0.5);
+    --shadow-float: 0 6px 24px oklch(0 0 0 / 0.4);
   }
 }
 
 :root[data-theme="dark"] {
-  --color-bg: #141B20;
-  --color-surface: #1E272F;
-  --color-surface-hover: #26323C;
-  --color-surface-alt: #192128;
-  --color-border: #2D3A45;
-  --color-border-scout: #3C4D5C;
-  --color-text: #F3F4F6;
-  --color-text-muted: #9CA3AF;
-  --color-azzurro: #3CA5E8;
-  --color-azzurro-active: #5BB6EE;
-  --color-azzurro-subtle: #1C3345;
-  --color-giallo: #FFD566;
-  --color-giallo-dark: #FFC93C;
-  --color-giallo-subtle: #3D351B;
-  --color-rosso: #F25A44;
-  --color-rosso-hover: #FF725C;
-  --color-rosso-subtle: #3E211E;
+  --color-bg: oklch(0.15 0.01 260);
+  --color-surface: oklch(0.22 0.015 260);
+  --color-surface-hover: oklch(0.26 0.015 260);
+  --color-surface-active: oklch(0.30 0.015 260);
+  --color-surface-card: oklch(0.22 0.015 260);
+  --color-border: oklch(0.28 0.01 260);
+  --color-border-subtle: oklch(0.25 0.01 260);
+
+  --color-text: oklch(0.96 0.005 260);
+  --color-text-secondary: oklch(0.68 0.01 260);
+  --color-text-tertiary: oklch(0.48 0.01 260);
+  --color-text-inverse: oklch(0.15 0.01 260);
+
+  --color-accent: oklch(0.68 0.16 240);
+  --color-accent-hover: oklch(0.72 0.15 240);
+  --color-accent-active: oklch(0.76 0.14 240);
+  --color-accent-subtle: oklch(0.26 0.04 245);
+  --color-accent-contrast: oklch(0.12 0.01 260);
+
+  --color-giallo: oklch(0.85 0.17 85);
+  --color-giallo-subtle: oklch(0.28 0.045 85);
+  --color-giallo-text: oklch(0.15 0.01 260);
+
+  --color-rosso: oklch(0.62 0.21 27);
+  --color-rosso-hover: oklch(0.66 0.20 27);
+  --color-rosso-subtle: oklch(0.26 0.04 27);
+
+  --color-glass-bg: oklch(0.18 0.01 260 / 0.82);
+  --color-glass-border: oklch(0.30 0.01 260 / 0.6);
+  --color-backdrop: oklch(0 0 0 / 0.65);
+
+  --shadow-subtle: 0 1px 2px oklch(0 0 0 / 0.25);
+  --shadow-sheet: 0 -4px 32px oklch(0 0 0 / 0.5);
+  --shadow-float: 0 6px 24px oklch(0 0 0 / 0.4);
 }

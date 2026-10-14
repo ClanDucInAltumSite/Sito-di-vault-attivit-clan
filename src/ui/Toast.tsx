@@ -1,3 +1,5 @@
+import { Icon } from './Icon';
+
 export interface ToastProps {
   message: string;
   type?: 'info' | 'success' | 'warning' | 'error';
@@ -14,21 +16,30 @@ export function Toast({
   onClose,
 }: ToastProps) {
   return (
-    <div className={`toast toast-${type}`} role="status" aria-live="polite">
-      <span className="toast-message">{message}</span>
+    <div
+      className={`ios-toast-capsule ios-toast-${type}`}
+      role="status"
+      aria-live="polite"
+    >
+      <span className="ios-toast-dot" aria-hidden="true" />
+      <span className="ios-toast-message">{message}</span>
       {actionLabel && onAction ? (
-        <button type="button" className="toast-action-btn" onClick={onAction}>
+        <button
+          type="button"
+          className="ios-toast-action"
+          onClick={onAction}
+        >
           {actionLabel}
         </button>
       ) : null}
       {onClose ? (
         <button
           type="button"
-          className="toast-close-btn"
+          className="ios-toast-close"
           onClick={onClose}
           aria-label="Chiudi notifica"
         >
-          ✕
+          <Icon name="clear" size={14} />
         </button>
       ) : null}
     </div>

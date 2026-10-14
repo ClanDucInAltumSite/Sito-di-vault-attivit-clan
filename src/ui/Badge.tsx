@@ -1,7 +1,7 @@
 import { JSX } from 'preact';
 
 export interface BadgeProps extends JSX.HTMLAttributes<HTMLSpanElement> {
-  variant?: 'giallo' | 'azzurro' | 'rosso' | 'neutral';
+  variant?: 'azzurro' | 'giallo' | 'rosso' | 'neutral';
   size?: 'sm' | 'md';
 }
 
@@ -12,12 +12,12 @@ export function Badge({
   className = '',
   ...props
 }: BadgeProps) {
-  const variantClass = `badge-${variant}`;
-  const sizeClass = `badge-${size}`;
+  const variantClass = `ios-badge-${variant}`;
+  const sizeClass = `ios-badge-${size}`;
 
   return (
     <span
-      className={`badge ${variantClass} ${sizeClass} ${className}`.trim()}
+      className={`ios-badge ${variantClass} ${sizeClass} ${className}`.trim()}
       {...props}
     >
       {children}

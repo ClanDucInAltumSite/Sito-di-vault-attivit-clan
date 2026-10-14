@@ -8,7 +8,8 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "verify:ui": "playwright test test/verify_ui.spec.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.1",
@@ -16,9 +17,12 @@
     "preact": "^10.25.4"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "^1.64.1",
     "@preact/preset-vite": "^2.9.5",
     "@types/node": "^22.13.1",
     "happy-dom": "^17.1.8",
+    "playwright": "^1.64.1",
     "typescript": "^5.7.3",
     "vite": "^6.2.0",
     "vite-plugin-pwa": "^0.21.1",

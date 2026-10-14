@@ -3,6 +3,8 @@ import { I18N } from '../lib/i18n';
 import { useRoute, navigate, RouteName } from './router';
 import { useAdmin } from '../lib/auth';
 import { AdminLoginModal } from '../features/admin/AdminLoginModal';
+import { Icon, IconName } from '../ui/Icon';
+import logoSrc from '../../assets/favicon.png';
 
 export interface ShellProps {
   isOnline: boolean;
@@ -23,24 +25,26 @@ export function Shell({
   const { isAdmin } = useAdmin();
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
-  const navItems: { id: RouteName; label: string; icon: string }[] = [
-    { id: 'home', label: I18N.nav.home, icon: '🏠' },
-    { id: 'giochi', label: I18N.nav.giochi, icon: '🎲' },
-    { id: 'bans', label: I18N.nav.bans, icon: '🔥' },
-    { id: 'canti', label: I18N.nav.canti, icon: '🎸' },
-    { id: 'calendario', label: I18N.nav.calendario, icon: '📅' },
+  const navItems: { id: RouteName; label: string; icon: IconName }[] = [
+    { id: 'home', label: I18N.nav.home, icon: 'home' },
+    { id: 'giochi', label: I18N.nav.giochi, icon: 'giochi' },
+    { id: 'bans', label: I18N.nav.bans, icon: 'bans' },
+    { id: 'canti', label: I18N.nav.canti, icon: 'canti' },
+    { id: 'calendario', label: I18N.nav.calendario, icon: 'calendario' },
   ];
 
   return (
     <>
       {/* Banner Aggiornamento PWA Disponibile */}
       {pwaNeedRefresh ? (
-        <div className="pwa-banner" role="alert">
-          <span>🔄 {I18N.status.pwaUpdateAvailable}</span>
+        <div className="ios-banner-pwa" role="alert">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Icon name="refresh" size={16} />
+            <span>{I18N.status.pwaUpdateAvailable}</span>
+          </div>
           <button
             type="button"
-            className="toast-action-btn"
-            style={{ backgroundColor: 'var(--color-giallo)', color: '#21262B' }}
+            className="ios-toast-action"
             onClick={onPwaUpdate}
           >
             {I18N.status.pwaUpdateAction}
@@ -48,45 +52,54 @@ export function Shell({
         </div>
       ) : null}
 
-      {/* Banner Offline */}
+      {/* Banner Offline con indicazione data e ora */}
       {!isOnline ? (
-        <div className="offline-banner" role="status">
-          <span>
-            ⚠️ {I18N.status.offlineBanner(lastSyncTime || I18N.status.neverSynced)}
-          </span>
+        <div className="ios-banner-offline" role="status">
+          <Icon name="wifi-off" size={16} />
+          <span>{I18N.status.offlineBanner(lastSyncTime || I18N.status.neverSynced)}</span>
         </div>
       ) : null}
 
-      {/* Top Bar Fissa */}
-      <header className="top-bar">
-        <a
-          href="#/"
-          className="top-bar-brand"
-          onClick={(e) => {
-            e.preventDefault();
-            navigate('home');
-          }}
-        >
-          <img src="./assets/favicon.png" alt="Logo" className="top-bar-logo" />
-          <span>{I18N.app.shortTitle}</span>
-        </a>
+      {/* Top Bar Apple Traslucida */}
+      <header className="ios-top-bar">
+        <div className="ios-top-bar-leading">
+          <a
+            href="#/"
+            className="ios-top-bar-brand"
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none', color: 'inherit' }}
+            onClick={(e) => {
+              e.preventDefault();
+              navigate('home');
+            }}
+          >
+            <img
+              src={logoSrc}
+              alt="Logo Clan Duc In Altum"
+              width="28"
+              height="28"
+              style={{ borderRadius: '6px', objectFit: 'contain' }}
+            />
+            <span className="ios-top-bar-title">{I18N.app.shortTitle}</span>
+          </a>
+        </div>
 
-        <div className="top-bar-actions">
-          {/* Scorciatoia Stampa */}
+        <div className="ios-top-bar-trailing">
+          {/* Scorciatoia Centro Stampa */}
           <button
             type="button"
-            className="btn btn-ghost btn-sm"
+            className="ios-btn ios-btn-ghost ios-btn-sm"
             onClick={() => navigate('stampa')}
             aria-label={I18N.nav.stampa}
             title={I18N.nav.stampa}
+            style={{ padding: '0 8px', minWidth: '40px' }}
           >
-            🖨️
+            <Icon name="stampa" size={20} />
           </button>
 
           {/* Accesso Admin */}
           <button
             type="button"
-            className={`btn btn-sm ${isAdmin ? 'btn-accent' : 'btn-ghost'}`}
+            className={`ios-btn ios-btn-sm ${isAdmin ? 'ios-btn-primary' : 'ios-btn-ghost'}`}
             onClick={() => {
               if (isAdmin) {
                 navigate('admin');
@@ -96,32 +109,38 @@ export function Shell({
             }}
             aria-label={I18N.nav.admin}
             title={isAdmin ? I18N.auth.loggedInAsAdmin : I18N.auth.loginTitle}
+            style={{ padding: '0 10px' }}
           >
-            {isAdmin ? '🛡️ Admin' : '🔒'}
+            <Icon name="admin" size={18} />
+            <span style={{ fontSize: '13px', marginLeft: '4px' }}>
+              {isAdmin ? 'Admin' : 'Accedi'}
+            </span>
           </button>
         </div>
       </header>
 
-      {/* Contenuto Principale della Pagina */}
-      <main style={{ flex: 1 }}>{children}</main>
+      {/* Contenuto Principale con scroll e padding sicuro */}
+      <main style={{ flex: 1, minHeight: 0 }}>
+        {children}
+      </main>
 
-      {/* Bottom Navigation Bar Fissa per Mobile */}
-      <nav className="bottom-nav" aria-label="Navigazione principale">
+      {/* Tab Bar Apple Traslucida con supporto Safe Area */}
+      <nav className="ios-tab-bar" aria-label="Navigazione principale">
         {navItems.map((item) => {
           const isActive = route === item.id;
           return (
             <a
               key={item.id}
               href={`#/${item.id === 'home' ? '' : item.id}`}
-              className={`nav-item ${isActive ? 'active' : ''}`}
+              className={`ios-tab-item ${isActive ? 'ios-tab-item-active' : ''}`}
               onClick={(e) => {
                 e.preventDefault();
                 navigate(item.id);
               }}
               aria-current={isActive ? 'page' : undefined}
             >
-              <span className="nav-item-icon" aria-hidden="true">
-                {item.icon}
+              <span className="ios-tab-item-icon" aria-hidden="true">
+                <Icon name={item.icon} size={22} strokeWidth={isActive ? 2.2 : 1.75} />
               </span>
               <span>{item.label}</span>
             </a>
@@ -129,7 +148,7 @@ export function Shell({
         })}
       </nav>
 
-      {/* Modale Login Admin */}
+      {/* Modale BottomSheet Login Admin */}
       <AdminLoginModal
         isOpen={isLoginModalOpen}
         onClose={() => setIsLoginModalOpen(false)}

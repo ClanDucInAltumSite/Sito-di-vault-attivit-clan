@@ -20,19 +20,15 @@ export default defineConfig({
       base: basePath,
       scope: basePath,
       includeAssets: [
-        'favicon.ico',
-        'icons/icon-192x192.png',
-        'icons/icon-512x512.png',
-        'icons/icon-maskable-512x512.png',
-        'fonts/outfit-v11-latin-regular.woff2',
-        'fonts/outfit-v11-latin-600.woff2',
-        'fonts/outfit-v11-latin-700.woff2',
+        'favicon.png',
+        'fonts/inter-latin.woff2',
+        'fonts/inter-latin-ext.woff2',
       ],
       manifest: {
         name: 'Vault Clan — Duc In Altum',
         short_name: 'Vault Clan',
         description: 'Archivio condiviso di Giochi, Bans, Canti e Calendario per Clan Scout',
-        theme_color: '#1E74A6',
+        theme_color: '#00BDFF',
         background_color: '#FAF6EC',
         display: 'standalone',
         orientation: 'portrait-primary',
@@ -68,5 +64,6 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'happy-dom',
+    include: ['test/**/*.test.ts'],
   },
 });

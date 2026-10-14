@@ -1,86 +1,129 @@
+import { useState } from 'preact/hooks';
 import { I18N } from '../../lib/i18n';
-import { Card } from '../../ui/Card';
 import { navigate } from '../../app/router';
+import { GroupedList } from '../../ui/GroupedList';
+import { GroupedRow } from '../../ui/GroupedRow';
+import { SearchField } from '../../ui/SearchField';
+import { Badge } from '../../ui/Badge';
+import { Icon } from '../../ui/Icon';
+import { LogoReveal, TheTrail, CompassSync } from '../../ui/ScoutMotifs';
 
 export function HomeView() {
+  const [searchQuery, setSearchQuery] = useState('');
+
   return (
     <div className="container">
-      <div style={{ textAlign: 'center', margin: '24px 0 32px' }}>
-        <img
-          src="./assets/favicon.png"
-          alt="Logo Duc In Altum"
-          style={{ width: '84px', height: '84px', objectFit: 'contain', marginBottom: '12px' }}
-        />
-        <h1 style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 700, color: 'var(--color-text)' }}>
+      {/* Intestazione Apple con Logo Reveal e Il Sentiero */}
+      <header style={{ textAlign: 'center', padding: '16px 0 8px' }}>
+        <LogoReveal size={68} />
+        <h1
+          style={{
+            fontSize: 'var(--font-size-2xl)',
+            fontWeight: 700,
+            color: 'var(--color-text)',
+            letterSpacing: '-0.02em',
+            marginTop: '12px',
+          }}
+        >
           {I18N.app.title}
         </h1>
-        <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-base)', marginTop: '4px' }}>
+        <p
+          style={{
+            color: 'var(--color-text-secondary)',
+            fontSize: 'var(--font-size-sm)',
+            marginTop: '4px',
+            maxWidth: '460px',
+            marginInline: 'auto',
+          }}
+        >
           {I18N.app.subtitle}
         </p>
+
+        {/* Motivo Scout 2: The Trail (Il Sentiero) */}
+        <TheTrail className="scout-trail-home" />
+      </header>
+
+      {/* Barra di ricerca rapida iOS */}
+      <div style={{ marginBottom: '24px' }}>
+        <SearchField
+          value={searchQuery}
+          onInput={setSearchQuery}
+          placeholder={I18N.search.placeholderGlobale}
+          aria-label={I18N.search.placeholderGlobale}
+        />
       </div>
 
-      {/* Griglia Accesso Rapido alle 4 Sezioni Principali */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '16px', marginBottom: '24px' }}>
-        <Card
-          interactive
-          style={{ padding: '20px', cursor: 'pointer', textAlign: 'center' }}
+      {/* Lista Raggruppata iOS: Le 4 Aree di Contenuto */}
+      <GroupedList header="ARCHIVIO CLAN">
+        <GroupedRow
+          leading={<Icon name="giochi" size={20} />}
+          title={I18N.nav.giochi}
+          subtitle="Regole, svolgimento e materiali per i giochi"
+          chevron
           onClick={() => navigate('giochi')}
-        >
-          <div style={{ fontSize: '2rem', marginBottom: '8px' }}>🎲</div>
-          <h2 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 600 }}>{I18N.nav.giochi}</h2>
-          <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', marginTop: '4px' }}>
-            Regole e materiali
-          </p>
-        </Card>
-
-        <Card
-          interactive
-          style={{ padding: '20px', cursor: 'pointer', textAlign: 'center' }}
+        />
+        <GroupedRow
+          leading={<Icon name="bans" size={20} />}
+          title={I18N.nav.bans}
+          subtitle="Testi e gesti a memoria per i fuochi serali"
+          chevron
           onClick={() => navigate('bans')}
-        >
-          <div style={{ fontSize: '2rem', marginBottom: '8px' }}>🔥</div>
-          <h2 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 600 }}>{I18N.nav.bans}</h2>
-          <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', marginTop: '4px' }}>
-            Testi e gesti a memoria
-          </p>
-        </Card>
-
-        <Card
-          interactive
-          style={{ padding: '20px', cursor: 'pointer', textAlign: 'center' }}
+        />
+        <GroupedRow
+          leading={<Icon name="canti" size={20} />}
+          title={I18N.nav.canti}
+          subtitle="Canzoniere con accordi ChordPro e trasposizione"
+          chevron
           onClick={() => navigate('canti')}
-        >
-          <div style={{ fontSize: '2rem', marginBottom: '8px' }}>🎸</div>
-          <h2 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 600 }}>{I18N.nav.canti}</h2>
-          <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', marginTop: '4px' }}>
-            Canzoniere con accordi
-          </p>
-        </Card>
-
-        <Card
-          interactive
-          style={{ padding: '20px', cursor: 'pointer', textAlign: 'center' }}
+        />
+        <GroupedRow
+          leading={<Icon name="calendario" size={20} />}
+          title={I18N.nav.calendario}
+          subtitle="Attività, uscite e Ordine del Giorno delle riunioni"
+          chevron
           onClick={() => navigate('calendario')}
-        >
-          <div style={{ fontSize: '2rem', marginBottom: '8px' }}>📅</div>
-          <h2 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 600 }}>{I18N.nav.calendario}</h2>
-          <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', marginTop: '4px' }}>
-            Attività e Ordine del Giorno
-          </p>
-        </Card>
-      </div>
+        />
+      </GroupedList>
 
-      {/* Prossimo Evento in Evidenza */}
-      <Card stitch style={{ padding: '16px', marginBottom: '24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-          <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-azzurro)', textTransform: 'uppercase' }}>
-            {I18N.calendario.prossimiEventi}
-          </span>
-        </div>
-        <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)' }}>
-          {I18N.calendario.empty}
-        </p>
-      </Card>
+      {/* Prossima Attività in Evidenza (Grouped List) */}
+      <GroupedList header="PROSSIMA ATTIVITÀ">
+        <GroupedRow
+          leading={<Icon name="clock" size={20} />}
+          title="Nessun evento in programma"
+          subtitle="Consulta il calendario completo per date e ODG"
+          trailing={<Badge variant="neutral" size="sm">Clan</Badge>}
+          chevron
+          onClick={() => navigate('calendario')}
+        />
+      </GroupedList>
+
+      {/* Stato e Bussola Scout */}
+      <GroupedList header="STATO E SINCRONIZZAZIONE">
+        <GroupedRow
+          leading={<CompassSync isSyncing={false} size={22} />}
+          title="Archivio Locale e Offline"
+          subtitle="Pronto all'uso senza connessione internet"
+          trailing={<Badge variant="azzurro" size="sm">Online</Badge>}
+        />
+      </GroupedList>
+
+      {/* Strumenti & Design System */}
+      <GroupedList header="STRUMENTI">
+        <GroupedRow
+          leading={<Icon name="stampa" size={20} />}
+          title={I18N.stampa.title}
+          subtitle="Componi fascicoli A4 per uscite e campi"
+          chevron
+          onClick={() => navigate('stampa')}
+        />
+        <GroupedRow
+          leading={<Icon name="settings" size={20} />}
+          title="Sistema di Design (FASE 1B)"
+          subtitle="Verifica palette OKLCH, componenti Apple e contrasti"
+          chevron
+          onClick={() => navigate('design')}
+        />
+      </GroupedList>
     </div>
   );
 }

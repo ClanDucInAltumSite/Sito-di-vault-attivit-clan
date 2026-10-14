@@ -8,6 +8,7 @@ import { CantiView } from '../features/canti/CantiView';
 import { CalendarioView } from '../features/calendario/CalendarioView';
 import { StampaView } from '../features/stampa/StampaView';
 import { AdminView } from '../features/admin/AdminView';
+import { DesignSystemView } from '../features/design/DesignSystemView';
 
 export function App() {
   const { route } = useRoute();
@@ -72,6 +73,7 @@ export function App() {
   else if (route === 'calendario') CurrentView = CalendarioView;
   else if (route === 'stampa') CurrentView = StampaView;
   else if (route === 'admin') CurrentView = AdminView;
+  else if (route === 'design') CurrentView = DesignSystemView;
 
   return (
     <Shell

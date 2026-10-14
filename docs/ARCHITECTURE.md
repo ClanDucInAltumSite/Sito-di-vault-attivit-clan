@@ -35,7 +35,7 @@ L'applicazione è progettata secondo il paradigma **Local-First PWA (Progressive
 │   ├── SETUP_MANUALE.md          # Guida passo-passo in italiano per configurazione Supabase, GitHub e Admin
 │   └── TEST_CHECKLIST.md         # Matrice e procedura di collaudo e accettazione
 ├── public/
-│   ├── fonts/                    # Font Outfit self-hosted (WOFF2)
+│   ├── fonts/                    # Font Inter variabile self-hosted (WOFF2)
 │   ├── icons/                    # Icone PWA (192x192, 512x512, maskable) generate dal logo originale
 │   └── favicon.ico               # Favicon multi-risoluzione
 ├── supabase/
@@ -76,9 +76,10 @@ L'applicazione è progettata secondo il paradigma **Local-First PWA (Progressive
 │   │   ├── Toast.tsx             # Notifiche discrete (online/offline, aggiornamento PWA)
 │   │   └── Badge.tsx             # Badge colorati per tipo evento, tonalità, tempo
 │   ├── styles/
-│   │   ├── tokens.css            # Variabili CSS (palette scout, spaziature, tipografia)
-│   │   ├── global.css            # Reset, stili base accessibili, classi utilità
-│   │   └── print.css             # Regole @media print per la stampa A4 (gestione elementi lunghi e brevi)
+│   │   ├── tokens.css            # Variabili CSS in coordinate OKLCH (palette logo, griglia 8pt, Inter)
+│   │   ├── components.css        # Stili componenti Apple (grouped lists, bottom sheets, translucent bars)
+│   │   ├── global.css            # Reset, stili base accessibili, safe-area iOS, tabular-nums
+│   │   └── print.css             # Regole @media print per la stampa A4 in OKLCH (elementi lunghi e brevi)
 │   ├── main.tsx                  # Bootstrap dell'applicazione Preact
 │   └── sw.ts                     # Service worker custom Workbox con eventi skipWaiting
 ├── index.html                    # Entry point HTML con CSP rigorosa via meta-tag (con wss://)

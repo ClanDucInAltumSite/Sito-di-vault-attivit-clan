@@ -157,6 +157,22 @@ Questo documento raccoglie tutte le decisioni architetturali, i vincoli e le mot
 
 ---
 
+## ADR-016: Design System Apple-Grade in OKLCH con Componenti Nativi e Tocco Scout Vettoriale
+- **Stato:** Approvato (Fase 1B)
+- **Decisione:** Rifacimento completo dell'interfaccia eliminando qualsiasi impostazione "da template generato" e adottando il linguaggio visivo delle app native Apple (Note, Promemoria, Libri, Impostazioni) arricchito da tre motivi scout vettoriali sottili.
+- **Scelte implementative:**
+  1. **Palette cromatica OKLCH:** Campionata dai colori reali del logo scout (`assets/favicon.png`): Azzurro Guida `oklch(0.53 0.18 245)`, Giallo Scout `oklch(0.83 0.18 85)`, Rosso `oklch(0.55 0.22 27)`, Sfondi e superfici neutre Apple (chiaro `oklch(0.975 0.003 260)`, scuro `oklch(0.15 0.01 260)`). Nessun colore hardcoded al di fuori di `tokens.css`.
+  2. **Tipografia Inter:** Carattere variabile woff2 self-hosted in `public/fonts/`, supporto a `tabular-nums` per date, orari e BPM.
+  3. **Componenti Nativi:** Liste raggruppate (iOS Grouped Table Views), Bottom Sheet a comparsa dal basso con maniglia e trappola del focus, Toggle Switch nativo iOS 51x31px, Segmented Control a pillola, Search pill con tasto di pulizia, Barre traslucide con `backdrop-filter: blur(20px)` e supporto a Safe Area insets.
+  4. **Iconografia Vettoriale Inline:** Zero emoji nella UI; libreria di icone SVG inline a tratto sottile 1.75px (`src/ui/Icon.tsx`).
+  5. **Tre Motivi Scout Vettoriali:**
+     - *Logo Reveal*: dissolvenza e scala con alone di accento pulsante all'avvio.
+     - *The Trail (Il Sentiero)*: tracciato SVG sinusoidale tratteggiato con punto giallo animato.
+     - *Bussola di Sincronizzazione*: ago bicolore che oscilla delicatamente durante il sync e punta a Nord (0°) a dati allineati.
+  6. **Suite di Test Reattiva Permanente:** Configurato `playwright test test/verify_ui.spec.ts` su 7 viewport (iPhone SE, 13/14/15, Max, Landscape, iPad Portrait, Landscape, Desktop) con audit continuo di accessibilità axe-core WCAG AA e screenshot salvati in `docs/design-review/screenshots/`.
+
+---
+
 ## Elenco Correzioni Pianificate per le Fasi Successive (Da Fare)
 
 Questa sezione tiene traccia delle implementazioni puntuali richieste e approvate al termine della Fase 0, che verranno integrate nei rispettivi moduli durante le fasi operative corrispondenti:

@@ -1,6 +1,14 @@
 import { useState, useEffect } from 'preact/hooks';
 
-export type RouteName = 'home' | 'giochi' | 'bans' | 'canti' | 'calendario' | 'stampa' | 'admin';
+export type RouteName =
+  | 'home'
+  | 'giochi'
+  | 'bans'
+  | 'canti'
+  | 'calendario'
+  | 'stampa'
+  | 'admin'
+  | 'design';
 
 export interface RouteState {
   route: RouteName;
@@ -28,6 +36,7 @@ function parseHash(hashString: string): RouteState {
   else if (path === 'calendario' || path.startsWith('calendario/')) route = 'calendario';
   else if (path === 'stampa') route = 'stampa';
   else if (path === 'admin') route = 'admin';
+  else if (path === 'design') route = 'design';
 
   return { route, params, hash: hashString };
 }

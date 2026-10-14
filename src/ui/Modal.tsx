@@ -1,13 +1,14 @@
-import { JSX } from 'preact';
+import { ComponentChildren } from 'preact';
 import { useEffect, useRef } from 'preact/hooks';
 import { I18N } from '../lib/i18n';
+import { Icon } from './Icon';
 
 export interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
-  children: JSX.Element | JSX.Element[] | string;
-  footer?: JSX.Element | JSX.Element[];
+  children: ComponentChildren;
+  footer?: ComponentChildren;
   closeOnBackdrop?: boolean;
 }
 
@@ -24,11 +25,9 @@ export function Modal({
   useEffect(() => {
     if (!isOpen) return;
 
-    // Blocca scroll del body
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 
-    // Gestione tasto Escape
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         onClose();
@@ -37,7 +36,6 @@ export function Modal({
 
     window.addEventListener('keydown', handleKeyDown);
 
-    // Focus iniziale sul primo elemento interattivo
     setTimeout(() => {
       if (modalRef.current) {
         const focusable = modalRef.current.querySelector<HTMLElement>(
@@ -57,7 +55,7 @@ export function Modal({
 
   return (
     <div
-      className="modal-backdrop"
+      className="ios-modal-backdrop"
       onClick={(e) => {
         if (closeOnBackdrop && e.target === e.currentTarget) {
           onClose();
@@ -69,21 +67,21 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="modal-container scout-card"
+        className="ios-modal-container"
       >
-        <div className="modal-header">
-          <h2 className="modal-title">{title}</h2>
+        <div className="ios-modal-header">
+          <h2 className="ios-modal-title">{title}</h2>
           <button
             type="button"
-            className="modal-close-btn"
+            className="ios-modal-close-btn"
             onClick={onClose}
             aria-label={I18N.dialogs.chiudi}
           >
-            ✕
+            <Icon name="clear" size={18} />
           </button>
         </div>
-        <div className="modal-body">{children}</div>
-        {footer ? <div className="modal-footer">{footer}</div> : null}
+        <div className="ios-modal-body">{children}</div>
+        {footer ? <div className="ios-modal-footer">{footer}</div> : null}
       </div>
     </div>
   );
