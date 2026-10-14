@@ -154,3 +154,28 @@ Questo documento raccoglie tutte le decisioni architetturali, i vincoli e le mot
 ## ADR-015: Protezione Funzioni Postgres contro Mutable search_path
 - **Stato:** Approvato (Fase 1)
 - **Decisione:** Tutte le funzioni create nel database (`set_updated_at`, `is_admin`, procedure di pulizia) dichiarano esplicitamente `SET search_path = public` (o `SET search_path = ''`) per eliminare le vulnerabilità di ricerca percorso e soddisfare al 100% i controlli del Supabase Security Advisor.
+
+---
+
+## Elenco Correzioni Pianificate per le Fasi Successive (Da Fare)
+
+Questa sezione tiene traccia delle implementazioni puntuali richieste e approvate al termine della Fase 0, che verranno integrate nei rispettivi moduli durante le fasi operative corrispondenti:
+
+1. **FASE 2 — Dati e Offline:**
+   - **Full Resync Atomico:** Nel primo download e nel full resync (> 90 giorni di assenza), i record vengono scaricati per intero in un buffer in memoria e scritti in IndexedDB in un'unica transazione atomica `readwrite`. È vietato svuotare IndexedDB prima del termine del download.
+   - **Timeout Differenziati:** Timeout breve a 4s per le pull incrementali; timeout esteso a 25s per full resync e primo avvio, con suddivisione a blocchi e gestione della ripresa.
+   - **Soft Delete Gerarchica:** Quando un elemento genitore (`gioco`, `ban`, `canto`, `evento`) subisce soft-delete (`deleted_at != null`), i relativi figli (`odg_punti`, `allegati`) vengono nascosti automaticamente dalla UI e ripristinati insieme al genitore in caso di un-delete.
+
+2. **FASE 3 — Giochi e Bans & FASE 5 — Allegati:**
+   - **Cestino e Rimozione Storage Definitiva:** Conservazione tombstone sul server a 180 giorni. La pulizia definitiva del Cestino (hard delete attivata dall'admin) cancella sia i record nel database sia i file fisici corrispondenti da Supabase Storage (`storage.objects`).
+
+3. **FASE 3 — Ricerca e Ordinamento:**
+   - **Regola Deterministica Tolleranza Typo:**
+     - Termini con lunghezza < 4 caratteri: Exact match (Levenshtein = 0).
+     - Termini con lunghezza 4–7 caratteri: Distanza Levenshtein $\le 1$.
+     - Termini con lunghezza $\ge 8$ caratteri: Distanza Levenshtein $\le 2$ (ad es. termine cercato "aveleata", lunghezza 8 caratteri, trova "avvelenata" con distanza 2).
+     - Test unitari allineati a questa specifica.
+
+4. **FASE 6 — Stampa:**
+   - **Gestione Spezzatura Pagine Giochi e Bans:** La direttiva `break-inside: avoid` viene applicata unicamente agli elementi brevi (testo sotto i 600 caratteri o classe `.print-item-short`); gli elementi lunghi possono spezzarsi normalmente tra le pagine A4 per evitare spazi bianchi a fondo pagina. `break-after: avoid` rimane attivo sui titoli.
+

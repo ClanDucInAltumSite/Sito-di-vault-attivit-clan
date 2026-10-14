@@ -290,3 +290,23 @@ CREATE POLICY "allegati_admin_delete" ON storage.objects
 DROP POLICY IF EXISTS "allegati_admin_select" ON storage.objects;
 CREATE POLICY "allegati_admin_select" ON storage.objects
   FOR SELECT USING (bucket_id = 'allegati' AND public.is_admin());
+
+
+-- PARTE 4: PERMESSI SCHEMA / RUOLI API E RELOAD SCHEMA CACHE
+-- ------------------------------------------------------------------------------
+
+-- Concessione permessi di utilizzo dello schema public ai ruoli Supabase
+GRANT USAGE ON SCHEMA public TO anon, authenticated;
+
+-- Permessi per tabelle di contenuto (sarà poi la RLS a filtrare o bloccare)
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon, authenticated;
+GRANT INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO authenticated;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated;
+
+-- Protezione specifica tabella admin_users
+REVOKE ALL ON public.admin_users FROM anon;
+GRANT SELECT ON public.admin_users TO authenticated;
+
+-- Forza il ricaricamento immediato dello schema cache di PostgREST
+NOTIFY pgrst, 'reload schema';
+
