@@ -11,11 +11,11 @@ L'applicazione è progettata secondo il paradigma **Local-First PWA (Progressive
 | Componente | Scelta Tecnologica | Motivazione e Benefici |
 | :--- | :--- | :--- |
 | **Framework UI** | **Preact** (con TSX e Preact Hooks) | Runtime di soli ~4.5 kB gzippato (contro i ~45 kB di React standard). Massima velocità di caricamento ed esecuzione su dispositivi mobili economici. Il Virtual DOM con TSX impedisce strutturalmente attacchi XSS effettuando per default l'escaping di tutti i valori dinamici. |
-| **Tooling & Build** | **Vite + TypeScript (Strict)** | Avvio rapido, bundling ottimizzato con tree-shaking aggressivo, tipizzazione statica al 100% senza tipi `any` permissivi. |
-| **PWA & Service Worker** | **vite-plugin-pwa (Workbox)** | Precache completo e versionato dell'app shell (HTML, bundle JS/CSS, font WOFF2, icone). Aggiornamento controllato senza ricariche forzate a sorpresa. |
-| **Database Locale** | **IndexedDB** (tramite libreria leggera `idb`) | Fonte dati esclusiva da cui la UI legge *sempre*. Supporta centinaia di record strutturati, indici di ricerca e conservazione a lungo termine, a differenza di `localStorage` (limitato a 5 MB e sincrono/bloccante). |
-| **Backend as a Service** | **Supabase** (Postgres 15+, Auth, Storage, Realtime) | Piano gratuito a costo zero. Autenticazione sicura per l'amministratore, storage con RLS per allegati (immagini/PDF), canale Realtime per la segnalazione di modifiche. |
-| **Testing** | **Vitest + Happy-DOM** | Test unitari fulminei per il parser ChordPro, la logica di trasposizione, l'algoritmo di ricerca (typo e diacritici), l'ordinamento italiano e la logica di sincronizzazione. |
+| **Tooling & Build** | **Vite + TypeScript (Strict)** | Avvio rapido, bundling ottimizzato con tree-shaking aggressivo, tipizzazione statica al 100% senza tipi `any` permissivi. Base path configurato su `/Sito-di-vault-attivit-clan/` per GitHub Pages. |
+| **PWA & Service Worker** | **vite-plugin-pwa (Workbox)** | Precache completo e versionato dell'app shell (HTML, bundle JS/CSS, font WOFF2, icone). Scope configurato sul base path. Aggiornamento controllato senza ricariche forzate a sorpresa. |
+| **Database Locale** | **IndexedDB** (tramite libreria leggera `idb`) | Fonte dati esclusiva da cui la UI legge *sempre*. Supporta centinaia di record strutturati, indici di ricerca e conservazione a lungo termine, a differenza di `localStorage` (limitato a 5 MB e sincrono/bloccante). Sostituzione atomica transazionale. |
+| **Backend as a Service** | **Supabase** (Postgres 15+, Auth, Storage, Realtime) | Piano gratuito a costo zero. Autenticazione sicura per l'amministratore, storage senza listing pubblico per allegati (immagini/PDF), canale Realtime per la segnalazione di modifiche. |
+| **Testing** | **Vitest + Happy-DOM** | Test unitari fulminei per il parser ChordPro, la logica di trasposizione, l'algoritmo di ricerca (typo calibrati e diacritici), l'ordinamento italiano e la logica di sincronizzazione. |
 | **Hosting & CI/CD** | **GitHub Pages + GitHub Actions** | Hosting statico gratuito ad alta affidabilità su CDN globale GitHub con deploy automatico a ogni commit su `main`. Workflow di keepalive per prevenire la disattivazione e la pausa automatica. |
 
 ---
@@ -26,7 +26,7 @@ L'applicazione è progettata secondo il paradigma **Local-First PWA (Progressive
 .
 ├── .github/
 │   └── workflows/
-│       ├── deploy.yml            # Build e deploy automatico su GitHub Pages ad ogni push su main
+│       ├── deploy.yml            # Build e deploy automatico su GitHub Pages (con paths-ignore: docs/**)
 │       └── keepalive.yml         # Ping programmato (ogni 2 gg) per evitare la pausa di Supabase e reset 60gg
 ├── assets/                       # File originali forniti (logo, favicon)
 ├── docs/
@@ -40,11 +40,11 @@ L'applicazione è progettata secondo il paradigma **Local-First PWA (Progressive
 │   └── favicon.ico               # Favicon multi-risoluzione
 ├── supabase/
 │   ├── migrations/
-│   │   ├── 0001_init_schema.sql  # Tabelle, vincoli CHECK, indici, trigger updated_at
-│   │   ├── 0002_security_rls.sql # Funzione is_admin(), abilitazione RLS e policy su tabelle
-│   │   └── 0003_storage.sql      # Configurazione bucket allegati e policy di storage
+│   │   ├── 0001_init_schema.sql  # Tabelle, vincoli CHECK, indici, trigger updated_at (search_path protetto)
+│   │   ├── 0002_security_rls.sql # Funzione is_admin(), abilitazione RLS, policy e publication supabase_realtime
+│   │   └── 0003_storage.sql      # Configurazione bucket allegati e policy di storage (senza SELECT pubblica)
 │   └── tests/
-│       └── security_test.sql     # Script SQL di verifica RLS e Storage (anon vs admin)
+│       └── security_test.sql     # Script SQL di verifica RLS, Realtime e Storage (anon vs admin)
 ├── src/
 │   ├── app/
 │   │   ├── App.tsx               # Root component con gestione shell e banner
@@ -61,9 +61,9 @@ L'applicazione è progettata secondo il paradigma **Local-First PWA (Progressive
 │   ├── lib/
 │   │   ├── i18n.ts               # FILE UNICO per tutte le stringhe, etichette e messaggi UI
 │   │   ├── supabase.ts           # Inizializzazione client Supabase con Anon Key
-│   │   ├── db.ts                 # Schema e wrapper IndexedDB con libreria idb
-│   │   ├── sync.ts               # Macchina di sincronizzazione (full, incrementale, tombstone)
-│   │   ├── search.ts             # Motore di ricerca normalizzato con Levenshtein e token match
+│   │   ├── db.ts                 # Schema e wrapper IndexedDB con libreria idb (transazioni atomiche)
+│   │   ├── sync.ts               # Macchina di sincronizzazione (full atomico, incrementale, tombstone)
+│   │   ├── search.ts             # Motore di ricerca normalizzato con Levenshtein calibrato e token match
 │   │   ├── chordpro.ts           # Parser ChordPro, trasposizione tonale, validatore e AST
 │   │   ├── print.ts              # Logica e stili di stampa A4 continua e canti pagina-singola
 │   │   ├── storage-cache.ts      # Cache API per download allegati e gestione offline
@@ -78,13 +78,13 @@ L'applicazione è progettata secondo il paradigma **Local-First PWA (Progressive
 │   ├── styles/
 │   │   ├── tokens.css            # Variabili CSS (palette scout, spaziature, tipografia)
 │   │   ├── global.css            # Reset, stili base accessibili, classi utilità
-│   │   └── print.css             # Regole @media print per la stampa A4
+│   │   └── print.css             # Regole @media print per la stampa A4 (gestione elementi lunghi e brevi)
 │   ├── main.tsx                  # Bootstrap dell'applicazione Preact
 │   └── sw.ts                     # Service worker custom Workbox con eventi skipWaiting
-├── index.html                    # Entry point HTML con CSP rigorosa via meta-tag
+├── index.html                    # Entry point HTML con CSP rigorosa via meta-tag (con wss://)
 ├── package.json
 ├── tsconfig.json
-└── vite.config.ts                # Configurazione Vite, Preact, PWA e build
+└── vite.config.ts                # Configurazione Vite, base: '/Sito-di-vault-attivit-clan/', Preact, PWA e build
 ```
 
 ---
@@ -97,17 +97,17 @@ Tutte le tabelle di contenuto adottano il medesimo standard di audit e sincroniz
 3. `updated_at timestamptz NOT NULL DEFAULT now()` (aggiornato esclusivamente via trigger server-side)
 4. `deleted_at timestamptz NULL` (soft delete per la propagazione delle cancellazioni ai client offline)
 
-### 3.1 Tabelle Dati
+### 3.1 Tabelle Dati e Trigger
 
 ```sql
--- Trigger comune per aggiornamento automatico di updated_at
+-- Trigger comune con search_path blindato a public (elimina warning del Supabase Security Advisor)
 CREATE OR REPLACE FUNCTION public.set_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
   NEW.updated_at = now();
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SET search_path = public;
 
 -- 1. Tabella Admin Users
 CREATE TABLE public.admin_users (
@@ -215,7 +215,7 @@ CREATE TABLE public.allegati (
 );
 ```
 
-### 3.2 Indici e Trigger
+### 3.2 Indici, Trigger e Attivazione Realtime
 
 ```sql
 -- Trigger updated_at su ogni tabella
@@ -241,6 +241,14 @@ CREATE INDEX idx_canti_titolo ON public.canti(titolo) WHERE deleted_at IS NULL;
 CREATE INDEX idx_eventi_inizio ON public.eventi(inizio) WHERE deleted_at IS NULL;
 CREATE INDEX idx_odg_evento ON public.odg_punti(evento_id, ordine) WHERE deleted_at IS NULL;
 CREATE INDEX idx_allegati_genitori ON public.allegati(gioco_id, ban_id, canto_id, evento_id) WHERE deleted_at IS NULL;
+
+-- Attivazione Realtime sulle tabelle di contenuto
+ALTER PUBLICATION supabase_realtime ADD TABLE public.giochi;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.bans;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.canti;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.eventi;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.odg_punti;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.allegati;
 ```
 
 ---
@@ -283,9 +291,10 @@ CREATE POLICY "admin_users_select_admin" ON public.admin_users FOR SELECT USING 
 
 ### 4.3 Policy su Supabase Storage (`storage.objects`)
 
-Il bucket `allegati` è configurato come pubblico per consentire il download diretto dei file via URL:
+Il bucket `allegati` è configurato come pubblico (`public: true`):
 - Limite dimensione per file: **10 MB** (imposto a livello di configurazione bucket).
 - Tipi MIME consentiti: `image/jpeg`, `image/png`, `image/webp`, `application/pdf`.
+- **Nessuna policy SELECT pubblica su `storage.objects`:** Poiché il bucket è pubblico, i file sono accessibili direttamente dal CDN di Supabase all'URL pubblico `/storage/v1/object/public/allegati/{storage_path}`. Rimuovere la policy SELECT pubblica impedisce a utenti anonimi di effettuare l'enumerazione (listing) dei file nel bucket via API.
 
 ```sql
 -- Inserimento del bucket 'allegati'
@@ -301,10 +310,7 @@ VALUES (
   file_size_limit = 10485760,
   allowed_mime_types = ARRAY['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
 
--- RLS su storage.objects
-CREATE POLICY "allegati_public_read" ON storage.objects
-  FOR SELECT USING (bucket_id = 'allegati');
-
+-- RLS su storage.objects: Scrittura, modifica e cancellazione riservate solo ad admin
 CREATE POLICY "allegati_admin_insert" ON storage.objects
   FOR INSERT WITH CHECK (bucket_id = 'allegati' AND public.is_admin());
 
@@ -320,84 +326,83 @@ CREATE POLICY "allegati_admin_delete" ON storage.objects
 ## 5. Flusso di Autenticazione e Sicurezza
 
 1. **Registrazione disabilitata:** Nel pannello Supabase Auth viene disattivata l'opzione "Enable email signups". Nessun utente sconosciuto può registrarsi.
-2. **Creazione Admin manuale:** L'amministratore (coppia di credenziali condivisa tra i capi clan) viene creato direttamente dalla Dashboard di Supabase (sezione *Authentication -> Users*). Subito dopo, l'UUID dell'utente creato viene inserito nella tabella `admin_users` tramite query SQL. Tutta la procedura è guidata in `docs/SETUP_MANUALE.md`.
+2. **Creazione Admin manuale:** L'amministratore (coppia di credenziali condivisa tra i capi clan) viene creato direttamente dalla Dashboard di Supabase (*Authentication -> Users*). Subito dopo, l'UUID dell'utente creato viene inserito nella tabella `admin_users` tramite query SQL. Tutta la procedura è guidata in `docs/SETUP_MANUALE.md`.
 3. **Flusso di Login:**
    - L'icona di accesso admin è posizionata con discrezione nell'header/Home.
    - Il modale di login richiede email e password.
    - `supabase.auth.signInWithPassword({ email, password })`.
    - Se il login ha successo, il client interroga la funzione SQL `is_admin()`. Se `false`, la sessione viene terminata con messaggio di errore.
-   - La sessione è persistita nel local storage dal client ufficiale Supabase, consentendo all'admin di non reinserire le credenziali ad ogni apertura (a meno di logout esplicito).
-4. **Protezione in caso di compromissione:** Se le credenziali finiscono nelle mani sbagliate, la procedura documentata in `SETUP_MANUALE.md` consente di reimpostare la password in 30 secondi dalla dashboard Supabase o revocare immediatamente l'UUID dalla tabella `admin_users`.
+   - La sessione è persistita nel local storage dal client ufficiale Supabase.
+4. **Protezione in caso di compromissione:** Reimpostazione password o rimozione istantanea dell'UUID da `admin_users` tramite query SQL.
 
 ---
 
 ## 6. Algoritmo di Sincronizzazione Offline-First (IndexedDB)
 
-### 6.1 Principio Fondamentale
-La UI legge **sempre e solo da IndexedDB**. Anche in presenza di connessione Internet eccellente, il rendering dei componenti attinge dalla copia locale istantanea ($< 5\text{ ms}$). Il backend Supabase alimenta IndexedDB in background.
-
-```
-[ Supabase Postgres ]
-       │
-       ▼  (pull incrementale / eventi Realtime)
-[ sync.ts  (Engine) ]
-       │
-       ▼  (idb upsert / delete)
-[ IndexedDB Locale ]  ◄── (Single Source of Truth)
-       │
-       ▼  (live query / useSync)
-[ Preact UI Components ]
-```
+### 6.1 Principio Fondamentale e Sostituzione Atomica
+La UI legge **sempre e solo da IndexedDB**. 
+- Durante la **Full Resync**, l'applicazione scarica **tutti i dati in memoria in un'area temporanea** e sostituisce il database locale IndexedDB in modo **rigorosamente atomico** all'interno di una singola transazione `readwrite` di `idb`. **Mai svuotare o cancellare IndexedDB prima del download**: se la rete si interrompe a metà, i dati locali preesistenti rimangono intatti e disponibili.
+- **Timeout differenziati:**
+  - Pull incrementale rapida di routine: timeout breve di **4 secondi** (se fallisce, l'utente naviga senza interruzioni e il sistema ritenta in background).
+  - Primo download e Full Resync: timeout esteso a **25 secondi**, con suddivisione a lotti (chunking) per tabelle e possibilità di ripresa automatica.
 
 ### 6.2 Struttura IndexedDB (`scout_vault_db`)
 - Database: `scout_vault_db`, versione 1.
-- Object Stores:
-  - `giochi` (keyPath: `id`)
-  - `bans` (keyPath: `id`)
-  - `canti` (keyPath: `id`)
-  - `eventi` (keyPath: `id`)
-  - `odg_punti` (keyPath: `id`, indice: `evento_id`)
-  - `allegati` (keyPath: `id`, indici: `gioco_id`, `ban_id`, `canto_id`, `evento_id`)
-  - `sync_metadata` (keyPath: `key`): contiene `last_sync_timestamp`, `last_full_sync`, `sync_status`.
+- Object Stores: `giochi`, `bans`, `canti`, `eventi`, `odg_punti`, `allegati`, `sync_metadata`.
 
 ### 6.3 Macchina di Sync (Incrementale vs Completa)
 1. **Verifica Timestamp:** Il client legge `last_sync_timestamp` da `sync_metadata`.
 2. **Controllo Scadenza Tombstone (90 giorni):**
-   - Se `last_sync_timestamp` è assente oppure `(now - last_sync_timestamp) > 90 giorni`, viene avviata una **Full Resync**.
-   - Nella *Full Resync*, IndexedDB viene svuotato per evitare record orfani, e vengono scaricati tutti i record attivi (`deleted_at IS NULL`) dal server.
+   - Se `last_sync_timestamp` è assente oppure `(now - last_sync_timestamp) > 90 giorni`, viene avviata la **Full Resync atomica**.
 3. **Pull Incrementale:**
-   - Per ciascuna tabella, viene eseguita la query:
-     `SELECT * FROM tabella WHERE updated_at >= (last_sync_timestamp - 5 secondi)`
-     *(Il margine di 5 secondi previene discrepanze di clock tra client e server).*
+   - Query per tabella: `SELECT * FROM tabella WHERE updated_at >= (last_sync_timestamp - 5 secondi)`.
    - **Upsert / Delete:**
      - Se `deleted_at IS NULL`: scrittura/aggiornamento del record in IndexedDB (`db.put(tabella, record)`).
-     - Se `deleted_at IS NOT NULL`: eliminazione fisica del record dalla copia locale IndexedDB (`db.delete(tabella, record.id)`).
+     - Se `deleted_at IS NOT NULL`: eliminazione del record locale (`db.delete(tabella, record.id)`).
    - Aggiornamento atomico di `last_sync_timestamp = server_now` in `sync_metadata`.
 4. **Trigger di Sincronizzazione:**
-   - Montaggio dell'applicazione (`DOMContentLoaded`).
-   - Evento browser `online`.
-   - Evento `visibilitychange` (quando l'utente riattiva lo schermo o riapre la scheda).
-   - Canale Supabase Realtime: la notifica `postgres_changes` funge solo da **segnale** ("qualcosa è cambiato sul server") e avvia una pull incrementale con debounce di 300 ms, ignorando il payload broadcast per sicurezza e consistenza.
-5. **Timeout di Rete:** Qualsiasi richiesta di sync ha un timeout rigido di **4 secondi**. Se la rete è instabile o assente, la sync va in standby senza bloccare l'esperienza d'uso e riprova al successivo segnale.
+   - Avvio applicazione (`DOMContentLoaded`).
+   - Ritorno online (`window.addEventListener('online', ...)`).
+   - `visibilitychange` (quando l'utente riattiva lo schermo o la scheda).
+   - Notifiche Realtime: usate esclusivamente come **segnale di notifica** per avviare una pull incrementale con debounce a 300 ms.
+
+### 6.4 Gestione Gerarchica Soft-Delete e Pulizia Storage (180 giorni)
+- **Regola Gerarchica:** Se un genitore (`gioco`, `ban`, `canto`, `evento`) subisce soft-delete, tutti i figli correlati (`odg_punti`, `allegati`) vengono nascosti automaticamente dalla UI. In caso di ripristino del genitore dal Cestino, anche i figli tornano visibili.
+- **Conservazione Tombstone:** I tombstone su server vengono conservati per **180 giorni** (soglia superiore ai 90 giorni di resync client).
+- **Pulizia Definitiva Cestino (Hard Delete):** Procedura attivata da admin per eliminare fisicamente i record con `deleted_at < now() - interval '180 days'` (o forzata dall'admin), che cancella congiuntamente anche i file fisici corrispondenti da Supabase Storage (`storage.objects`).
 
 ---
 
 ## 7. Strategia di Caching e PWA
 
-### 7.1 Service Worker (Workbox)
-- Precache dell'App Shell: `index.html`, bundle `assets/*.js`, bundle `assets/*.css`, icone PWA, font self-hosted WOFF2.
-- Modalità `skipWaiting: false` per evitare aggiornamenti a sorpresa mentre un utente sta leggendo un canto o svolgendo un ban all'aperto.
-- Banner di notifica non invasivo: *"Nuova versione disponibile. [Aggiorna ora]"*. Al click, invio di messaggio `SKIP_WAITING` al Service Worker e ricaricamento controllato della pagina.
+### 7.1 Base Path, Manifest e Service Worker
+- GitHub Pages Base Path: `/Sito-di-vault-attivit-clan/`.
+- Manifest: `scope: "/Sito-di-vault-attivit-clan/"`, `start_url: "/Sito-di-vault-attivit-clan/#/"`.
+- Service Worker Workbox configurato sul base path con precache dell'App Shell (HTML, bundle JS/CSS, font WOFF2, icone).
+- Aggiornamento controllato (`skipWaiting: false`): avviso discreto *"Nuova versione disponibile. [Aggiorna ora]"*. Al click, invio messaggio `SKIP_WAITING` e reload controllato.
 
-### 7.2 Cache degli Allegati (Cache API)
+### 7.2 Content Security Policy (CSP)
+Meta-tag restrittivo in `index.html`:
+```html
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'self';
+  script-src 'self' 'wasm-unsafe-eval';
+  style-src 'self' 'unsafe-inline';
+  img-src 'self' data: blob: https://lpeiyzwccedtqjbficjo.supabase.co;
+  connect-src 'self' https://lpeiyzwccedtqjbficjo.supabase.co wss://lpeiyzwccedtqjbficjo.supabase.co;
+  font-src 'self';
+  object-src 'none';
+  base-uri 'self';
+  form-action 'self';
+">
+```
+
+### 7.3 Cache degli Allegati (Cache API) e Persistenza iOS
 - Cache storage dedicata: `scout-attachments-v1`.
-- **Auto-download silente:** Tutti gli allegati (immagini WebP/JPEG e PDF) di dimensione $< 500\text{ KB}$ vengono memorizzati nella Cache API in background al termine della sincronizzazione dati.
-- **Allegati pesanti ($> 500\text{ KB}$):** Viene mostrato un pulsante esplicito *"Scarica tutti gli allegati per l'uso offline"* con barra di progresso e percentuale.
-- **Fallback visivo:** Se un allegato non è presente in cache e il dispositivo è offline, la card visualizza l'icona con etichetta chiara *"Non scaricato — connettiti a internet per aprirlo"*, senza errori o crash dell'interfaccia.
-
-### 7.3 Persistenza iOS e Android
-- Chiamata all'avvio a `navigator.storage.persist()`. Se accordata, previene l'eviction automatica della memoria da parte del sistema operativo.
-- **Rilevamento iOS Safari:** Safari mobile applica una policy di cancellazione dei dati dei siti dopo 7 giorni di mancata visita se il sito è aperto come normale scheda browser. Tale restrizione **non** viene applicata se l'app è aggiunta alla schermata Home. L'app rileva se gira in browser e, su iOS, mostra un banner informativo permanente finché non viene aggiunta a Home (*"Condividi -> Aggiungi alla schermata Home"*).
+- **Auto-download:** Allegati $< 500\text{ KB}$ scaricati in background dopo la sync.
+- **Download su richiesta:** Pulsante *"Scarica tutti gli allegati per l'uso offline"* con barra di progresso.
+- **Fallback visivo:** *"Non scaricato — connettiti a internet per aprirlo"*.
+- **Persistenza iOS:** Chiamata `navigator.storage.persist()`. Banner di istruzioni per l'installazione su Schermata Home di iOS per neutralizzare la policy di rimozione dei 7 giorni di Safari.
 
 ---
 
@@ -406,169 +411,64 @@ La UI legge **sempre e solo da IndexedDB**. Anche in presenza di connessione Int
 ### 8.1 Giochi e Bans
 - **Giochi:** Card con nome, materiali occorrenti, svolgimento/regole, allegati.
 - **Bans:** Card e modalità lettura speciale:
-  - Font a scala aumentata regolabile (+/− o slider da 18px a 32px).
+  - Font a scala aumentata regolabile (+/− da 18px a 32px).
   - Contrasto elevatissimo per lettura alla luce del sole.
-  - Distinzione tipografica netta tra testo del canto e note sui gesti (box con bordo a tratteggio o badge).
-  - Attivazione della **Screen Wake Lock API** durante la modalità lettura per evitare lo spegnimento dello schermo con il cellulare posato a terra o tenuto con una mano sola.
+  - Distinzione tipografica tra testo del canto e note sui gesti.
+  - Attivazione della **Screen Wake Lock API** durante la modalità lettura con ri-aggancio automatico su `visibilitychange`.
 
 ### 8.2 Canti e Parser ChordPro
-
-#### Grammatica ChordPro
-- Accordo racchiuso tra parentesi quadre: `[Do]Sopra la [Fa]panca la [Sol]capra campa`.
-- Supporto notazione italiana (`Do, Re, Mi, Fa, Sol, La, Si`) con alterazioni (`#`, `b`) e suffissi (`m`, `7`, `maj7`, `dim`, `sus4`, `6`, `9`, `add9`, `/Basso`). Accetta anche la notazione americana in ingresso (`C, D, E, F, G, A, B`) convertendola.
-- Direttive su riga propria:
-  - `{strofa}` o `{s}`: etichetta e stile blocco strofa.
-  - `{ritornello}` o `{r}`: box evidenziato per il ritornello con bordo colorato a sinistra.
-  - `{ponte}` o `{p}`: stile dedicato per il bridge.
-  - `{nuova_pagina}`: interruzione di pagina forzata per la stampa.
-  - `{commento: ...}`: annotazione a margine.
-
-#### Rendering Senza innerHTML
-Il parser genera un albero di nodi Preact:
-```tsx
-<span class="chord-syllable-pair">
-  <span class="chord">{accordo}</span>
-  <span class="syllable">{sillaba}</span>
-</span>
-```
-La classe CSS garantisce che l'accordo sovrasti la sillaba e rimanga a essa inscindibilmente ancorato anche quando il testo va a capo su display compatti.
-
-#### Trasposizione Tonale
-- Mappatura su scala cromatica a 12 semitoni:
-  `['Do', 'Do#', 'Re', 'Re#', 'Mi', 'Fa', 'Fa#', 'Sol', 'Sol#', 'La', 'Sib', 'Si']`
-- Algoritmo con calcolo automatico della scala di riferimento per la scelta corretta tra diesis e bemolli (es. tonalità di Fa privilegia Sib, tonalità di Sol privilegia Fa#).
-- La trasposizione agisce solo a livello visivo (`transposeDelta = +2`), senza mai alterare il testo originale memorizzato nel database.
-
-#### Editor Admin Live
-- Area di testo con sintassi ChordPro.
-- Pulsante rapido `[+ Accordo]` che inserisce `[]` nella posizione del cursore e posiziona il focus tra le parentesi.
-- Anteprima live istantanea a fianco o sotto l'editor.
-- Validazione sintattica morbida: segnala eventuali accordi con parentesi aperte e non chiuse senza inibire il salvataggio.
+- **Grammatica:** Formato `[Accordo]sillaba`, notazione italiana (`Do, Re, Mi...`) e anglosassone (`C, D, E...`), direttive `{strofa}`, `{ritornello}`, `{ponte}`, `{nuova_pagina}`.
+- **Rendering sicuro:** Coppie verticali strutturate in nodi DOM Preact, nessun uso di `innerHTML`. Accordo posizionato sopra la sillaba e ancorato anche quando la riga va a capo.
+- **Trasposizione Tonale:** Mappatura su 12 semitoni con calcolo intelligente dell'armatura (diesis/bemolli) solo a livello visivo.
+- **Editor Admin Live:** Anteprima live, inserimento accordi rapido `[]` e validazione sintattica morbida.
 
 ### 8.3 Calendario e Ordine del Giorno (ODG)
-- Fuso orario `Europe/Rome`, locale `it-IT`, inizio settimana lunedì.
-- Viste: **Mese** (griglia interattiva con indicatori colorati per tipo di evento) e **Lista prossimi eventi**.
-- Dettaglio Evento: Titolo, tipo (`riunione`, `uscita`, `evento`, `scadenza`, `altro`), data/ora inizio e fine (o tutto il giorno), luogo, descrizione, responsabile, cosa portare.
-- **Gestione ODG:**
-  - Elenco punti numerati e ordinabili.
-  - Checkbox per spuntare i punti completati durante la riunione.
-  - Pulsante *"Riporta punti non conclusi alla prossima riunione"*: seleziona i punti con `completato = false`, individua la successiva riunione in programma (o permette di sceglierla) e clona i punti collegandoli tramite `riportato_da`.
-  - Tasto stampa rapida ODG.
+- Fuso `Europe/Rome`, locale `it-IT`, inizio lunedì. Viste Mese e Lista prossimi eventi.
+- Dettaglio Evento completo.
+- **ODG:** Punti ordinabili, casella di spunta e pulsante *"Riporta punti non conclusi alla prossima riunione"*, che clona i punti non completati collegandoli con `riportato_da`. Stampa rapida ODG.
 
 ### 8.4 Motore di Ricerca e Ordinamento
-- **Campi indicizzati:** Ricerca multi-campo (titolo, testo, regole, materiali, note gesti; gli accordi tra parentesi quadre vengono esclusi per evitare falsi positivi).
-- **Normalizzazione:** Rimozione dei diacritici/accenti (es. `perche` trova `perché`) e case-insensitive (`Intl.Collator` o `normalize('NFD')`).
-- **Tolleranza Typo:** Algoritmo Levenshtein leggero per parole $\ge 4$ caratteri (distanza massima 1).
-- **Evidenziazione sicura:** La porzione corrispondente viene evidenziata spezzando il testo in sequenze di TextNode DOM alternati a tag `<mark>` (nessun `innerHTML`).
-- **Ordinamento (esattamente 4 opzioni):**
-  1. A → Z (default, con `Intl.Collator('it', { sensitivity: 'base' })`)
-  2. Z → A
-  3. Più recenti (`created_at` decrescente)
-  4. Più vecchi (`created_at` crescente)
-- Conservazione stato: parametri di ricerca e ordinamento memorizzati in `sessionStorage` per non perdere la posizione quando si torna indietro da un dettaglio.
+- **Campi indicizzati:** Multi-campo (titolo, testo, regole, materiali, note gesti; accordi esclusi dal match per non generare falsi positivi).
+- **Normalizzazione:** Rimozione diacritici/accenti (es. `perche` trova `perché`) e case-insensitive.
+- **Regola Tolleranza Typo (Distanza Levenshtein):**
+  - Token brevi (< 4 caratteri): Exact match (Levenshtein = 0).
+  - Token medi (4–7 caratteri): Levenshtein $\le 1$.
+  - Token lunghi ($\ge 8$ caratteri): Levenshtein $\le 2$ (es. "aveleata" $\rightarrow$ "avvelenata").
+- **Evidenziazione sicura:** TextNode alternati a tag `<mark>` (nessun `innerHTML`).
+- **Ordinamento (esattamente 4 opzioni):** A→Z (default con `Intl.Collator`), Z→A, Più recenti, Più vecchi. Parametri conservati in `sessionStorage`.
 
 ### 8.5 Architettura di Stampa A4
-- Esecuzione nella stessa pagina con `window.print()` e selettori CSS `@media print`.
-- **Giochi e Bans:** Flusso continuo compatto, `break-inside: avoid` sul blocco elemento, `break-after: avoid` sui titoli, nessun salto pagina forzato tra elementi diversi, massimizzazione dello spazio su carta.
-- **Canti:** Ogni canto inizia su una pagina nuova (`break-before: page`). I tag `{nuova_pagina}` spezzano il canto su più pagine secondo le direttive dell'autore.
-  - Pagine successive con intestazione compatta: *"Titolo del Canto — pag. 2/2"*.
-  - Rilevamento overflow: simulazione grafica in anteprima. Se il canto sfora l'altezza della pagina A4, l'anteprima mostra un avviso visibile: *"Attenzione: il canto supera la pagina A4. Riduci la dimensione del carattere o inserisci {nuova_pagina}"*.
-- **ODG:** Scheda A4 singola con intestazione evento e caselle quadrate stampabili `[ ]` per la spunta a penna.
-
-### 8.6 Amministrazione e Gestione Dati
-- **CRUD Diretto:** I pulsanti Modifica/Elimina compaiono direttamente sulle schede quando la sessione admin è attiva.
-- **Avviso Doppioni:** Durante l'inserimento/modifica, se il nome/titolo ha una similarità $> 85\%$ con un elemento già presente, compare un avviso giallo di attenzione non bloccante.
-- **Eliminazione a Doppio Step e Cestino:**
-  - Modale di conferma in cui l'admin deve confermare l'eliminazione.
-  - L'eliminazione imposta `deleted_at = now()` (soft delete).
-  - Schermata *Cestino* con elenco degli elementi cancellati e pulsante di ripristino istantaneo.
-- **Backup e Ripristino JSON:**
-  - Esportazione manuale di tutte le tabelle in un unico file JSON strutturato (attivata solo tramite click esplicito dell'admin).
-  - Importazione da JSON con anteprima comparativa (numero di nuovi elementi, sovrascritture) prima della conferma definitiva.
+- Esecuzione in-page con `window.print()` e `@media print` A4.
+- **Giochi e Bans:** Flusso continuo senza interruzioni forzate. `break-inside: avoid` applicato **solo agli elementi brevi** (< 600 caratteri); gli elementi lunghi possono spezzarsi normalmente tra le pagine per evitare grandi spazi vuoti a fondo pagina. `break-after: avoid` sui titoli.
+- **Canti:** Ogni canto inizia su una pagina nuova (`break-before: page`), rispetto dei tag `{nuova_pagina}`, intestazione ridotta nelle pagine successive ("Titolo — pag. 2/2") e rilevamento visivo preventivo di overflow in anteprima con avviso.
+- **ODG:** Scheda singola compatta con caselle quadrate stampabili `[ ]` per la spunta a penna.
 
 ---
 
-## 9. Design System e Accessibilità
+## 9. Keepalive e Workflow CI/CD
 
-### 9.1 Palette Colori Scout
-I colori rappresentano l'identità scout del Clan (Giallo, Azzurro, Rosso):
+### 9.1 Deploy su GitHub Pages (`deploy.yml`)
+- Trigger su `push` al branch `main`.
+- Esclusione percorsi documentazione: `paths-ignore: ['docs/**']`.
+- Build con Vite (base path `/Sito-di-vault-attivit-clan/`) e pubblicazione su Pages.
 
-```css
-:root {
-  /* Colori Identitari */
-  --color-giallo: #FFC93C;        /* Badge, accenti, highlight */
-  --color-giallo-dark: #D49B00;   /* Giallo a contrasto elevato */
-  --color-azzurro: #1E74A6;       /* Struttura, bottoni secondari, link (WCAG AA su sfondo chiaro) */
-  --color-azzurro-active: #2F8FC7;/* Stato attivo / focus */
-  --color-rosso: #D9381E;         /* Azioni primarie, conferme distruttive (WCAG AA su bianco) */
-  --color-rosso-hover: #B82810;
-
-  /* Neutri Tema Chiaro */
-  --color-bg: #FAF6EC;            /* Sfondo caldo tela scout */
-  --color-surface: #FFFFFF;       /* Superficie card */
-  --color-surface-alt: #F2EBD9;   /* Sfondo alternato / barre */
-  --color-border: #E2D7C3;        /* Bordi card e cuciture */
-  --color-text: #21262B;          /* Testo primario ad alto contrasto (13.5:1) */
-  --color-text-muted: #596573;    /* Testo secondario */
-
-  /* Neutri Tema Scuro */
-  --color-bg-dark: #1A232A;
-  --color-surface-dark: #24303A;
-  --color-border-dark: #374754;
-  --color-text-dark: #F3F4F6;
-  --color-text-muted-dark: #9CA3AF;
-}
-```
-
-### 9.2 Regole di Accessibilità (WCAG AA)
-- Testo su sfondo Giallo: **sempre** scuro (`--color-text`), mai bianco (contrasto $> 10:1$).
-- Dimensioni touch target: minimo **44 × 44 pixel** per ogni elemento interattivo (pulsanti, icone, voci di navigazione, accordi cliccabili).
-- Indicatori `:focus-visible` ad alto contrasto con outline azzurro di 3px per navigazione da tastiera.
-- Attributi ARIA: `aria-live="polite"` sui contatori dei risultati di ricerca, `aria-expanded` sui menu a tendina e accordion.
-- Rispetto di `prefers-reduced-motion` per utenti con sensibilità al movimento.
+### 9.2 Keepalive Supabase e Heartbeat 60 Giorni (`keepalive.yml`)
+- Esecuzione pianificata ogni 2 giorni (`0 6 */2 * *`) più avvio manuale.
+- Esegue una reale query REST SQL (`GET /rest/v1/giochi?select=id&limit=1`) verificando HTTP 200.
+- **Heartbeat 60 giorni:** Controlla la data dell'ultimo commit su `main`. Se sono passati più di 40 giorni, committa un timestamp su `docs/keepalive_heartbeat.txt` con messaggio `chore(keepalive): heartbeat [skip ci]`.
+  - Poiché il file è in `docs/` e il commit contiene `[skip ci]`, il workflow `deploy.yml` non viene eseguito, evitando build inutili.
+  - L'attività del commit azzera la soglia dei 60 giorni di inattività di GitHub.
 
 ---
 
-## 10. Piano di Collaudo e Test Automatici
-
-### 10.1 Test Unitari (Vitest)
-1. **Parser ChordPro (`test/chordpro.test.ts`):**
-   - Riconoscimento accordi italiani e americani con alterazioni (`Do#m7`, `Fa#`, `Bb`, `Fmaj7/C`).
-   - Accordi isolati a fine riga o senza testo associato.
-   - Righe con sole direttive (`{strofa}`, `{ritornello}`, `{nuova_pagina}`).
-   - Gestione parentesi non chiuse o caratteri speciali.
-   - Trasposizione: $+1$ semitono su tutta la scala, $-1$ semitono, trasposizioni con armature complesse.
-2. **Motore di Ricerca (`test/search.test.ts`):**
-   - Normalizzazione diacritici (lettere accentate `à, è, é, ì, ò, ù`).
-   - Tolleranza typo Levenshtein (es. `palla avvelenata` trovato digitando `pala aveleata`).
-   - Esclusione degli accordi dal testo indicizzato dei canti.
-   - Ordinamento con `Intl.Collator` su caratteri italiani.
-3. **Logica di Sync (`test/sync.test.ts`):**
-   - Calcolo cursore temporale con sovrapposizione di 5 secondi.
-   - Applicazione idempotente degli aggiornamenti (ripetizione della stessa riga non altera lo stato).
-   - Rimozione locale dei record con `deleted_at` valorizzato.
-   - Trigger di Full Resync se `now - last_sync > 90 giorni`.
-
-### 10.2 Test di Sicurezza PostgreSQL / RLS (`supabase/tests/security_test.sql`)
-1. **Verifica Utente Anonimo:**
-   - `SELECT` su tutte le 7 tabelle -> SUCCESSO.
-   - `INSERT`, `UPDATE`, `DELETE` su `giochi`, `bans`, `canti`, `eventi`, `odg_punti`, `allegati`, `admin_users` -> FALLIMENTO con errore RLS (`42501`).
-   - `INSERT` su `storage.objects` (bucket allegati) con Anon Key -> FALLIMENTO.
-2. **Verifica Utente Admin:**
-   - Inserimento riga su `giochi` -> SUCCESSO.
-   - Aggiornamento riga -> SUCCESSO (e verifica che `updated_at` sia cambiato via trigger).
-   - Upload file su bucket storage -> SUCCESSO se MIME consentito e dimensione $< 10\text{ MB}$.
-   - Upload file con MIME non consentito (es. `.exe` o `.zip`) -> FALLIMENTO bloccato dal bucket.
-
----
-
-## 11. Rischi Noti e Matrice di Mitigazione
+## 10. Rischi Noti e Matrice di Mitigazione
 
 | Rischio Identificato | Probabilità | Impatto | Strategia di Mitigazione Adottata |
 | :--- | :--- | :--- | :--- |
-| **Pausa automatica Supabase dopo 7 giorni di inattività** | Alta (durante pause estive o mesi senza uscite) | Bloccante per gli aggiornamenti | Workflow GitHub Actions `keepalive.yml` ogni 2 giorni che esegue una vera query REST a Postgres. Secondo ping indipendente raccomandato via servizio di cron esterno gratuito. |
-| **Disattivazione workflow GitHub Actions dopo 60 giorni** | Media | Alto (blocca keepalive) | Controllo data ultimo commit in `keepalive.yml`: se $> 40$ giorni, esecuzione di commit automatico di heartbeat sul file `docs/keepalive_heartbeat.txt`. |
-| **Cancellazione storage IndexedDB su iOS Safari dopo 7 giorni** | Alta (se aperto da Safari browser) | Medio (perdita dati offline) | Richiesta `navigator.storage.persist()`. Banner all'avvio con istruzioni chiare per l'installazione PWA sulla Schermata Home di iOS (dove il limite non si applica). Ricaricamento silente completo se i dati locali risultano vuoti. |
-| **Saturazione quota Storage Supabase (1 GB Free Tier)** | Media (nel lungo periodo) | Alto | Compressione client-side obbligatoria prima dell'upload per tutte le immagini (riduzione del ~90% del peso, max 1600px). Esclusione file audio dalla v1. Monitoraggio spazio occupato nella schermata Admin. |
-| **Vulnerabilità XSS da contenuti utente/database** | Bassa (un solo admin) | Critico | Divieto assoluto di `innerHTML` in tutto il codebase. Templating JSX/Preact con escaping automatico per ogni stringa. Parser ChordPro basato su generazione di nodi DOM nativi. |
-| **Popup Blocker su stampa da smartphone** | Alta | Alto | Stampa esclusivamente in-page con `window.print()` e stili `@media print` A4, senza creazione di nuove finestre popup. |
+| **Pausa automatica Supabase dopo 7 giorni di inattività** | Alta (periodi senza attività) | Bloccante per aggiornamenti | Workflow GitHub Actions `keepalive.yml` ogni 2 giorni con query REST a Postgres. Secondo ping indipendente documentato via cron-job.org. |
+| **Disattivazione workflow GitHub Actions dopo 60 giorni** | Media | Alto (blocca keepalive) | Controllo ultimo commit in `keepalive.yml`: se $> 40$ giorni, commit heartbeat su `docs/` con `[skip ci]` (zero deploy sprecati e timer resettato). |
+| **Cancellazione storage IndexedDB su iOS Safari dopo 7 giorni** | Alta (da Safari browser) | Medio (perdita dati offline) | Richiesta `navigator.storage.persist()`. Banner d'installazione su Schermata Home di iOS (dove la policy non si applica). Resync atomico completo silenzioso se i dati risultano vuoti. |
+| **Saturazione quota Storage Supabase (1 GB Free Tier)** | Media | Alto | Compressione client-side prima dell'upload (max 1600px). Esclusione file audio in v1. Monitoraggio occupazione spazio in Admin e limite bucket a 10 MB. |
+| **Listing pubblico non autorizzato del bucket Storage** | Media | Sicurezza/Privacy | Rimozione policy SELECT pubblica su `storage.objects`: i file sono raggiungibili solo via URL diretto, impedendo il list dei file ad anonimi. |
+| **Vulnerabilità XSS da contenuti utente/database** | Bassa (un solo admin) | Critico | Divieto assoluto di `innerHTML`. Templating JSX/Preact con escaping automatico. Parser ChordPro basato su nodi DOM nativi. |
+| **Warning search_path Supabase Security Advisor** | Certa (se omesso) | Qualità/Sicurezza | Dichiarazione esplicita `SET search_path = public` su tutte le funzioni SQL (`set_updated_at`, `is_admin`). |

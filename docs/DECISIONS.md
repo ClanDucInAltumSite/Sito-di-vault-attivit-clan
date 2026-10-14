@@ -37,18 +37,21 @@ Questo documento raccoglie tutte le decisioni architetturali, i vincoli e le mot
 ---
 
 ## ADR-004: Prevenzione Pausa Gratuita Supabase e Limite 60 Giorni GitHub Actions
-- **Stato:** Approvato (Fase 0)
+- **Stato:** Approvato (Fase 0, aggiornato con verifica documentale ufficiale)
 - **Fonti ufficiali verificate:**
   1. *Supabase Inactivity Pausing:* [Supabase Documentation - Project Pausing](https://supabase.com/docs/guides/platform/pausing). Nei progetti con piano gratuito (Free Tier), l'istanza PostgreSQL viene messa automaticamente in pausa dopo **7 giorni consecutivi di inattività** sul database (mancanza di query utente REST/Postgres). La pausa non cancella i dati (conservati per 1 anno), ma spegne il compute instance rendendo l'app offline finché il progetto non viene ripristinato manualmente dalla dashboard.
-  2. *GitHub Actions 60-Day Scheduled Workflow Policy:* [GitHub Docs - Disabling and enabling a workflow](https://docs.github.com/en/actions/managing-workflow-runs-and-deployments/managing-workflow-runs/disabling-and-enabling-a-workflow). Nei repository pubblici, i workflow con trigger `schedule` (cron) vengono **disabilitati automaticamente dopo 60 giorni** di assenza di attività (commit/push sul repository).
+  2. *GitHub Actions 60-Day Scheduled Workflow Policy:* [GitHub Docs - Disabling and enabling a workflow](https://docs.github.com/en/actions/managing-workflow-runs-and-deployments/managing-workflow-runs/disabling-and-enabling-a-workflow). La documentazione ufficiale stabilisce espressamente: *"In a public repository, scheduled workflows are automatically disabled when no repository activity has occurred in 60 days."* L'attività del repository che resetta la finestra di 60 giorni richiede modifiche dirette al codice/commit (apertura issue, commenti o release tag non resettano con certezza il timer).
 - **Decisione e Mitigazione:**
   1. **Keepalive Workflow (`.github/workflows/keepalive.yml`):**
      - Schedulato ogni 2-3 giorni (`0 6 */2 * *`) con supporto a esecuzione manuale `workflow_dispatch`.
      - Esegue una **vera query REST a Postgres** (`GET /rest/v1/giochi?select=id&limit=1`) autenticata con l'Anon Key letta da GitHub Secrets/Variables. Verifica che la risposta sia HTTP 200. Se Supabase risponde con errore o è in pausa, il workflow fallisce visibilmente inviando una notifica email automatica da GitHub all'amministratore.
-  2. **Superamento del limite dei 60 giorni di GitHub Actions:**
-     - Il workflow `keepalive.yml` include un controllo sulla data dell'ultimo commit sul branch `main`. Se sono trascorsi più di 40 giorni dall'ultimo commit, il workflow effettua un commit di aggiornamento leggero su un file timestamp (`docs/keepalive_heartbeat.txt`) con permessi `contents: write`, resettando in modo del tutto trasparente il timer dei 60 giorni.
+  2. **Superamento del limite dei 60 giorni senza Deploy superfluo:**
+     - Il workflow `keepalive.yml` controlla la data dell'ultimo commit su `main`. Se sono trascorsi più di 40 giorni, esegue un commit di heartbeat aggiornando `docs/keepalive_heartbeat.txt` con messaggio `chore(keepalive): heartbeat [skip ci]`.
+     - **Come si evita che l'heartbeat scateni `deploy.yml`:**
+       a) Nel workflow `deploy.yml`, il trigger di push esclude esplicitamente i percorsi di documentazione tramite `paths-ignore: ['docs/**']`.
+       b) Il messaggio di commit include il tag standard `[skip ci]`, supportato nativamente da GitHub Actions per non avviare workflow correlati al push.
   3. **Ridondanza esterna a costo zero:**
-     - In `docs/SETUP_MANUALE.md` viene fornita la guida per impostare un ping gratuito indipendente tramite servizio esterno (ad es. *Cron-job.org* o *UptimeRobot*), che esegue una chiamata GET ogni 3 giorni all'endpoint REST di Supabase, garantendo la continuità anche qualora GitHub Actions dovesse subire blocchi o interruzioni.
+     - In `docs/SETUP_MANUALE.md` viene fornita la guida per impostare un ping gratuito indipendente tramite servizio esterno (ad es. *Cron-job.org* o *UptimeRobot*), che esegue una chiamata GET ogni 3 giorni all'endpoint REST di Supabase.
 
 ---
 
@@ -57,60 +60,97 @@ Questo documento raccoglie tutte le decisioni architetturali, i vincoli e le mot
 - **Decisione:** I canti vengono archiviati in formato ChordPro semplificato (`[Accordo]sillaba`). Il parser supporta la notazione italiana (`Do, Re, Mi, Fa, Sol, La, Si` con alterazioni `#`, `b` e suffissi `m, 7, maj7, dim, sus4, add9, /Basso`) e converte trasparentemente anche la notazione anglosassone (`C, D, E, F, G, A, B`).
 - **Rendering e Sicurezza:**
   1. Il parser genera un Abstract Syntax Tree (AST) strutturato e lo converte in nodi DOM Preact. È rigorosamente vietato qualsiasi uso di `innerHTML` o regex di sostituzione HTML grezzo.
-  2. Il rendering dispone l'accordo in un contenitore a due righe (accordo in alto con colore azzurro o giallo, sillaba in basso) raggruppato in blocchi inline-block/flex. In caso di testo lungo su schermi mobili stretti, l'accordo rimane perfettamente ancorato sopra la sillaba anche quando la frase va a capo su più righe.
+  2. Il rendering dispone l'accordo in un contenitore a due righe (accordo in alto, sillaba in basso) raggruppato in blocchi inline-block/flex. In caso di testo lungo su schermi mobili stretti, l'accordo rimane perfettamente ancorato sopra la sillaba anche quando la frase va a capo su più righe.
   3. La trasposizione opera sul modello dati a livello semitoni matematici ($0 \dots 11$) calcolando l'armatura appropriata (diesis vs bemolli) e agisce esclusivamente a runtime per la visualizzazione, lasciando invariato il testo ChordPro archiviato su database.
 
 ---
 
-## ADR-006: Gestione Allegati, Compressione Client-Side ed Esclusione Audio in v1
-- **Stato:** Approvato (Fase 0)
-- **Fonti verificate:** Supabase Free Tier offre **1 GB** di archiviazione Storage complessiva.
+## ADR-006: Gestione Allegati, Compressione Client-Side e Policy Storage Senza Listing Pubblico
+- **Stato:** Approvato (Fase 0, aggiornato con verifica policy Supabase Storage)
+- **Fonti verificate:**
+  1. Supabase Free Tier offre **1 GB** di archiviazione Storage complessiva.
+  2. *Supabase Storage Public Bucket Documentation:* Quando un bucket è impostato come `public = true`, i singoli oggetti vengono serviti direttamente dal CDN di Supabase all'endpoint `/storage/v1/object/public/{bucket}/{path}` senza passare dalle regole RLS di `storage.objects`. Non è necessaria alcuna policy `SELECT` per visualizzare/scaricare file con il loro URL diretto. La policy `SELECT` su `storage.objects` abiliterebbe invece il listing dell'intero bucket (es. `supabase.storage.from('allegati').list()`).
 - **Decisione:**
-  1. In v1 sono supportati unicamente **immagini (JPG, PNG, WebP)** e **documenti PDF**. I file audio (registrazioni audio o mp3 dei canti) sono **esclusi dalla v1** per evitare di saturare rapidamente la quota gratuita di 1 GB.
-  2. L'architettura del database (`allegati` con `mime text`, `storage_path text`, `dimensione bigint`) è già predisposta per l'abilitazione di tipi MIME `audio/*` in v2 senza alcuna alterazione dello schema.
-  3. Per le immagini caricate da smartphone (spesso 5–15 MB scattate con fotocamere moderne), viene implementata la compressione/ridimensionamento automatico client-side tramite Canvas HTML5: le foto vengono ridotte a un massimo di 1600px di lato lungo e codificate in WebP o JPEG a qualità 0.82 prima dell'invio a Supabase Storage (riduzione media del 90% del peso, tipicamente da 8 MB a ~300 KB).
-  4. Dimensione massima per singolo file imposta sia lato client che lato bucket RLS: 10 MB per i PDF e 5 MB per le immagini compresse.
+  1. **Nessuna policy SELECT pubblica su `storage.objects`:** Per ragioni di sicurezza e privacy, si vieta l'esplorazione (listing) anonima dell'intero contenuto del bucket. I file sono raggiungibili unicamente tramite i rispettivi percorsi diretti archiviati nella tabella `allegati`.
+  2. Solo `is_admin()` ha i permessi `INSERT`, `UPDATE` e `DELETE` su `storage.objects`.
+  3. In v1 sono supportati unicamente **immagini (JPG, PNG, WebP)** e **documenti PDF**. I file audio sono **esclusi dalla v1** per preservare il limite di 1 GB (architettura già predisposta per v2 con colonna `mime text`).
+  4. Compressione client-side prima dell'upload per tutte le immagini (max 1600px, WebP/JPEG qualità 0.82) con riduzione media del 90% del peso.
+  5. Limite dimensione per file: 10 MB per i PDF e 5 MB per le immagini compresse.
 
 ---
 
-## ADR-007: Stampa In-Page con CSS `@media print`
-- **Stato:** Approvato (Fase 0)
-- **Decisione:** La stampa avviene interamente nella stessa pagina tramite la chiamata standard `window.print()`, applicando regole `@media print` e direttive `@page A4`. Nessuna finestra popup e nessuna libreria di generazione PDF pesante (es. jsPDF / html2pdf).
-- **Motivazione:**
-  1. Su smartphone Android e iOS i browser bloccano sistematicamente i popup o aprono schede orfane che perdono il contesto della PWA offline.
-  2. Le librerie esterne di generazione PDF client-side pesano centinaia di kilobyte, degradano la nitidezza dei font nativi e consumano molta memoria RAM sui dispositivi mobili.
-  3. `@media print` sfrutta il motore tipografico nativo del browser, garantendo esportazione perfetta in "Salva come PDF" su Chrome/Edge/Firefox e stampa AirPrint su iOS.
-  4. Specifiche per sezione:
-     - *Giochi e Bans:* Flusso continuo con `break-inside: avoid` su ciascun elemento e separatore sottile, evitando sprechi di carta.
-     - *Canti:* Nuova pagina obbligatoria per ogni canto (`break-before: page`), rispetto dei tag `{nuova_pagina}`, intestazione ridotta nelle pagine successive ("Titolo — 2/2") e algoritmo di rilevamento overflow che avvisa nell'anteprima se il canto sfora l'A4.
-     - *ODG:* Scheda singola compatta con caselle quadrate stampabili per la spunta manuale.
+## ADR-007: Stampa In-Page con CSS `@media print` e Gestione Elementi Lunghi
+- **Stato:** Approvato (Fase 0, aggiornato per regole break-inside)
+- **Decisione:** La stampa avviene interamente nella stessa pagina tramite `window.print()` e `@media print` A4.
+- **Specifiche per sezione:**
+  - *Giochi e Bans:* Flusso continuo senza interruzioni di pagina forzate. La regola `break-inside: avoid` viene applicata **esclusivamente agli elementi brevi** (testo sotto i 600 caratteri); gli elementi lunghi possono spezzarsi liberamente tra le pagine per non lasciare ampi spazi bianchi a fondo pagina. `break-after: avoid` rimane attivo sui titoli per evitare titoli orfani.
+  - *Canti:* Nuova pagina obbligatoria per ogni canto (`break-before: page`), rispetto dei tag `{nuova_pagina}`, intestazione ridotta nelle pagine successive ("Titolo — 2/2") e algoritmo di rilevamento overflow che avvisa nell'anteprima se il canto sfora l'A4.
+  - *ODG:* Scheda singola compatta con caselle quadrate stampabili per la spunta manuale.
 
 ---
 
 ## ADR-008: Palette Colori Scout, Contrasto WCAG AA e Tipografia
 - **Stato:** Approvato (Fase 0)
-- **Colori istituzionali di partenza:** Giallo `#FFC93C`, Rosso `#E8442D`, Azzurro `#2F8FC7`, Sfondo Chiaro `#FAF6EC`, Testo Chiaro `#21262B`, Sfondo Scuro `#1E2A33`.
-- **Verifica Contrasto WCAG AA:**
-  - Su sfondo Giallo (`#FFC93C`): il testo bianco NON ha contrasto sufficiente (1.5:1). Viene imposto per regola ferrea testo scuro `#1E2A33` (rapporto di contrasto **10.2:1**, conforme WCAG AAA).
-  - Testo su Sfondo Chiaro (`#FAF6EC`): `#21262B` produce contrasto **13.5:1** (conforme AAA).
-  - Pulsante Rosso: `#D9381E` con testo bianco `#FFFFFF` produce contrasto **4.8:1** (conforme AA per testo normale, AAA per testo grande).
-  - Accenti Azzurro: `#1E74A6` (calibrato leggermente rispetto al base per garantire > 4.5:1 su fondo chiaro).
-  - Tema scuro (`#1E2A33`): testo primario `#F3F4F6`, accenti azzurro brillante `#4AA9E8`, giallo badge `#FFD566` con testo `#1E2A33`.
-- **Tipografia:** Font **Outfit** self-hosted (file WOFF2 memorizzati localmente in `public/fonts/`, pesi 400, 600, 700), nessun caricamento da Google Fonts per totale operatività offline e conformità privacy GDPR. Fallback di sistema: `system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`.
+- **Decisione:** Palette Scout: Giallo `#FFC93C`, Rosso `#D9381E` (calibrato per AA su bianco), Azzurro `#1E74A6` (calibrato per AA su chiaro) / `#2F8FC7` (su scuro).
+- **Regola inderogabile:** Su sfondo Giallo, testo **sempre** scuro `#21262B` (contrasto > 10:1, AAA).
+- **Tipografia:** Font **Outfit** self-hosted (WOFF2 in `public/fonts/`, pesi 400, 600, 700), zero chiamate esterne a Google Fonts.
 
 ---
 
 ## ADR-009: Centralizzazione Stringhe UI (`src/lib/i18n.ts`)
 - **Stato:** Approvato (Fase 0)
-- **Decisione:** Tutti i testi, etichette, messaggi di errore, conferme e stati visibili all'utente sono definiti in un unico dizionario TypeScript fortemente tipizzato (`src/lib/i18n.ts`), esclusivamente in lingua italiana. Nessuna stringa testuale hardcodata all'interno dei componenti TSX.
-- **Motivazione:** Rispetto puntuale del vincolo non negoziabile n. 5 ("Tutta l'interfaccia è solo in italiano. Le stringhe stanno in un unico file"), facilitando revisioni lessicali, consistenza del tono scout e test di regressione sui testi.
+- **Decisione:** Tutte le stringhe, etichette, messaggi e testi dell'applicazione risiedono in un unico file TypeScript tipizzato (`src/lib/i18n.ts`). Lingua unicamente in italiano.
 
 ---
 
-## ADR-010: Politica di Conservazione Tombstone (90 giorni) e Risincronizzazione Completa
-- **Stato:** Approvato (Fase 0)
-- **Decisione:** I record cancellati mantengono `deleted_at NOT NULL` (soft delete) su Supabase per almeno **90 giorni**.
-- **Algoritmo:**
-  1. Durante la sincronizzazione incrementale, i record con `deleted_at IS NOT NULL` vengono rimossi dalla copia locale in IndexedDB.
-  2. Se un dispositivo scout riapre l'applicazione dopo un periodo di assenza superiore a 90 giorni (o se il database locale risulta vuoto/corrotto), l'applicazione esegue automaticamente e silenziosamente una **risincronizzazione completa** da zero (`full resync`), azzerando e ricostruendo IndexedDB per evitare che record eliminati definitivamente dal server rimangano orfani sul dispositivo.
-  3. L'utente admin dispone di un Cestino per visualizzare i record cancellati di recente e ripristinarli con un click.
+## ADR-010: Politica Tombstone (Conservazione 180 giorni) e Pulizia Definitiva Storage
+- **Stato:** Approvato (Fase 0, aggiornato con gerarchia tombstone)
+- **Decisione:**
+  1. Quando un elemento genitore (`gioco`, `ban`, `canto`, `evento`) subisce soft-delete (`deleted_at = now()`), tutti i relativi elementi figli associati (`odg_punti`, `allegati`) vengono **nascosti dalla UI** e, in caso di ripristino del genitore, ripristinati congiuntamente.
+  2. **Periodo di conservazione dei tombstone:** Fissato a **180 giorni** sul server, ben superiore alla soglia dei 90 giorni che attiva la Full Resync dei client.
+  3. **Pulizia definitiva del Cestino (Hard Delete):** Tramite apposita funzione di svuotamento definitivo attivabile da admin, gli elementi con `deleted_at < now() - interval '180 days'` (o forzati dall'admin nel Cestino) vengono eliminati fisicamente dal database e i corrispondenti file su Supabase Storage vengono cancellati definitivamente.
+
+---
+
+## ADR-011: Attivazione Supabase Realtime via Migrazione SQL
+- **Stato:** Approvato (Fase 1)
+- **Decisione:** Nelle migrazioni SQL viene aggiunta l'istruzione esplicita per abilitare il Realtime sulle tabelle di contenuto:
+  `ALTER PUBLICATION supabase_realtime ADD TABLE public.giochi, public.bans, public.canti, public.eventi, public.odg_punti, public.allegati;`
+- **Uso:** Il client frontend ascolta il canale broadcast Postgres Changes su queste tabelle come puro **segnale** di notifica (debounced a ~300ms) per avviare una pull incrementale, garantendo coerenza e sicurezza dei dati.
+
+---
+
+## ADR-012: Meccanica di Full Resync Atomico e Timeout Differenziati
+- **Stato:** Approvato (Fase 1)
+- **Decisione:**
+  1. Durante la **Full Resync** (primo avvio dell'app o dopo assenza > 90 giorni), i dati dal server vengono scaricati interamente in memoria in un'area temporanea.
+  2. La sostituzione dei dati in IndexedDB avviene in modo **strettamente atomico** tramite una singola transazione `readwrite` di `idb` **solo ed esclusivamente a download completato con successo**. È severamente vietato svuotare o cancellare IndexedDB prima del download, prevenendo la perdita di dati locali in caso di caduta della connessione.
+  3. **Timeout differenziati:**
+     - Pull incrementale rapida di routine: timeout breve di **4 secondi** (se fallisce, l'utente continua a navigare sui dati locali e riprova in background).
+     - Primo download e Full Resync: timeout esteso a **25 secondi**, con suddivisione a lotti (chunking) per tabelle e possibilità di ripresa automatica.
+
+---
+
+## ADR-013: Regola Rigorosa per Tolleranza Typo nella Ricerca Multi-Campo
+- **Stato:** Approvato (Fase 1)
+- **Decisione:** Per evitare incoerenze tra specifica e test, l'algoritmo di corrispondenza per typo adotta la seguente regola deterministica su ciascun token normalizzato:
+  1. **Token corti (lunghezza < 4 caratteri):** Nessun typo consentito (distanza Levenshtein = 0, exact prefix match).
+  2. **Token medi (lunghezza tra 4 e 7 caratteri):** Distanza Levenshtein massima **1**.
+  3. **Token lunghi (lunghezza $\ge 8$ caratteri):** Distanza Levenshtein massima **2** (es. termine ricercato "aveleata", lunghezza 8 caratteri, corrisponde ad "avvelenata" con distanza 2).
+- Questa formulazione garantisce precisione su parole brevi senza falsi positivi e massima tolleranza su termini lunghi.
+
+---
+
+## ADR-014: Base Path GitHub Pages, PWA Scope e CSP con WebSockets
+- **Stato:** Approvato (Fase 1)
+- **Decisione:**
+  1. Base path Vite configurato su `/Sito-di-vault-attivit-clan/`.
+  2. Manifest PWA con `scope: "/Sito-di-vault-attivit-clan/"` e `start_url: "/Sito-di-vault-attivit-clan/#/"`.
+  3. Service Worker registrato relativamente al base path corretto.
+  4. Content Security Policy (meta tag) include esplicitamente `wss://lpeiyzwccedtqjbficjo.supabase.co` e `https://lpeiyzwccedtqjbficjo.supabase.co` in `connect-src` per garantire il funzionamento del canale Realtime.
+
+---
+
+## ADR-015: Protezione Funzioni Postgres contro Mutable search_path
+- **Stato:** Approvato (Fase 1)
+- **Decisione:** Tutte le funzioni create nel database (`set_updated_at`, `is_admin`, procedure di pulizia) dichiarano esplicitamente `SET search_path = public` (o `SET search_path = ''`) per eliminare le vulnerabilità di ricerca percorso e soddisfare al 100% i controlli del Supabase Security Advisor.
