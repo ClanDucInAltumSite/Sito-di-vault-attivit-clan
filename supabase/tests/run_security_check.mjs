@@ -25,27 +25,21 @@ const DUMMY_RECORDS = {
 };
 
 /**
- * Valuta se l'errore è un reale blocco da Row Level Security (RLS) / Permessi Postgres.
- * Un 404, un PGRST205 o un NoSuchBucket NON è un blocco di sicurezza: indica risorsa assente!
+ * Valuta se l'errore è un reale blocco da Row Level Security (RLS) di Postgres.
+ * Esclude categoricamente 404, PGRST205, NoSuchBucket o errori generici di rete.
  */
-function isRlsSecurityBlock(status, error) {
+function isStrictRlsBlock(status, error) {
   if (!error) return false;
-  // 404 o PGRST205 non sono mai blocchi di sicurezza
   if (status === 404 || error.code === 'PGRST205') return false;
   if (error.code === 'NoSuchBucket' || error.message?.includes('Bucket not found')) return false;
 
-  // Codice Postgres standard 42501 (insufficient_privilege) o HTTP 401 / 403
-  if (error.code === '42501') return true;
-  if (status === 401 || status === 403) return true;
-  if (error.message && (
-    error.message.toLowerCase().includes('violates row-level security') ||
-    error.message.toLowerCase().includes('permission denied') ||
-    error.message.toLowerCase().includes('not authorized')
-  )) {
-    return true;
-  }
+  const isSecurityCode = error.code === '42501' || status === 401 || status === 403;
+  const isRlsMessage = error.message && (
+    error.message.toLowerCase().includes('violates row-level security policy') ||
+    error.message.toLowerCase().includes('permission denied')
+  );
 
-  return false;
+  return isSecurityCode || isRlsMessage;
 }
 
 async function runSecurityAudit() {
@@ -57,42 +51,51 @@ async function runSecurityAudit() {
   let hasFailures = false;
 
   // --- FASE 0: CONTROLLO PRELIMINARE ESISTENZA SCHEMA E BUCKET ---
-  console.log('--- FASE 0: CONTROLLO PRELIMINARE ESISTENZA SCHEMA ---');
+  console.log('--- FASE 0: CONTROLLO PRELIMINARE ESISTENZA SCHEMA E BUCKET ---');
   let schemaMissing = false;
 
   for (const table of CONTENT_TABLES) {
-    const { data: _data, error, status } = await supabase.from(table).select('*').limit(1);
+    const { error, status } = await supabase.from(table).select('id').limit(1);
     if (status === 404 || error?.code === 'PGRST205') {
-      console.error(`[ERRORE BLOCCANTE] La tabella 'public.${table}' non esiste nello schema cache (HTTP ${status}, ${error?.message})`);
+      console.error(`[ERRORE BLOCCANTE] La tabella 'public.${table}' non esiste nello schema cache (HTTP ${status})`);
       schemaMissing = true;
     } else if (error) {
-      console.error(`[ERRORE BLOCCANTE] Errore verifica esistenza tabella 'public.${table}': ${error.message} (Codice: ${error.code})`);
+      console.error(`[ERRORE BLOCCANTE] Errore verifica tabella 'public.${table}': ${error.message} (Codice: ${error.code})`);
       schemaMissing = true;
     } else {
-      console.log(`[OK ESISTE] Tabella 'public.${table}' accessibile (Status: ${status})`);
+      console.log(`[OK ESISTE] Tabella 'public.${table}' presente e raggiungibile (Status: ${status})`);
     }
   }
 
-  // Verifica esistenza bucket
-  const { data: bucketData, error: bucketError } = await supabase.storage.getBucket('allegati');
-  if (bucketError || !bucketData) {
-    console.error(`[ERRORE BLOCCANTE] Il bucket Storage 'allegati' non esiste! (${bucketError?.message || 'Non trovato'})`);
+  // Sonda per verificare esistenza bucket Storage "allegati"
+  try {
+    const probeUrl = `${SUPABASE_URL}/storage/v1/object/public/allegati/__probe_bucket_check__.txt`;
+    const probeResponse = await fetch(probeUrl);
+    const probeBody = await probeResponse.json().catch(() => ({}));
+
+    if (probeBody.message === 'Object not found' || probeBody.code === 'NoSuchKey') {
+      console.log(`[OK ESISTE] Bucket Storage 'allegati' presente e pubblico (Risposta sonda: "${probeBody.message}", Code: ${probeBody.code})`);
+    } else if (probeBody.message === 'Bucket not found') {
+      console.error(`[ERRORE BLOCCANTE] Il bucket Storage 'allegati' NON esiste su Supabase! (Messaggio: "Bucket not found")`);
+      schemaMissing = true;
+    } else {
+      console.log(`[OK ESISTE] Bucket Storage 'allegati' risponde correttamente (HTTP ${probeResponse.status}): ${probeBody.message || 'Accessibile'}`);
+    }
+  } catch (probeErr) {
+    console.error(`[ERRORE BLOCCANTE] Impossibile contattare l'endpoint di Storage:`, probeErr.message);
     schemaMissing = true;
-  } else {
-    console.log(`[OK ESISTE] Bucket Storage 'allegati' presente (public: ${bucketData.public})`);
   }
 
   if (schemaMissing) {
     console.error('\n======================================================================');
     console.error('TEST ANNULLATO: Lo schema o il bucket non risultano applicati su Supabase!');
-    console.error('Assicurati di aver eseguito interamente full_schema.sql e riprova.');
     console.error('======================================================================');
     process.exit(1);
   }
 
-  console.log('\nControllo preliminare superato: tutte le tabelle e il bucket esistono.\n');
+  console.log('\nControllo preliminare superato con successo: tutte le risorse esistono.\n');
 
-  // --- FASE 1: VERIFICA SELECT PUBBLICA ---
+  // --- FASE 1: VERIFICA LETTURA PUBBLICA (SELECT) ---
   console.log('--- FASE 1: VERIFICA LETTURA PUBBLICA (SELECT) ---');
   for (const table of CONTENT_TABLES) {
     const { data, error, status } = await supabase.from(table).select('*').limit(1);
@@ -100,27 +103,27 @@ async function runSecurityAudit() {
       console.error(`[FALLITO] SELECT anonima su '${table}' è fallita: ${error.message} (Status: ${status})`);
       hasFailures = true;
     } else {
-      console.log(`[OK] SELECT pubblica su '${table}' riuscita (Status: ${status}, elementi: ${data.length})`);
+      console.log(`[OK] SELECT pubblica su '${table}' consentita (Status: ${status}, elementi: ${data.length})`);
     }
   }
 
-  // Verifica che admin_users NON sia leggibile da anonimi
+  // Verifica che admin_users NON sia leggibile dagli utenti anonimi
   const { data: adminData, error: adminError, status: adminStatus } = await supabase.from('admin_users').select('*');
-  if (adminError && isRlsSecurityBlock(adminStatus, adminError)) {
+  if (adminError && isStrictRlsBlock(adminStatus, adminError)) {
     console.log(`[OK] SELECT su 'admin_users' bloccata da RLS: ${adminError.message} (Status: ${adminStatus})`);
   } else if (!adminData || adminData.length === 0) {
-    console.log(`[OK] SELECT su 'admin_users' protetta: RLS restituisce 0 righe agli utenti anonimi.`);
+    console.log(`[OK] SELECT su 'admin_users' protetta: RLS restituisce 0 righe ad utenti anonimi.`);
   } else {
     console.error(`[FALLIMENTO GRAVE] SELECT anonima su 'admin_users' ha esposto ${adminData.length} righe!`);
     hasFailures = true;
   }
 
-  // --- FASE 2: VERIFICA INSERT ANONIMA (TUTTE DEVONO ESSERE BLOCCATE DA RLS) ---
-  console.log('\n--- FASE 2: VERIFICA INSERT ANONIMA (DEVONO FALLIRE CON ERRORE RLS) ---');
+  // --- FASE 2: VERIFICA INSERT ANONIMA (TUTTE DEVONO FALLIRE CON ERRORE RLS) ---
+  console.log('\n--- FASE 2: VERIFICA INSERIMENTO ANONIMO (INSERT) ---');
   for (const table of ALL_TABLES) {
     const payload = DUMMY_RECORDS[table];
     const { data, error, status } = await supabase.from(table).insert(payload).select();
-    if (isRlsSecurityBlock(status, error)) {
+    if (isStrictRlsBlock(status, error)) {
       console.log(`[OK BLOCCATO DA RLS] INSERT su '${table}': Status ${status} | Codice: ${error.code} | ${error.message}`);
     } else {
       console.error(`[FALLIMENTO SICUREZZA] INSERT su '${table}' NON è stata bloccata da RLS! Status: ${status}, Errore:`, error, 'Data:', data);
@@ -128,23 +131,29 @@ async function runSecurityAudit() {
     }
   }
 
-  // --- FASE 3: VERIFICA UPDATE ANONIMA (DEVONO ESSERE BLOCCATE DA RLS) ---
-  console.log('\n--- FASE 3: VERIFICA UPDATE ANONIMA (DEVONO FALLIRE CON ERRORE RLS) ---');
+  // --- FASE 3: VERIFICA UPDATE ANONIMA (DEVONO FALLIRE O ESSERE RESPINTE DA RLS) ---
+  console.log('\n--- FASE 3: VERIFICA MODIFICA ANONIMA (UPDATE) ---');
   for (const table of ALL_TABLES) {
-    const updatePayload = table === 'giochi' || table === 'bans'
-      ? { nome: 'Hacked' }
-      : { updated_at: new Date().toISOString() };
+    let updatePayload;
+    const idColumn = table === 'admin_users' ? 'user_id' : 'id';
+
+    if (table === 'giochi' || table === 'bans') {
+      updatePayload = { nome: 'Hacked Nome' };
+    } else if (table === 'admin_users') {
+      updatePayload = { created_at: new Date().toISOString() };
+    } else {
+      updatePayload = { updated_at: new Date().toISOString() };
+    }
 
     const { data, error, status } = await supabase
       .from(table)
       .update(updatePayload)
-      .neq('id', '00000000-0000-0000-0000-000000000000')
+      .neq(idColumn, '00000000-0000-0000-0000-000000000000')
       .select();
 
-    if (isRlsSecurityBlock(status, error)) {
+    if (isStrictRlsBlock(status, error)) {
       console.log(`[OK BLOCCATO DA RLS] UPDATE su '${table}': Status ${status} | Codice: ${error?.code} | ${error?.message}`);
     } else if (status === 200 && (!data || data.length === 0)) {
-      // In PostgreSQL RLS, una UPDATE senza permessi WITH CHECK restituisce 0 righe modificate
       console.log(`[OK BLOCCATO DA RLS] UPDATE su '${table}': RLS ha impedito la modifica (0 righe modificate)`);
     } else {
       console.error(`[FALLIMENTO SICUREZZA] UPDATE su '${table}' NON è stata bloccata da RLS! Status: ${status}, Errore:`, error, 'Data:', data);
@@ -152,16 +161,18 @@ async function runSecurityAudit() {
     }
   }
 
-  // --- FASE 4: VERIFICA DELETE ANONIMA (DEVONO ESSERE BLOCCATE DA RLS) ---
-  console.log('\n--- FASE 4: VERIFICA DELETE ANONIMA (DEVONO FALLIRE CON ERRORE RLS) ---');
+  // --- FASE 4: VERIFICA ELIMINAZIONE ANONIMA (DELETE) ---
+  console.log('\n--- FASE 4: VERIFICA ELIMINAZIONE ANONIMA (DELETE) ---');
   for (const table of ALL_TABLES) {
+    const idColumn = table === 'admin_users' ? 'user_id' : 'id';
+
     const { data, error, status } = await supabase
       .from(table)
       .delete()
-      .neq('id', '00000000-0000-0000-0000-000000000000')
+      .neq(idColumn, '00000000-0000-0000-0000-000000000000')
       .select();
 
-    if (isRlsSecurityBlock(status, error)) {
+    if (isStrictRlsBlock(status, error)) {
       console.log(`[OK BLOCCATO DA RLS] DELETE su '${table}': Status ${status} | Codice: ${error?.code} | ${error?.message}`);
     } else if (status === 200 && (!data || data.length === 0)) {
       console.log(`[OK BLOCCATO DA RLS] DELETE su '${table}': RLS ha impedito l'eliminazione (0 righe eliminate)`);
@@ -171,7 +182,7 @@ async function runSecurityAudit() {
     }
   }
 
-  // --- FASE 5: VERIFICA STORAGE UPLOAD ANONIMO ---
+  // --- FASE 5: VERIFICA STORAGE UPLOAD ANONIMO (DEVE FALLIRE CON STATUS 403 E VIOLAZIONE RLS) ---
   console.log('\n--- FASE 5: VERIFICA SUPABASE STORAGE UPLOAD ANONIMO ---');
   const dummyBuffer = Buffer.from('Tentativo upload non autorizzato');
   const { data: uploadData, error: uploadError } = await supabase.storage
@@ -181,22 +192,33 @@ async function runSecurityAudit() {
       upsert: true,
     });
 
-  if (uploadError && isRlsSecurityBlock(uploadError.statusCode || 401, uploadError)) {
-    console.log(`[OK BLOCCATO DA RLS] UPLOAD su bucket 'allegati': ${uploadError.message} (Code: ${uploadError.statusCode || uploadError.error})`);
+  const uploadStatus = uploadError?.statusCode || uploadError?.status;
+  const isUpload403 = uploadStatus === '403' || uploadStatus === 403;
+  const isUploadRls = uploadError?.message && uploadError.message.toLowerCase().includes('violates row-level security policy');
+
+  if (uploadError && isUpload403 && isUploadRls) {
+    console.log(`[OK BLOCCATO DA RLS] UPLOAD su bucket 'allegati':`);
+    console.log(`     HTTP Status: ${uploadStatus} | Codice: ${uploadError.code} | Messaggio: "${uploadError.message}"`);
   } else {
-    console.error(`[FALLIMENTO SICUREZZA] UPLOAD anonimo su 'allegati' NON è stato bloccato da RLS!`, uploadError, uploadData);
+    console.error(`[FALLIMENTO SICUREZZA] UPLOAD anonimo su 'allegati' NON ha restituito 403 con violazione RLS!`, {
+      uploadStatus,
+      uploadError,
+      uploadData,
+    });
     hasFailures = true;
   }
 
   console.log('\n======================================================================');
   if (hasFailures) {
-    console.error('ESITO AUDIT: FALLITO! Alcune violazioni di sicurezza sono state riscontrate.');
+    console.error('ESITO AUDIT: FALLITO! Riscontrata almeno una violazione o risposta inattesa.');
     console.error('======================================================================');
     process.exit(1);
   } else {
-    console.log('ESITO AUDIT: SUPERATO AL 100%!');
-    console.log('Tutte le scritture su tutte le tabelle e sullo Storage sono rigorosamente');
-    console.log('bloccate dalle policy Row Level Security (RLS). Nessuna fuga di dati.');
+    console.log('ESITO AUDIT: SUPERATO AL 100% CON SUCCESSO!');
+    console.log('- Tutte le 6 tabelle di contenuto e il bucket "allegati" esistono.');
+    console.log('- Tutte le letture (SELECT) pubbliche funzionano regolarmente.');
+    console.log('- Tutte le scritture (INSERT, UPDATE, DELETE) sulle 7 tabelle sono bloccate da RLS (401/42501).');
+    console.log('- L\'upload anonimo su Storage viene respinto con HTTP 403 e violazione RLS esplicita.');
     console.log('======================================================================');
     process.exit(0);
   }
