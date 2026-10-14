@@ -1,0 +1,148 @@
+/* ==============================================================================
+   Stili di Stampa (@media print) — Formato A4, Nero su Bianco, Alto Contrasto
+   ============================================================================== */
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm 10mm;
+  }
+
+  /* Reset generale per risparmio inchiostro e leggibilità */
+  *, *::before, *::after {
+    background: transparent !important;
+    color: #000000 !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  html, body {
+    background: #ffffff !important;
+    font-size: 11pt !important;
+    line-height: 1.35 !important;
+  }
+
+  #app {
+    padding-bottom: 0 !important;
+  }
+
+  /* Elementi dell'interfaccia da nascondere tassativamente */
+  nav,
+  header,
+  .no-print,
+  .bottom-nav,
+  .top-bar,
+  .offline-banner,
+  .pwa-update-banner,
+  .search-container,
+  button:not(.print-keep),
+  input,
+  select {
+    display: none !important;
+  }
+
+  /* 1. SEZIONE GIOCHI E BANS: Flusso continuo */
+  .print-continuous {
+    display: block;
+    width: 100%;
+  }
+
+  .print-item-short {
+    /* Gli elementi brevi non si spezzano tra due pagine */
+    break-inside: avoid;
+    page-break-inside: avoid;
+    margin-bottom: 12pt;
+    padding-bottom: 8pt;
+    border-bottom: 0.5pt solid #888888;
+  }
+
+  .print-item-long {
+    /* Gli elementi lunghi possono spezzarsi per non lasciare vuoti a fondo pagina */
+    break-inside: auto;
+    page-break-inside: auto;
+    margin-bottom: 14pt;
+    padding-bottom: 8pt;
+    border-bottom: 0.5pt solid #888888;
+  }
+
+  .print-title {
+    break-after: avoid;
+    page-break-after: avoid;
+    font-size: 13pt;
+    font-weight: 700;
+    margin-bottom: 4pt;
+  }
+
+  /* 2. SEZIONE CANTI: Ogni canto inizia su una pagina nuova */
+  .print-song {
+    break-before: page;
+    page-break-before: always;
+  }
+
+  .print-song:first-of-type {
+    break-before: avoid;
+    page-break-before: avoid;
+  }
+
+  /* Interruzione forzata manuale tramite tag {nuova_pagina} */
+  .print-page-break {
+    break-before: page !important;
+    page-break-before: always !important;
+    height: 0;
+  }
+
+  .print-song-header {
+    border-bottom: 1pt solid #000;
+    margin-bottom: 8pt;
+    padding-bottom: 4pt;
+  }
+
+  .print-song-title {
+    font-size: 15pt;
+    font-weight: 700;
+  }
+
+  .print-song-meta {
+    font-size: 9pt;
+    font-style: italic;
+  }
+
+  /* Accordo sopra il testo in stampa */
+  .chord-syllable-pair {
+    display: inline-flex;
+    flex-direction: column;
+    vertical-align: bottom;
+    margin-right: 1px;
+  }
+
+  .chord-syllable-pair .chord {
+    font-size: 8pt;
+    font-weight: 700;
+    line-height: 1;
+    color: #000 !important;
+  }
+
+  .chord-syllable-pair .syllable {
+    font-size: 10.5pt;
+    line-height: 1.2;
+  }
+
+  /* 3. SEZIONE ODG: Scheda con caselle quadrate stampabili */
+  .print-odg-item {
+    break-inside: avoid;
+    display: flex;
+    align-items: flex-start;
+    gap: 8pt;
+    margin-bottom: 6pt;
+  }
+
+  .print-checkbox {
+    display: inline-block;
+    width: 11pt;
+    height: 11pt;
+    border: 1.2pt solid #000;
+    border-radius: 2pt;
+    flex-shrink: 0;
+    margin-top: 2pt;
+  }
+}

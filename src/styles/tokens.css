@@ -1,0 +1,121 @@
+/* ==============================================================================
+   Design Tokens — Identità Scout Clan (Giallo, Azzurro, Rosso)
+   WCAG AA Conforme, Mobile-First, Touch Target >= 44px
+   ============================================================================== */
+
+@font-face {
+  font-family: 'Outfit';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/fonts/outfit-regular.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Outfit';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/fonts/outfit-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+:root {
+  /* --- PALETTE IDENTITARIA SCOUT --- */
+  --color-giallo: #FFC93C;        /* Badge, accenti, highlight */
+  --color-giallo-dark: #D49B00;   /* Bordo/testo per giallo */
+  --color-giallo-subtle: #FFF5D6; /* Sfondo chiaro per avvisi */
+  
+  --color-azzurro: #1E74A6;       /* Struttura, navigazione, link (WCAG AA > 4.5:1 su sfondo chiaro) */
+  --color-azzurro-active: #2F8FC7;/* Focus, bottoni attivi */
+  --color-azzurro-subtle: #E8F4FA;
+  
+  --color-rosso: #D9381E;         /* Azioni primarie, conferme distruttive (WCAG AA > 4.5:1 su bianco) */
+  --color-rosso-hover: #B82810;
+  --color-rosso-subtle: #FDF0ED;
+
+  /* --- TEMA CHIARO (Default) --- */
+  --color-bg: #FAF6EC;            /* Caldo tela scout */
+  --color-surface: #FFFFFF;       /* Superficie card */
+  --color-surface-hover: #F7F3E6;
+  --color-surface-alt: #F2EBD9;   /* Barre, header, bottom nav */
+  --color-border: #E2D7C3;        /* Bordi card */
+  --color-border-scout: #C4B599;  /* "Cucitura" scout */
+  --color-text: #21262B;          /* Contrasto 13.5:1 su sfondo chiaro */
+  --color-text-muted: #596573;    /* Testo secondario */
+
+  /* --- TIPOGRAFIA --- */
+  --font-family: 'Outfit', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-size-xs: clamp(0.75rem, 0.7rem + 0.25vw, 0.8125rem);
+  --font-size-sm: clamp(0.875rem, 0.825rem + 0.25vw, 0.9375rem);
+  --font-size-base: clamp(1rem, 0.95rem + 0.25vw, 1.0625rem);
+  --font-size-lg: clamp(1.125rem, 1.05rem + 0.35vw, 1.25rem);
+  --font-size-xl: clamp(1.35rem, 1.25rem + 0.5vw, 1.55rem);
+  --font-size-2xl: clamp(1.65rem, 1.5rem + 0.75vw, 2rem);
+
+  /* --- SPAZIATURE & TOUCH TARGET --- */
+  --touch-target-min: 44px;
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-full: 9999px;
+
+  /* --- OMBRE & TRANSIZIONI --- */
+  --shadow-sm: 0 1px 3px rgba(33, 38, 43, 0.08);
+  --shadow-md: 0 4px 8px rgba(33, 38, 43, 0.1);
+  --shadow-lg: 0 8px 20px rgba(33, 38, 43, 0.14);
+  --transition-fast: 150ms ease;
+  --transition-normal: 250ms ease;
+}
+
+/* --- TEMA SCURO (prefers-color-scheme o override data-theme="dark") --- */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-bg: #141B20;
+    --color-surface: #1E272F;
+    --color-surface-hover: #26323C;
+    --color-surface-alt: #192128;
+    --color-border: #2D3A45;
+    --color-border-scout: #3C4D5C;
+    --color-text: #F3F4F6;
+    --color-text-muted: #9CA3AF;
+    --color-azzurro: #3CA5E8;
+    --color-azzurro-active: #5BB6EE;
+    --color-azzurro-subtle: #1C3345;
+    --color-giallo: #FFD566;
+    --color-giallo-dark: #FFC93C;
+    --color-giallo-subtle: #3D351B;
+    --color-rosso: #F25A44;
+    --color-rosso-hover: #FF725C;
+    --color-rosso-subtle: #3E211E;
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35);
+    --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.45);
+    --shadow-lg: 0 8px 20px rgba(0, 0, 0, 0.6);
+  }
+}
+
+:root[data-theme="dark"] {
+  --color-bg: #141B20;
+  --color-surface: #1E272F;
+  --color-surface-hover: #26323C;
+  --color-surface-alt: #192128;
+  --color-border: #2D3A45;
+  --color-border-scout: #3C4D5C;
+  --color-text: #F3F4F6;
+  --color-text-muted: #9CA3AF;
+  --color-azzurro: #3CA5E8;
+  --color-azzurro-active: #5BB6EE;
+  --color-azzurro-subtle: #1C3345;
+  --color-giallo: #FFD566;
+  --color-giallo-dark: #FFC93C;
+  --color-giallo-subtle: #3D351B;
+  --color-rosso: #F25A44;
+  --color-rosso-hover: #FF725C;
+  --color-rosso-subtle: #3E211E;
+}

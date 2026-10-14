@@ -1,0 +1,59 @@
+name: Deploy su GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'docs/**'
+      - '.github/workflows/keepalive.yml'
+  workflow_dispatch:
+
+# Permessi minimi richiesti per GitHub Pages deployment
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Permette una sola esecuzione di deploy concorrente
+concurrency:
+  group: 'pages'
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del codice
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Installazione dipendenze
+        run: npm ci
+
+      - name: Build dell'applicazione PWA
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || vars.VITE_SUPABASE_URL || 'https://lpeiyzwccedtqjbficjo.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || vars.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxwZWl5endjY2VkdHFqYmZpY2pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5MTgzNTQsImV4cCI6MjEwNzQ5NDM1NH0.9eIZRUNLPlJn1l4DMs46DNauFdi_32X2y6YBZ1ytZSQ' }}
+          VITE_BASE_PATH: /Sito-di-vault-attivit-clan/
+        run: npm run build
+
+      - name: Setup GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Caricamento artefatto Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './dist'
+
+      - name: Pubblicazione su GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

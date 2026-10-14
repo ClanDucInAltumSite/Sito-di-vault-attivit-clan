@@ -4,10 +4,19 @@ Questa guida spiega passo passo, in italiano semplice e per chi non è un progra
 
 ---
 
-## 1. Configurazione del Progetto Supabase
+## 0. Applicazione dello Schema del Database (Tabelle e RLS)
 
-Il progetto Supabase è già creato al seguente indirizzo:
-**Dashboard:** `https://supabase.com/dashboard/project/lpeiyzwccedtqjbficjo`
+Prima di procedere con l'autenticazione, è necessario creare le tabelle e le regole di sicurezza:
+1. Accedi alla dashboard del tuo progetto Supabase: `https://supabase.com/dashboard/project/lpeiyzwccedtqjbficjo`
+2. Nel menu a sinistra, clicca sull'icona **SQL Editor** (icona con il simbolo `>_`).
+3. Clicca sul pulsante verde **"New query"**.
+4. Apri il file del repository [`supabase/full_schema.sql`](file:///c:/Users/Utente/Documents/Progetti_e_programmi/Siti%20miei/Sito%20Vault%20Scout/supabase/full_schema.sql), copia **tutto il suo contenuto** e incollalo nell'editor SQL di Supabase.
+5. Clicca sul pulsante verde **Run** in basso a destra.
+6. Entro pochi secondi vedrai la scritta verde *"Success. No rows returned"*. Tutte le 7 tabelle, i trigger di sicurezza, la pubblicazione Realtime e il bucket di Storage sono ora creati e protetti!
+
+---
+
+## 1. Configurazione dell'Autenticazione Supabase
 
 ### 1.1 Disabilitare la registrazione pubblica
 Per evitare che persone non autorizzate possano registrarsi all'app:

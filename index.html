@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+    
+    <!-- Content Security Policy Restrittiva (Nessuna CDN esterna, solo dominio locale e Supabase con WebSockets) -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://lpeiyzwccedtqjbficjo.supabase.co https://*.supabase.co; connect-src 'self' https://lpeiyzwccedtqjbficjo.supabase.co wss://lpeiyzwccedtqjbficjo.supabase.co https://*.supabase.co wss://*.supabase.co; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self';"
+    />
+
+    <title>Vault Clan — Duc In Altum</title>
+    <meta name="description" content="Archivio condiviso di Giochi, Bans, Canti e Calendario con ODG per Clan Scout" />
+    <meta name="theme-color" content="#1E74A6" />
+    
+    <!-- Meta iOS Safari PWA -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Vault Clan" />
+
+    <link rel="icon" type="image/png" href="./assets/favicon.png" />
+    <link rel="apple-touch-icon" href="./assets/favicon.png" />
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="./src/main.tsx"></script>
+  </body>
+</html>
