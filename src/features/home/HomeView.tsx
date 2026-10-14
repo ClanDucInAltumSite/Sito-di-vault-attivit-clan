@@ -9,7 +9,6 @@ import { BrandLogo } from '../../ui/BrandLogo';
 import { HeaderBanner } from '../../ui/HeaderBanner';
 import { SectionIcon } from '../../ui/SectionIcon';
 import { TheTrail, CompassSync } from '../../ui/ScoutMotifs';
-import { TopographicBackground } from '../../ui/TopographicBackground';
 
 export function HomeView() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -253,9 +252,6 @@ export function HomeView() {
             onClick={() => navigate('design')}
           />
         </GroupedList>
-
-        {/* 10. SFONDO TOPOGRAFICO CON ISOIPSE CARTOGRAFICHE */}
-        <TopographicBackground />
       </div>
     </div>
   );
