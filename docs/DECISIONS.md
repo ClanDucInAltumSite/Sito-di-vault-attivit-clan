@@ -264,4 +264,50 @@ L'applicazione deve funzionare in modo rapido e affidabile all'aperto senza conn
    - Guida contestuale non invasiva per l'installazione su Schermata Home (iOS Safari e Android).
    - Code splitting delle viste secondarie tramite `lazy` e `Suspense` nativi di `preact/compat` per ridurre il peso del bundle iniziale di primo avvio.
 
+---
+
+## ADR-0009: Architettura Giochi e Bans, Ricerca Deterministica, Modalità Lettura e Cestino (Fase 3)
+
+### Stato
+Accettata e implementata (Fase 3).
+
+### Contesto
+Le sezioni Giochi e Bans rappresentano il nucleo operativo per l'animazione e le attività all'aperto del Clan (campi estivi, uscite, fuochi di bivacco). L'applicazione deve permettere una consultazione immediata e intuitiva offline, una ricerca rapida resistente a errori di digitazione da smartphone, una modalità di lettura dedicata attorno al fuoco serale (dove lo schermo non deve spegnersi e il testo deve essere leggibile a distanza), e una gestione amministrativa sicura con soft-delete, prevenzione di cancellazioni accidentali e recupero dal cestino.
+
+### Decisioni Architetturali Adottate
+1. **Ricerca Deterministica e Tolleranza ai Typo (`src/lib/search.tsx`):**
+   - Normalizzazione Unicode NFD per la rimozione di accenti/diacritici e conversione in minuscolo.
+   - Tolleranza ai typo rigorosamente deterministica basata su soglie fisse di lunghezza del token cercato:
+     - Lunghezza $< 4$ caratteri: Corrispondenza esatta (Distanza Levenshtein = 0).
+     - Lunghezza 4–7 caratteri: Distanza Levenshtein $\le 1$ (es. `"pala"` trova `"palla"`).
+     - Lunghezza $\ge 8$ caratteri: Distanza Levenshtein $\le 2$ (es. `"aveleata"` trova `"avvelenata"`).
+   - Multi-campo AND: tutti i token della query devono riscontrare corrispondenza in almeno uno dei campi (`nome`, `regole`/`testo`, `materiali`/`note_gesti`).
+2. **Evidenziazione XSS-Safe (`HighlightText`):**
+   - Vietato tassativamente l'uso di `innerHTML` o parser HTML non protetti.
+   - Il testo viene segmentato tramite espressioni regolari Unicode preservando fedelmente punteggiatura, spazi e maiuscole/minuscole originali.
+   - I frammenti corrispondenti vengono inseriti in elementi `<mark class="search-highlight">` generati come Virtual DOM VNodes nativi di Preact con escaping automatico dei caratteri speciali.
+3. **Ordinamento a 4 Opzioni e Persistenza di Stato:**
+   - Esattamente quattro opzioni di ordinamento nel `SegmentedControl`: `A → Z`, `Z → A`, `Recenti`, `Vecchi` (per `created_at`).
+   - Ordinamento alfabetico gestito tramite `Intl.Collator('it', { sensitivity: 'base' })`.
+   - Query di ricerca e scelta di ordinamento persistono al ritorno dalla vista di dettaglio tramite `sessionStorage` (`giochi_search`, `giochi_sort`, `bans_search`, `bans_sort`).
+4. **Modalità Lettura Bans per Fuochi Serali (`BanReadingMode`):**
+   - Schermata a tutto schermo ad alto contrasto concepita per la visibilità all'aperto e al buio.
+   - Controlli per l'ingrandimento del testo (range 16px – 36px) con memorizzazione della preferenza.
+   - Callout distinto e separato per le note sui gesti (`note_gesti`) con sfondo e bordo dedicati al colore dei bans.
+   - Integrazione con Screen Wake Lock API (`src/lib/wakelock.ts`) per mantenere lo schermo acceso durante l'animazione, con fallback silenzioso per browser non supportati e riacquisizione automatica al ritorno sulla scheda (`visibilitychange`).
+5. **Admin Gating Rigoroso:**
+   - I pulsanti di aggiunta ("Nuovo Gioco", "Nuovo Ban"), modifica ed eliminazione NON vengono renderizzati nel DOM se `isAdmin === false` (stato verificato con RPC `is_admin()`).
+   - Nessun elemento interattivo di scrittura è esposto a utenti anonimi.
+6. **Scritture Online-Only e Doppia Conferma Eliminazione:**
+   - Tutte le modifiche richiedono connessione di rete; in modalità offline viene sollevato un avviso esplicito senza perdita o corruzione dei dati.
+   - Form in BottomSheet con validazione campi obbligatori e segnalazione morbida di possibile duplicato (`findSimilarName`) se esiste già un elemento con distanza di Levenshtein $\le 2$.
+   - Eliminazione in due passaggi (`DeleteConfirmModal`): richiede all'amministratore di digitare il nome esatto dell'elemento prima di abilitare il pulsante di soft-delete.
+7. **Cestino, Conservazione Tombstone e Punto di Estensione Storage:**
+   - Conservazione tombstone sul server per 180 giorni.
+   - Vista Cestino dedicata in `AdminView` per consultare gli elementi eliminati con funzione di ripristino (`restoreRecord`) o eliminazione definitiva (`hardDeleteRecord` / `purgeTrash`).
+   - Predisposizione architetturale della rimozione fisica dei file da Supabase Storage (`deleteAssociatedStorageFiles` in `src/lib/admin_actions.ts`), che in Fase 5 invocherà la rimozione dei relativi file dal bucket `allegati`.
+8. **Backup JSON Completo:**
+   - Funzione `exportBackupJson()` esporta l'intero archivio (tutte le 6 tabelle) in formato JSON standard scaricabile con marcatura temporale.
+
+
 

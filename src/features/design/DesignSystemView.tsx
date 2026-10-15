@@ -14,15 +14,31 @@ import { BrandLogo } from '../../ui/BrandLogo';
 import { SectionIcon } from '../../ui/SectionIcon';
 import { TheTrail, CompassSync } from '../../ui/ScoutMotifs';
 import { PHOTOS } from '../../lib/photos';
+import { HighlightText } from '../../lib/search';
+import { DeleteConfirmModal } from '../../ui/DeleteConfirmModal';
+import { BanReadingMode } from '../bans/BanReadingMode';
+import { Ban } from '../../lib/db';
 
 export function DesignSystemView() {
   const [searchValue, setSearchValue] = useState('avvelenata');
   const [selectedSegment, setSelectedSegment] = useState<'tutti' | 'giochi' | 'canti'>('giochi');
   const [isSwitchOn, setIsSwitchOn] = useState(true);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isReadingModeOpen, setIsReadingModeOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [currentTheme, setCurrentTheme] = useState<'auto' | 'light' | 'dark'>('auto');
+
+  const demoBan: Ban = {
+    id: 'demo-ban-1',
+    nome: 'La Macchina del Capo',
+    testo: 'La macchina del capo ha un buco nella gomma,\nLa macchina del capo ha un buco nella gomma,\nLa macchina del capo ha un buco nella gomma,\nE noi la ripareremo con il chewing-gum!',
+    note_gesti: 'Gesti: Al secondo giro non si dice capo ma si fa il saluto scout; al terzo non si dice macchina ma si mima il volante.',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    deleted_at: null,
+  };
 
   const toggleTheme = (theme: 'auto' | 'light' | 'dark') => {
     setCurrentTheme(theme);
@@ -378,6 +394,38 @@ export function DesignSystemView() {
         />
       </GroupedList>
 
+      {/* 15. GIOCHI E BANS (FASE 3) */}
+      <GroupedList
+        header="15. COMPONENTI GIOCHI E BANS (FASE 3)"
+        footer="Evidenziazione XSS-safe in giallo, tolleranza typo, eliminazione in due passaggi e modalità lettura per fuochi serali."
+      >
+        <GroupedRow
+          leading={<SectionIcon section="giochi" size="sm" />}
+          title={
+            <HighlightText
+              text="Palla Avvelenata dei Clan con palloni e corsa"
+              query="avvelenata"
+            />
+          }
+          subtitle="Evidenziazione ricerca sicura senza markup non validato in giallo scout"
+          trailing={<Badge variant="giallo" size="sm">Nuovo</Badge>}
+        />
+        <GroupedRow
+          leading={<Icon name="trash" size={20} />}
+          title="Conferma Eliminazione a Due Passaggi"
+          subtitle="Richiede la digitazione del nome esatto dell'elemento"
+          chevron
+          onClick={() => setIsDeleteModalOpen(true)}
+        />
+        <GroupedRow
+          leading={<Icon name="eye" size={20} />}
+          title="Modalità Lettura Bans per Fuochi Serali"
+          subtitle="Testo ingrandito, alto contrasto, note gesti e Wake Lock attivo"
+          chevron
+          onClick={() => setIsReadingModeOpen(true)}
+        />
+      </GroupedList>
+
       {/* BOTTOM SHEET DIMOSTRATIVO */}
       <BottomSheet
         isOpen={isSheetOpen}
@@ -408,6 +456,24 @@ export function DesignSystemView() {
           onClose={() => setShowToast(false)}
         />
       ) : null}
+
+      {/* MODAL CONFERMA ELIMINAZIONE A DUE PASSAGGI */}
+      <DeleteConfirmModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={() => {
+          setIsDeleteModalOpen(false);
+          setShowToast(true);
+        }}
+        itemName="Palla Avvelenata dei Clan"
+      />
+
+      {/* MODALITÀ LETTURA BANS */}
+      <BanReadingMode
+        ban={demoBan}
+        isOpen={isReadingModeOpen}
+        onClose={() => setIsReadingModeOpen(false)}
+      />
     </div>
   );
 }

@@ -109,13 +109,72 @@ Questo documento definisce la matrice dei test per ciascuna fase di sviluppo del
 
 ---
 
+## FASE 3 — Giochi e Bans (Ricerca, Ordinamento, Modalità Lettura, Admin e Cestino)
+
+- [x] **301. Ricerca Deterministica e Tolleranza ai Typo (`src/lib/search.tsx`):**
+  - Algoritmo Levenshtein deterministico basato sulla lunghezza del token cercato:
+    - $<4$ caratteri: Corrispondenza esatta (Distanza 0).
+    - $4-7$ caratteri: Tolleranza Levenshtein $\le 1$.
+    - $\ge 8$ caratteri: Tolleranza Levenshtein $\le 2$.
+  - Risoluzione verificata con test automatico dedicato: query `"pala aveleata"` trova con successo `"palla avvelenata"`.
+  - Normalizzazione completa di maiuscole e diacritici/accenti (NFD).
+  - Multi-campo AND (nome, regole/testo, materiali/note_gesti).
+- [x] **302. Evidenziazione Ricerca XSS-Safe (`HighlightText`):**
+  - Zero uso di `innerHTML` o parser insicuri nel codice.
+  - Generazione di nodi Virtual DOM Preact nativi (`<mark class="search-highlight">`) con sfondo giallo scout (`--color-giochi`) e testo inchiostro.
+  - Punteggiatura, maiuscole e spazi originali preservati integralmente.
+  - Annunciatore accessibile con `aria-live="polite"` sul contatore dei risultati.
+  - Stato vuoto contestuale: *"Nessun risultato per «xxx»"*.
+- [x] **303. Ordinamento a 4 Opzioni e Persistenza in SessionStorage:**
+  - Controllo segmentato con esattamente quattro opzioni: `A → Z`, `Z → A`, `Recenti`, `Vecchi` (per `created_at`).
+  - Ordinamento alfabetico gestito tramite `Intl.Collator('it', { sensitivity: 'base' })`.
+  - Query di ricerca e ordinamento selezionato restano in memoria al ritorno dalla visualizzazione del dettaglio tramite `sessionStorage` (`giochi_search`, `giochi_sort`, `bans_search`, `bans_sort`).
+- [x] **304. Badge "Nuovo" per Elementi Recenti:**
+  - Badge giallo scout visualizzato automaticamente per tutti i giochi e i bans creati da meno di 7 giorni (`created_at < 7 days`).
+- [x] **305. Dettaglio Giochi e Bans con Predisposizione Allegati:**
+  - `GiocoDetailSheet`: regole dettagliate, materiali necessari e placeholder per la galleria allegati e schemi di gioco (Fase 5).
+  - `BanDetailSheet`: testo completo, note sui gesti, pulsante rapido per la modalità lettura e placeholder allegati audio (Fase 5).
+- [x] **306. Modalità Lettura Bans per Fuochi Serali (`BanReadingMode`):**
+  - Modalità fullscreen ad alto contrasto concepita per la lettura all'aperto attorno al fuoco.
+  - Controlli dimensione testo `A-` / `A+` da 16px a 36px con preferenza persistita in `localStorage`.
+  - Riquadro note sui gesti (`note_gesti`) con colore dedicato, icona fiamma e bordo marcato per distinguere nettamente le istruzioni sceniche dal testo.
+  - Screen Wake Lock API (`src/lib/wakelock.ts`) attiva durante la lettura per impedire lo spegnimento dello schermo, con riacquisizione automatica al ritorno sulla scheda (`visibilitychange`) e fallback silenzioso se non supportata.
+- [x] **307. Admin Gating Rigoroso:**
+  - Senza sessione admin attiva (verificata tramite RPC `is_admin()`), nessun pulsante "Nuovo Gioco", "Nuovo Ban", "Modifica" o "Elimina" è renderizzato nell'interfaccia.
+  - Protezione backend garantita al 100% da Row Level Security (RLS) PostgreSQL.
+- [x] **308. Form in BottomSheet e Segnalazione Duplicati:**
+  - Form dedicato per Giochi e Bans con validazione campi obbligatori.
+  - Controllo duplicati morbido: se il nome inserito ha una distanza di Levenshtein $\le 2$ da un elemento esistente, mostra un alert giallo che informa l'amministratore senza impedire il salvataggio.
+- [x] **309. Eliminazione Distruttiva a Due Passaggi (`DeleteConfirmModal`):**
+  - Prevenzione errori accidentali: l'utente deve digitare il nome esatto dell'elemento per abilitare il pulsante di soft-delete.
+- [x] **310. Cestino, Ripristino e Svuotamento Definitivo:**
+  - Gestione tombstone a 180 giorni.
+  - Vista `TrashSheet` in Admin per consultare gli elementi eliminati con funzione di ripristino (`restoreRecord`) o eliminazione permanente (`hardDeleteRecord` / `purgeTrash`).
+  - Predisposizione punto di estensione Storage (`deleteAssociatedStorageFiles` in `src/lib/admin_actions.ts`): alla cancellazione definitiva elimina anche i file corrispondenti dal bucket `allegati` (Fase 5), documentato in `docs/DECISIONS.md`.
+- [x] **311. Esportazione Backup JSON:**
+  - Funzione `exportBackupJson()` esporta tutte le 6 tabelle di IndexedDB in un file JSON scaricabile localmente con marcatura data.
+- [x] **312. Resilienza a Dati Sporchi (Stress Test):**
+  - Test automatico con 200 record eterogenei eseguito in meno di 100 ms.
+  - Resilienza a stringhe continue senza spazi di 300 caratteri e titoli estremamente lunghi senza crash né overflow.
+- [x] **313. Suite Test Unitari Automatizzati (`test/giochi_bans.test.ts`):**
+  - 17 test su 17 superati con successo (typo, ordinamento, XSS highlight, soft-delete, nascondimento gerarchico figli, cestino, stress test).
+- [x] **314. Suite Test Playwright e Accessibilità (`test/verify_ui.spec.ts`):**
+  - 16 test su 16 superati con successo su tutti i 7 viewport (incluse le nuove schermate `#/giochi` e `#/bans`, zero overflow orizzontale, 0 violazioni critiche axe-core).
+- [x] **315. Audit Lighthouse Mobile:**
+  - **Performance:** 89 (ottimizzazioni rimandate alla Fase 8 come da accordi).
+  - **Accessibilità:** 96 (superiore alla soglia di 90).
+  - **Best Practices:** 100.
+  - **SEO:** 100.
+
+---
+
 ## Comandi di Verifica
 
 ```bash
-# 1. Esecuzione test unitari e suite di sincronizzazione offline (18 test)
+# 1. Esecuzione test unitari e suite complete (35 test)
 npm test
 
-# 2. Esecuzione verifica reattiva e accessibilità Playwright (14 test)
+# 2. Esecuzione verifica reattiva e accessibilità Playwright su 7 viewport (16 test)
 npm run verify:ui
 
 # 3. Compilazione TypeScript e build bundle Vite

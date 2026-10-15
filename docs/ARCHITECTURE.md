@@ -65,8 +65,9 @@ L'applicazione è progettata secondo il paradigma **Local-First PWA (Progressive
 │   │   ├── supabase.ts           # Inizializzazione client Supabase con Anon Key
 │   │   ├── db.ts                 # Schema e wrapper IndexedDB con idb (transazione atomica, query, soft-delete)
 │   │   ├── sync.ts               # Macchina di sincronizzazione (full atomico, incrementale, tombstone, timeout)
+│   │   ├── admin_actions.ts      # Operazioni di scrittura admin online, soft-delete, hard-delete, cestino e backup JSON
 │   │   ├── photos.ts             # Configurazione e placeholder WebP per le 5 fotografie d'intestazione
-│   │   ├── search.ts             # Motore di ricerca normalizzato con Levenshtein calibrato e token match
+│   │   ├── search.tsx            # Motore di ricerca normalizzato con Levenshtein calibrato, token match e HighlightText sicuro
 │   │   ├── chordpro.ts           # Parser ChordPro, trasposizione tonale, validatore e AST
 │   │   ├── print.ts              # Logica e stili di stampa A4 continua e canti pagina-singola
 │   │   ├── storage-cache.ts      # Cache API per download allegati e gestione offline
@@ -79,10 +80,11 @@ L'applicazione è progettata secondo il paradigma **Local-First PWA (Progressive
 │   │   ├── SectionIcon.tsx       # Quadratini arrotondati pieni per ogni sezione
 │   │   ├── Button.tsx            # Pulsante accessibile
 │   │   ├── Card.tsx              # Card contenitore per giochi, bans ed eventi
-│   │   ├── Modal.tsx             # Finestra modale con focus trap e conferma distruttiva a 2 step
-│   │   ├── SearchBar.tsx         # Barra di ricerca con debounce (~200ms) e pulsante reset
+│   │   ├── Modal.tsx             # Finestra modale con focus trap e tasto Esc
+│   │   ├── DeleteConfirmModal.tsx # Modale di eliminazione a due passaggi con digitazione del nome
+│   │   ├── SearchField.tsx       # Barra di ricerca pillola con debounce e pulsante reset
 │   │   ├── Toast.tsx             # Notifiche discrete (online/offline, aggiornamento PWA)
-│   │   └── Badge.tsx             # Badge colorati per tipo evento, tonalità, tempo
+│   │   └── Badge.tsx             # Badge colorati per tipo evento, tonalità, tempo, "Nuovo"
 │   ├── styles/
 │   │   ├── tokens.css            # Variabili CSS in coordinate OKLCH (palette logo, inchiostro viola, Inter)
 │   │   ├── components.css        # Stili componenti Apple (grouped lists, bottom sheets, translucent bars)

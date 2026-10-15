@@ -1421,6 +1421,27 @@
   border-color: var(--color-interactive);
 }
 
+.ios-form-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: inherit;
+  font-size: var(--font-size-base);
+  color: var(--color-text);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  min-height: 90px;
+  resize: vertical;
+  transition: border-color var(--duration-fast) var(--ease-ios);
+  outline: none;
+}
+
+.ios-form-textarea:focus {
+  border-color: var(--color-interactive);
+}
+
+
 .ios-card {
   background-color: var(--color-surface);
   border: 1px solid var(--color-border);

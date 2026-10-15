@@ -128,3 +128,34 @@ La suite di test automatizzati con **Playwright** e **Axe-Core** verifica ad ogn
 - **Target Tattili:** Minimo $44\times 44\text{ px}$ per tutti i comandi primari e righe interattive.
 - **Supporto Zoom 200%:** Rispetto di WCAG 1.4.4 (Resize text) senza sovrapposizione o rottura di riga.
 - **Accessibilità WCAG AA:** 0 violazioni critiche o serie rilevate da Axe-Core su tutte le schermate.
+
+---
+
+## 8. Specifiche Componenti Giochi e Bans (Fase 3)
+
+### 8.1 Barra di Ricerca a Pillola e Ordinamento
+- **Pill SearchField (`SearchField`):** Campo di ricerca a capsula con icona lente a sinistra, pulsante cancellazione rapida "clear" a destra e debounce di ~200ms.
+- **SegmentedControl a 4 Opzioni:** Esattamente 4 opzioni (`A → Z`, `Z → A`, `Recenti`, `Vecchi`).
+- **Persistenza in sessionStorage:** Query cercata e ordinamento selezionato persistono al ritorno dalla vista di dettaglio (`giochi_search`, `giochi_sort`, `bans_search`, `bans_sort`).
+- **Evidenziazione XSS-Safe (`HighlightText`):**
+  - Nessun ricorso a `innerHTML` né parsing HTML insicuro.
+  - Testo suddiviso in Virtual DOM Preact VNodes con wrapping dei match in `<mark class="search-highlight">` (sfondo giallo scout `--color-giochi` e testo inchiostro `--color-giochi-text`).
+  - Tolleranza ai typo deterministica: parole $<4$ lettere exact match, $4-7$ lettere Levenshtein $\le 1$, $\ge 8$ lettere Levenshtein $\le 2$.
+  - Annunciatore `aria-live="polite"` accessibile per screen reader che dichiara il numero di risultati trovati.
+
+### 8.2 Badge e Schede di Dettaglio
+- **Badge "Nuovo":** Contrassegno giallo scout con testo scuro per elementi inseriti da meno di 7 giorni (`created_at < 7 days`).
+- **Fogli di Dettaglio (`GiocoDetailSheet`, `BanDetailSheet`):** Presentati in BottomSheet con maniglia Apple, separazione netta tra regole/materiali e testo/note gesti.
+- **Placeholder Allegati (Fase 5):** Area riservata a schemi e file PDF predisposta per la successiva fase di sviluppo.
+
+### 8.3 Modalità Lettura Bans per Fuochi Serali (`BanReadingMode`)
+- Schermo intero ad altissimo contrasto per consultazione al buio o intorno al fuoco.
+- Regolazione della dimensione del carattere da 16px a 36px tramite controlli `A-` e `A+` con preferenza salvata in `localStorage`.
+- Riquadro note sui gesti (`note_gesti`) con colore dedicato, icona fiamma e bordo di risalto, per distinguere immediatamente le istruzioni sceniche dalle parole cantate.
+- Screen Wake Lock API integrata per impedire lo spegnimento dello schermo durante le animazioni serali, con fallback silenzioso se non supportata.
+
+### 8.4 Amministrazione, Duplicati e Doppia Conferma
+- **Gating Visivo Rigoroso:** Senza sessione admin attiva verificata tramite RPC `is_admin()`, nessun pulsante o controllo di creazione/modifica/eliminazione compare nell'interfaccia o nel DOM.
+- **Segnalazione Morbida Duplicati:** Se il nome inserito ha una distanza di Levenshtein $\le 2$ da un elemento esistente, compare un avviso visivo in giallo che avvisa l'utente senza bloccare il salvataggio.
+- **Eliminazione in Due Passaggi (`DeleteConfirmModal`):** Richiede la digitazione esatta del nome completo dell'elemento per abilitare il pulsante rosso "Elimina".
+

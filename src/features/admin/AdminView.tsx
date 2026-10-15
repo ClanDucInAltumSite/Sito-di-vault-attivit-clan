@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks';
+import { useState, useEffect } from 'preact/hooks';
 import { I18N } from '../../lib/i18n';
 import { GroupedList } from '../../ui/GroupedList';
 import { GroupedRow } from '../../ui/GroupedRow';
@@ -7,23 +7,75 @@ import { SectionIcon } from '../../ui/SectionIcon';
 import { Icon } from '../../ui/Icon';
 import { Badge } from '../../ui/Badge';
 import { useAdmin, logoutAdmin } from '../../lib/auth';
+import { getTrashItems, exportBackupJson } from '../../lib/admin_actions';
 import { AdminLoginModal } from './AdminLoginModal';
+import { TrashSheet } from './TrashSheet';
 
 export function AdminView() {
   const { isAdmin, userEmail } = useAdmin();
   const [isLoginOpen, setIsLoginOpen] = useState(false);
+  const [isTrashOpen, setIsTrashOpen] = useState(false);
+  const [trashCount, setTrashCount] = useState<number>(0);
+  const [isExporting, setIsExporting] = useState(false);
+
+  const loadTrashCount = async () => {
+    if (isAdmin) {
+      try {
+        const items = await getTrashItems();
+        setTrashCount(items.length);
+      } catch (_err) {
+        setTrashCount(0);
+      }
+    }
+  };
+
+  useEffect(() => {
+    loadTrashCount();
+  }, [isAdmin]);
+
+  const handleExportJson = async () => {
+    setIsExporting(true);
+    try {
+      await exportBackupJson();
+    } catch (err: any) {
+      alert(err.message || 'Errore durante l\'esportazione del backup');
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   return (
     <div className="container" style={{ paddingTop: 'var(--space-6)' }}>
       {/* Intestazione Sezione */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-6)' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 'var(--space-6)',
+        }}
+      >
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
           <SectionIcon section="admin" size="md" />
           <div>
-            <h1 style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 700, color: 'var(--color-ink)', letterSpacing: '-0.02em', margin: 0 }}>
+            <h1
+              style={{
+                fontSize: 'var(--font-size-2xl)',
+                fontWeight: 700,
+                color: 'var(--color-ink)',
+                letterSpacing: '-0.02em',
+                margin: 0,
+              }}
+            >
               {I18N.admin.title}
             </h1>
-            <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-xs)', margin: '2px 0 0' }}>
+            <p
+              style={{
+                color: 'var(--color-text-secondary)',
+                fontSize: 'var(--font-size-xs)',
+                margin: '2px 0 0',
+              }}
+            >
               Area riservata per capi e amministratori del clan
             </p>
           </div>
@@ -38,13 +90,36 @@ export function AdminView() {
       {!isAdmin ? (
         <GroupedList header="AUTENTICAZIONE RICHIESTA">
           <div style={{ padding: 'var(--space-6) var(--space-4)', textAlign: 'center' }}>
-            <div style={{ display: 'inline-flex', padding: 'var(--space-3)', borderRadius: 'var(--radius-full)', backgroundColor: 'var(--color-border-subtle)', color: 'var(--color-interactive)', marginBottom: 'var(--space-3)' }}>
+            <div
+              style={{
+                display: 'inline-flex',
+                padding: 'var(--space-3)',
+                borderRadius: 'var(--radius-full)',
+                backgroundColor: 'var(--color-border-subtle)',
+                color: 'var(--color-interactive)',
+                marginBottom: 'var(--space-3)',
+              }}
+            >
               <Icon name="admin" size={32} />
             </div>
-            <h2 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 600, color: 'var(--color-ink)', marginBottom: 'var(--space-1)' }}>
+            <h2
+              style={{
+                fontSize: 'var(--font-size-lg)',
+                fontWeight: 600,
+                color: 'var(--color-ink)',
+                marginBottom: 'var(--space-1)',
+              }}
+            >
               {I18N.auth.loginTitle}
             </h2>
-            <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)', maxWidth: '400px', margin: '0 auto var(--space-4)' }}>
+            <p
+              style={{
+                color: 'var(--color-text-secondary)',
+                fontSize: 'var(--font-size-sm)',
+                maxWidth: '400px',
+                margin: '0 auto var(--space-4)',
+              }}
+            >
               {I18N.auth.loginDescription}
             </p>
             <Button variant="primary" onClick={() => setIsLoginOpen(true)}>
@@ -65,19 +140,41 @@ export function AdminView() {
           </GroupedList>
 
           {/* Manutenzione e Cestino */}
-          <GroupedList header="GESTIONE DATI E CESTINO" footer="Gli elementi eliminati restano nel cestino per 90 giorni prima della pulizia definitiva.">
+          <GroupedList
+            header="GESTIONE DATI E CESTINO"
+            footer="Gli elementi eliminati restano nel cestino per 180 giorni prima della pulizia definitiva."
+          >
             <GroupedRow
               leading={<Icon name="trash" size={20} />}
               title={I18N.admin.cestino}
-              subtitle={I18N.admin.cestinoVuoto}
-              trailing={<Badge variant="neutral" size="sm">0 elementi</Badge>}
+              subtitle={
+                trashCount === 0
+                  ? I18N.admin.cestinoVuoto
+                  : `${trashCount} ${trashCount === 1 ? 'elemento nel cestino' : 'elementi nel cestino'}`
+              }
+              trailing={
+                <Badge variant={trashCount > 0 ? 'giallo' : 'neutral'} size="sm">
+                  {trashCount} {trashCount === 1 ? 'elemento' : 'elementi'}
+                </Badge>
+              }
               chevron
+              onClick={() => setIsTrashOpen(true)}
             />
             <GroupedRow
-              leading={<Icon name="file-text" size={20} />}
+              leading={<Icon name="download" size={20} />}
               title={I18N.admin.backupJson}
               subtitle="Esporta l'intero archivio in un file JSON scaricabile localmente"
-              trailing={<Button variant="secondary" size="sm">Esporta</Button>}
+              trailing={
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleExportJson}
+                  isLoading={isExporting}
+                >
+                  <Icon name="download" size={14} />
+                  <span>Esporta</span>
+                </Button>
+              }
             />
           </GroupedList>
 
@@ -87,7 +184,11 @@ export function AdminView() {
               leading={<Icon name="settings" size={20} />}
               title={I18N.admin.spazioStorage}
               subtitle="Bucket pubblico allegati (limite 1 GB piano gratuito)"
-              trailing={<span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>0.0 MB</span>}
+              trailing={
+                <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+                  0.0 MB
+                </span>
+              }
             />
             <GroupedRow
               leading={<Icon name="refresh" size={20} />}
@@ -103,7 +204,17 @@ export function AdminView() {
       <AdminLoginModal
         isOpen={isLoginOpen}
         onClose={() => setIsLoginOpen(false)}
-        onSuccess={() => setIsLoginOpen(false)}
+        onSuccess={() => {
+          setIsLoginOpen(false);
+          loadTrashCount();
+        }}
+      />
+
+      {/* Sheet Gestione Cestino */}
+      <TrashSheet
+        isOpen={isTrashOpen}
+        onClose={() => setIsTrashOpen(false)}
+        onItemsChanged={loadTrashCount}
       />
     </div>
   );
