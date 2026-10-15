@@ -8,6 +8,8 @@ import { Icon } from '../../ui/Icon';
 import { Badge } from '../../ui/Badge';
 import { useAdmin, logoutAdmin } from '../../lib/auth';
 import { getTrashItems, exportBackupJson } from '../../lib/admin_actions';
+import { getStorageUsageInfo, findOrphanStorageFiles, purgeOrphanStorageFiles } from '../../lib/attachments';
+import { downloadAllAttachmentsForOffline, getOfflineAttachmentStats } from '../../lib/storage-cache';
 import { AdminLoginModal } from './AdminLoginModal';
 import { TrashSheet } from './TrashSheet';
 
@@ -18,20 +20,92 @@ export function AdminView() {
   const [trashCount, setTrashCount] = useState<number>(0);
   const [isExporting, setIsExporting] = useState(false);
 
-  const loadTrashCount = async () => {
+  // Stato Storage e Allegati
+  const [storageInfo, setStorageInfo] = useState<{
+    usedFormatted: string;
+    totalFormatted: string;
+    percent: number;
+    attachmentCount: number;
+  }>({ usedFormatted: '0 B', totalFormatted: '1 GB', percent: 0, attachmentCount: 0 });
+
+  const [orphanPaths, setOrphanPaths] = useState<string[]>([]);
+  const [isScanningOrphans, setIsScanningOrphans] = useState(false);
+  const [isPurgingOrphans, setIsPurgingOrphans] = useState(false);
+
+  // Stato Download Offline Allegati
+  const [offlineStats, setOfflineStats] = useState<{ cached: number; total: number }>({ cached: 0, total: 0 });
+  const [isDownloadingOffline, setIsDownloadingOffline] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState<number>(0);
+
+  const loadData = async () => {
     if (isAdmin) {
       try {
         const items = await getTrashItems();
         setTrashCount(items.length);
+
+        const storage = await getStorageUsageInfo();
+        setStorageInfo(storage);
+
+        const offline = await getOfflineAttachmentStats();
+        setOfflineStats(offline);
       } catch (_err) {
-        setTrashCount(0);
+        // Fallback silenzioso
       }
     }
   };
 
   useEffect(() => {
-    loadTrashCount();
+    loadData();
   }, [isAdmin]);
+
+  const handleScanOrphans = async () => {
+    setIsScanningOrphans(true);
+    try {
+      const orphans = await findOrphanStorageFiles();
+      setOrphanPaths(orphans);
+      if (orphans.length === 0) {
+        alert('Nessun file orfano rilevato nel bucket Storage!');
+      }
+    } catch (err: any) {
+      alert(err.message || 'Errore scansione file orfani');
+    } finally {
+      setIsScanningOrphans(false);
+    }
+  };
+
+  const handlePurgeOrphans = async () => {
+    if (orphanPaths.length === 0) return;
+    if (!confirm(`Vuoi rimuovere definitivamente i ${orphanPaths.length} file orfani dallo Storage?`)) return;
+
+    setIsPurgingOrphans(true);
+    try {
+      await purgeOrphanStorageFiles(orphanPaths);
+      setOrphanPaths([]);
+      await loadData();
+      alert('File orfani rimossi con successo dallo Storage!');
+    } catch (err: any) {
+      alert(err.message || 'Errore durante la pulizia dei file orfani');
+    } finally {
+      setIsPurgingOrphans(false);
+    }
+  };
+
+  const handleDownloadAllOffline = async () => {
+    setIsDownloadingOffline(true);
+    setDownloadProgress(0);
+    try {
+      await downloadAllAttachmentsForOffline((_curr, _tot, pct) => {
+        setDownloadProgress(pct);
+      });
+      await loadData();
+      alert('Tutti gli allegati sono stati scaricati nella cache offline con successo!');
+    } catch (err: any) {
+      alert(err.message || 'Errore durante il download degli allegati');
+    } finally {
+      setIsDownloadingOffline(false);
+      setDownloadProgress(0);
+    }
+  };
 
   const handleExportJson = async () => {
     setIsExporting(true);
@@ -178,18 +252,80 @@ export function AdminView() {
             />
           </GroupedList>
 
-          {/* Sistema & Infrastruttura */}
-          <GroupedList header="INFRASTRUTTURA SUPABASE">
+          {/* Sistema & Infrastruttura Storage (Fase 5) */}
+          <GroupedList
+            header="INFRASTRUTTURA SUPABASE E ALLEGATI"
+            footer="Supabase Free Tier: 1 GB di storage per allegati. La Cache API memorizza localmente i file per la consultazione offline."
+          >
             <GroupedRow
               leading={<Icon name="settings" size={20} />}
               title={I18N.admin.spazioStorage}
-              subtitle="Bucket pubblico allegati (limite 1 GB piano gratuito)"
+              subtitle={`${storageInfo.attachmentCount} allegati attivi • ${storageInfo.usedFormatted} di ${storageInfo.totalFormatted} (${storageInfo.percent}%)`}
               trailing={
-                <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
-                  0.0 MB
-                </span>
+                <Badge variant={storageInfo.percent > 85 ? 'rosso' : 'azzurro'} size="sm">
+                  {storageInfo.percent}%
+                </Badge>
               }
             />
+
+            {/* Gestione File Orfani */}
+            <GroupedRow
+              leading={<Icon name="file" size={20} />}
+              title="File Orfani in Storage"
+              subtitle={
+                orphanPaths.length > 0
+                  ? `${orphanPaths.length} file orfani individuati nel bucket`
+                  : 'Nessun file orfano rilevato'
+              }
+              trailing={
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleScanOrphans}
+                    isLoading={isScanningOrphans}
+                  >
+                    <span>Scansiona</span>
+                  </Button>
+                  {orphanPaths.length > 0 && (
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={handlePurgeOrphans}
+                      isLoading={isPurgingOrphans}
+                      style={{ backgroundColor: 'var(--color-bans)' }}
+                    >
+                      <span>Ripulisci</span>
+                    </Button>
+                  )}
+                </div>
+              }
+            />
+
+            {/* Download Offline Allegati */}
+            <GroupedRow
+              leading={<Icon name="download" size={20} />}
+              title="Archivio Offline Allegati"
+              subtitle={`${offlineStats.cached} di ${offlineStats.total} allegati disponibili offline`}
+              trailing={
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleDownloadAllOffline}
+                  isLoading={isDownloadingOffline}
+                >
+                  <Icon name="download" size={14} />
+                  <span>
+                    {isDownloadingOffline
+                      ? `${downloadProgress}%`
+                      : offlineStats.cached >= offlineStats.total && offlineStats.total > 0
+                      ? 'Aggiorna'
+                      : 'Scarica tutto'}
+                  </span>
+                </Button>
+              }
+            />
+
             <GroupedRow
               leading={<Icon name="refresh" size={20} />}
               title={I18N.admin.statoKeepalive}
@@ -206,7 +342,7 @@ export function AdminView() {
         onClose={() => setIsLoginOpen(false)}
         onSuccess={() => {
           setIsLoginOpen(false);
-          loadTrashCount();
+          loadData();
         }}
       />
 
@@ -214,7 +350,7 @@ export function AdminView() {
       <TrashSheet
         isOpen={isTrashOpen}
         onClose={() => setIsTrashOpen(false)}
-        onItemsChanged={loadTrashCount}
+        onItemsChanged={loadData}
       />
     </div>
   );

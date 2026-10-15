@@ -345,11 +345,14 @@ Le sezioni Giochi e Bans rappresentano il nucleo operativo per l'animazione e le
   2. **Rendering DOM/VDOM Puro (Zero `innerHTML`):**
      - Il testo viene segmentato da un tokenizer dedicato in un Abstract Syntax Tree (AST).
      - Ogni combinazione accordo/sillaba è renderizzata come container `.song-chord-column` in `display: inline-flex; flex-direction: column; vertical-align: bottom;`:
-       - `.song-chord`: visualizzato sopra la sillaba in grassetto e colore blu notte (`var(--color-navy)`).
+       - `.song-chord`: visualizzato sopra la sillaba in grassetto e colore Azzurro Scuro approvato (`var(--color-calendario)`: `oklch(0.42 0.15 255)`). Nessun nuovo colore arbitrario: si riconduce al token di calendario/accento scuro.
        - `.song-lyric`: testo della sillaba posizionato esattamente sotto l'accordo corrispondente.
      - Se una riga va a capo nel viewport dello smartphone, la colonna si sposta unitamente impedendo il disallineamento orizzontale accordo-sillaba.
      - I blocchi ritornello ricevono lo stile `.song-chorus-block` con barra laterale sinistra color giallo scout (`var(--color-yellow)`).
-  3. **Motore di Trasposizione Semitonale:**
+  3. **Fonte di Verità Metadati Musicali (Campi DB vs Direttive Testuali):**
+     - Le colonne dedicate della tabella Postgres `canti` (`ritmo`, `tempo_bpm`, `misura`, `capotasto`, `tonalita`) costituiscono l'UNICA fonte di verità per tali informazioni.
+     - Le eventuali direttive `{ritmo}`, `{bpm}`, `{misura}`, `{capo}` inserite dentro il testo ChordPro vengono deliberatamente ignorate nel rendering e nell'anteprima (o preservate solo per eventuale parsing di importazione da terze parti). L'editor esclude suggerimenti o bottoni che inducano a inserirle nel testo.
+  4. **Motore di Trasposizione Semitonale:**
      - Algoritmo circolare sui 12 semitoni temperati (`normalizeChordName`, `transposeChord`, `transposeChordPro`).
      - Supporto completo della notazione italiana (`Do, Do#, Reb, Re, Mib, Mi, Fa, Fa#, Solb, Sol, Lab, La, Sib, Si`) e anglosassone (`C, C#, Db, D, Eb, E, F, F#, Gb, G, Ab, A, Bb, B`).
      - Gestione trasparente di alterazioni, estensioni (es. `m, 7, maj7, sus4, add9, dim, 5+`) e slash chords con basso alternativo (es. `Sol/Si` $\rightarrow$ `La/Do#`).
@@ -359,6 +362,38 @@ Le sezioni Giochi e Bans rappresentano il nucleo operativo per l'animazione e le
   5. **Modalità Lettura Canti e Screen Wake Lock:**
      - Componente `CantoReadingMode`: controlli a contrasto elevato, regolazione dinamica dimensione caratteri (`+/-`), commutatore di visibilità accordi on/off e trasposizione di tonalità.
      - Acquisizione automatica del Wake Lock all'apertura dello spartito e rilascio controllato alla chiusura, con ripristino su `visibilitychange`.
+
+---
+
+## ADR-0012: Gestione Allegati, Compressione Client-Side WebP, Cache API e Pulizia Storage (Fase 5)
+- **Stato:** Approvato e implementato (Fase 5)
+- **Contesto:**
+  I capi clan hanno necessità di allegare schemi di gioco, regolamenti in PDF, immagini esplicative di bans e spartiti in PDF ai rispettivi contenuti. L'infrastruttura Supabase Free Tier offre 1 GB di archiviazione Storage complessiva. È fondamentale prevenire la saturazione del bucket, impedire l'esplorazione pubblica non autorizzata dei file, supportare la consultazione offline e garantire la pulizia dei file orfani o eliminati dal cestino.
+- **Decisione e Architettura Adottata:**
+  1. **Tipologie di File e Limiti:**
+     - Ammessi esclusivamente: immagini (JPEG, PNG, WebP) e documenti PDF (max 10 MB).
+     - File audio rigorosamente esclusi in v1 (annotato nel database e nell'architettura per salvaguardare il piano gratuito).
+  2. **Compressione WebP Client-Side:**
+     - Le immagini caricate da smartphone vengono ridimensionate via Canvas (lato lungo max 1600px) e convertite in WebP (qualità 0.82), abbattendo il peso dell'85-90% prima dell'invio.
+  3. **Generazione Percorso Sicuro nel Bucket:**
+     - Il nome originale del file dell'utente viene sanificato e archiviato solo come metadato descrittivo (`nome_file`).
+     - Il percorso su Storage (`storage_path`) è generato atomicamente nella forma `{parentType}/{parentId}/{timestamp}_{randomSuffix}.{ext}`, prevenendo collisioni e path-traversal.
+  4. **Sicurezza e Policy Storage:**
+     - Bucket `allegati` configurato con `public: true` per permettere la fruizione diretta via CDN ai client anonimi tramite l'URL archiviato nel record del database locale.
+     - Rimozione della policy SELECT pubblica su `storage.objects`: i file sono raggiungibili solo con URL diretto, impedendo a utenti non autenticati di eseguire il listing dei contenuti del bucket.
+     - Operazioni di upload, aggiornamento ed eliminazione riservate ad utenti autenticati con ruolo `is_admin()`.
+  5. **Pulizia Storage Fisico e Rilevamento File Orfani:**
+     - Prima della bonifica tombstone o durante lo svuotamento del cestino (`purgeTrash`), la procedura in `src/lib/admin_actions.ts` invoca l'eliminazione fisica tramite Supabase Storage API (`supabase.storage.from('allegati').remove([...])`) prima della rimozione della riga SQL.
+     - Funzioni di audit `findOrphanStorageFiles()` e `purgeOrphanStorageFiles()` nel pannello Admin per scansionare file presenti su bucket che non abbiano più una corrispondente riga attiva in `allegati`.
+     - Visualizzazione visiva dell'occupazione percentuale rispetto a 1 GB con barra di avanzamento e badge cromatico.
+  6. **Cache Offline (Cache API `scout-attachments-v1`):**
+     - Gli allegati di piccole dimensioni ($< 500\text{ KB}$) vengono automaticamente scaricati e inseriti in cache al termine di ogni sincronizzazione in background.
+     - Pulsante dedicato in Admin per forzare il download manuale di tutti gli allegati con barra di progresso in percentuale.
+     - In assenza di rete, gli allegati non ancora memorizzati in cache mostrano un badge sobrio "Non scaricato — serve connessione" senza provocare errori di rete visibili o interruzioni dell'interfaccia.
+  7. **Interfaccia Utente e Lightbox Zoom:**
+     - Componente `AttachmentGallery`: griglia responsiva con miniature ad altezza e larghezza fisse per prevenire Cumulative Layout Shift (CLS), icona identificativa per PDF con dimensione formattata, zoom modale a tutto schermo per immagini (lightbox accessibile) e opzioni di eliminazione per admin.
+     - Componente `AttachmentUploadManager`: selettore duale fotocamera/file, anteprima immediata e barra di avanzamento caricamento.
+
 
 
 

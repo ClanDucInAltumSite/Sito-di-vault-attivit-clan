@@ -32,6 +32,7 @@ export function DesignSystemView() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [currentTheme, setCurrentTheme] = useState<'auto' | 'light' | 'dark'>('auto');
+  const [demoZoomImage, setDemoZoomImage] = useState<string | null>(null);
 
   const demoCanto: Canto = {
     id: 'demo-canto-1',
@@ -484,6 +485,68 @@ export function DesignSystemView() {
         </div>
       </GroupedList>
 
+      {/* 12. ALLEGATI (Fase 5: Galleria Immagini con Zoom e Documenti PDF) */}
+      <GroupedList
+        header="12. ALLEGATI (GALLERIA IMMAGINI E DOCUMENTI PDF)"
+        footer="Compressione automatica WebP, lightbox zoom ad alta risoluzione, cache offline e schede documenti PDF con dimensioni."
+      >
+        <div style={{ padding: 'var(--space-4)' }}>
+          <div className="attachment-section-header">
+            <span className="attachment-section-title">Esempio Immagini (Con Zoom Modale)</span>
+          </div>
+
+          <div className="attachment-grid">
+            <div
+              className="attachment-thumb-card"
+              onClick={() => setDemoZoomImage('./photos/giochi-800w.webp')}
+              role="button"
+              tabIndex={0}
+              aria-label="Ingrandisci schema di gioco"
+            >
+              <img
+                src="./photos/giochi-400w.webp"
+                alt="Schema campo di gioco"
+                className="attachment-thumb-img"
+                loading="lazy"
+                width={200}
+                height={150}
+              />
+              <div className="attachment-thumb-zoom-badge">
+                <Icon name="zoom-in" size={14} />
+              </div>
+            </div>
+
+            <div
+              className="attachment-thumb-card"
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--color-border-subtle)' }}
+            >
+              <Icon name="wifi-off" size={24} style={{ color: 'var(--color-text-secondary)', marginBottom: '4px' }} />
+              <span className="attachment-offline-badge">Non scaricato</span>
+            </div>
+          </div>
+
+          <div className="attachment-section-header" style={{ marginTop: 'var(--space-4)' }}>
+            <span className="attachment-section-title">Esempio Documento PDF</span>
+          </div>
+
+          <div className="attachment-pdf-card">
+            <div className="attachment-pdf-info">
+              <div className="attachment-pdf-icon-wrap">
+                <Icon name="file" size={20} />
+              </div>
+              <div className="attachment-pdf-details">
+                <div className="attachment-pdf-title">Regolamento Completo del Gioco.pdf</div>
+                <div className="attachment-pdf-meta">PDF • 342 KB • Disponibile offline</div>
+              </div>
+            </div>
+            <button type="button" className="ios-btn ios-btn-secondary" style={{ padding: '6px 12px', fontSize: 'var(--font-size-xs)' }}>
+              <Icon name="eye" size={14} />
+              <span style={{ marginLeft: '4px' }}>Apri</span>
+            </button>
+          </div>
+        </div>
+      </GroupedList>
+
       {/* BOTTOM SHEET DIMOSTRATIVO */}
       <BottomSheet
         isOpen={isSheetOpen}
@@ -539,6 +602,29 @@ export function DesignSystemView() {
         isOpen={isCantoReadingOpen}
         onClose={() => setIsCantoReadingOpen(false)}
       />
+
+      {/* LIGHTBOX ZOOM IMMAGINE DIMOSTRATIVO */}
+      {demoZoomImage && (
+        <div
+          className="attachment-lightbox-backdrop"
+          onClick={() => setDemoZoomImage(null)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="attachment-lightbox-topbar">
+            <span>Schema Campo di Gioco (Dimostrazione Zoom)</span>
+            <button
+              type="button"
+              className="ios-btn ios-btn-ghost"
+              style={{ color: 'oklch(1 0 0)', padding: '8px' }}
+              onClick={() => setDemoZoomImage(null)}
+            >
+              <Icon name="close" size={24} />
+            </button>
+          </div>
+          <img src={demoZoomImage} alt="Zoom" className="attachment-lightbox-img" onClick={(e) => e.stopPropagation()} />
+        </div>
+      )}
     </div>
   );
 }

@@ -369,7 +369,21 @@ export async function purgeTrash(olderThanDays = 180): Promise<number> {
     throw new Error(I18N.status.offlineNotice);
   }
 
-  // Se eliminiamo i tombstone scaduti (> 180 giorni), invoca l'RPC admin su Supabase
+  const trash = await getTrashItems();
+  const now = Date.now();
+  const thresholdMs = olderThanDays * 24 * 60 * 60 * 1000;
+  const expiredItems = trash.filter((item) => (now - new Date(item.deleted_at).getTime()) >= thresholdMs);
+
+  // 1. Rimuovi prima i file fisici da Supabase Storage con l'API Storage
+  for (const item of expiredItems) {
+    try {
+      await deleteAssociatedStorageFiles(item.table, item.id);
+    } catch (storageErr) {
+      console.warn(`[Storage] Errore rimozione file associati a ${item.table}/${item.id}:`, storageErr);
+    }
+  }
+
+  // 2. Poi invoca l'RPC admin per la pulizia delle righe scadute (> 180 giorni)
   if (olderThanDays >= 180) {
     try {
       await supabase.rpc('purge_old_tombstones');
@@ -378,17 +392,11 @@ export async function purgeTrash(olderThanDays = 180): Promise<number> {
     }
   }
 
-  const trash = await getTrashItems();
-  const now = Date.now();
-  const thresholdMs = olderThanDays * 24 * 60 * 60 * 1000;
+  // 3. Elimina fisicamente i singoli record rimasti ed aggiorna IndexedDB
   let count = 0;
-
-  for (const item of trash) {
-    const age = now - new Date(item.deleted_at).getTime();
-    if (age >= thresholdMs) {
-      await hardDeleteRecord(item.table, item.id);
-      count++;
-    }
+  for (const item of expiredItems) {
+    await hardDeleteRecord(item.table, item.id);
+    count++;
   }
 
   return count;

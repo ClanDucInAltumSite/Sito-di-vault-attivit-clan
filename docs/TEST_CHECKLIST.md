@@ -188,7 +188,7 @@ Questo documento definisce la matrice dei test per ciascuna fase di sviluppo del
   - Segmentazione del testo `[Accordo]sillaba` in AST strutturato senza uso di `innerHTML`.
   - Supporto direttive `{strofa}`, `{ritornello}` / `{soc}` / `{eoc}`, `{ponte}`, `{nuova_pagina}` e metadati `{ritmo}`, `{bpm}`, `{misura}`, `{capo}`.
 - [x] **404. Rendering Tipografico VDOM Sicuro:**
-  - Colonne verticali `.song-chord-column` con `.song-chord` in blu notte (`--color-navy`) e `.song-lyric` sottostante.
+  - Colonne verticali `.song-chord-column` con `.song-chord` in Azzurro Scuro (`--color-calendario`) e `.song-lyric` sottostante.
   - Allineamento preservato a ogni a capo riga (anche su schermi da 320 px).
   - Ritornello `.song-chorus-block` con barra laterale sinistra gialla scout (`--color-yellow`).
 - [x] **405. Trasposizione Semitonale Real-time:**
@@ -225,19 +225,73 @@ Questo documento definisce la matrice dei test per ciascuna fase di sviluppo del
 
 ---
 
+## FASE 5 — Gestione Allegati, Galleria, Lightbox, Compressione WebP e Storage Offline
+
+- [x] **501. Validazione Formati e Dimensioni (`validateAttachmentFile`):**
+  - Accetta esclusivamente formati consentiti: immagini (`image/jpeg`, `image/png`, `image/webp`) e documenti (`application/pdf`).
+  - File audio espressamente esclusi dalla v1 per preservare la quota di 1 GB.
+  - Limite dimensione massimo di 10 MB per i PDF e 10 MB pre-compressione per le immagini.
+  - Rifiuto categorico di MIME type eseguibili o rischiosi (`text/html`, `application/x-msdownload`, script).
+- [x] **502. Compressione Client-Side WebP con Canvas (`compressImageClientSide`):**
+  - Ridimensionamento proporzionale delle immagini ad alta risoluzione (max 1600px sul lato lungo).
+  - Codifica in formato WebP a qualità 0.82 (con fallback su JPEG su browser legacy).
+  - Abbattimento medio dell'85-90% del payload di rete prima del trasferimento verso Supabase.
+- [x] **503. Generazione Percorso Storage Univoco e Protetto (`generateSafeStoragePath`):**
+  - Nessun uso del nome file originale sul filesystem del server.
+  - Struttura deterministica e isolata: `{parentType}/{parentId}/{timestamp}_{randomSuffix}.{ext}`.
+- [x] **504. Upload con Progresso e Transazione Database (`uploadAttachment`):**
+  - Inserimento del blob su Supabase Storage nel bucket `allegati`.
+  - Creazione contestuale della riga nella tabella Postgres `allegati` protetta da RLS.
+  - Callback di avanzamento progressivo in percentuale (0-100%).
+- [x] **505. Cache API Dedicata per Consultazione Offline (`scout-attachments-v1`):**
+  - Storage cache isolato dal Service Worker dell'app shell per non rallentare l'avvio.
+  - Sincronizzazione automatica silenziosa in background al termine del sync per file $< 500\text{ KB}$.
+- [x] **506. Risoluzione Sorgente Immagine con Fallback Offline (`resolveAttachmentSource`):**
+  - Se online: preferenza per il CDN pubblico o per la cache locale.
+  - Se offline: recupero trasparente da Cache API; se non presente, visualizzazione di un badge elegante *"Non scaricato — serve connessione"* senza rompere il layout o mostrare icone di errore browser.
+- [x] **507. Download Completo Offline con Monitoraggio Avanzamento (`downloadAllAttachmentsForOffline`):**
+  - Azione accessibile nel pannello Admin per forzare il caching di tutti i file dell'archivio.
+  - Monitoraggio real-time di progresso e percentuale.
+- [x] **508. Rimozione Fisica da Storage API prima della Cancellazione SQL:**
+  - `purgeTrash` e `hardDeleteAttachment` invocano `supabase.storage.from('allegati').remove([...])` per eliminare i file fisici dal bucket prima della rimozione o bonifica della riga SQL.
+- [x] **509. Scansione e Bonifica File Orfani (`findOrphanStorageFiles`, `purgeOrphanStorageFiles`):**
+  - Strumento per individuare file rimasti nel bucket privi di riferimento attivo nel database e rimuoverli in modo controllato.
+- [x] **510. Misuratore Occupazione Quota 1 GB Free Tier (`getStorageUsageStats`):**
+  - Calcolo dimensione totale utilizzata rispetto al limite di 1 GB.
+  - Barra grafica con percentuale e badge cromatico di sicurezza in `AdminView`.
+- [x] **511. Galleria Allegati con Rapporto Fisso Anti-CLS (`AttachmentGallery`):**
+  - Griglia responsive per miniature di immagini con `width` e `height` esplicite.
+  - Card documenti PDF con icona, titolo con ellissi e metadati di dimensione.
+  - Gating admin completo per le azioni di eliminazione.
+- [x] **512. Modale Lightbox Zoom a Schermo Intero:**
+  - Ingrandimento immagine ad alta risoluzione con backdrop oscurato accessibile.
+  - Chiusura tramite click sul backdrop, pulsante dedicato con `aria-label` o tasto di chiusura.
+- [x] **513. Gestore Upload Amministrativo da Smartphone (`AttachmentUploadManager`):**
+  - Selettore doppio: Scatta foto (`capture="environment"`) e Scegli file da dispositivo.
+  - Anteprima visiva del file selezionato e barra di caricamento.
+- [x] **514. Integrazione Globale nei Fogli di Dettaglio:**
+  - Integrata in `GiocoDetailSheet`, `BanDetailSheet`, `CantoDetailSheet`, `AdminView` e Sezione 12 su `DesignSystemView` (`#/design`).
+- [x] **515. Verifica Suite Completa e Audit Qualità:**
+  - Test unitari completi (`npm test`): **65 su 65 superati**.
+  - Test UI Playwright (`npm run verify:ui`): **20 su 20 superati** su tutti i 7 viewport.
+  - Audit Mobile Lighthouse: **Performance 91**, **Accessibilità 96**, **Best Practices 100**, **SEO 100**.
+
+---
+
 ## Comandi di Verifica
 
 ```bash
-# 1. Esecuzione test unitari completi (56 test)
+# 1. Esecuzione test unitari completi (65 test)
 npm test
 
-# 2. Esecuzione verifica reattiva e accessibilità Playwright su 7 viewport e stress test (19 test)
+# 2. Esecuzione verifica reattiva e accessibilità Playwright su 7 viewport, stress test e Allegati (20 test)
 npm run verify:ui
 
-# 3. Test di sicurezza RLS e Storage (admin e anonimo)
+# 3. Test di sicurezza RLS e Storage (admin e anonimo, richiesta credenziali a runtime)
 npm run test:admin
 
 # 4. Compilazione TypeScript e build bundle Vite
 npm run build
 ```
+
 

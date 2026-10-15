@@ -1,7 +1,10 @@
+import { useState } from 'preact/hooks';
 import { BottomSheet } from '../../ui/BottomSheet';
 import { Button } from '../../ui/Button';
 import { Badge } from '../../ui/Badge';
 import { Icon } from '../../ui/Icon';
+import { AttachmentGallery } from '../allegati/AttachmentGallery';
+import { AttachmentUploadManager } from '../allegati/AttachmentUploadManager';
 import { Gioco } from '../../lib/db';
 import { I18N } from '../../lib/i18n';
 import { useAdmin } from '../../lib/auth';
@@ -22,6 +25,7 @@ export function GiocoDetailSheet({
   onDelete,
 }: GiocoDetailSheetProps) {
   const { isAdmin } = useAdmin();
+  const [attachmentKey, setAttachmentKey] = useState(0);
 
   if (!isOpen || !gioco) return null;
 
@@ -133,42 +137,21 @@ export function GiocoDetailSheet({
           </div>
         </div>
 
-        {/* Predisposizione per la futura galleria allegati (Fase 5) */}
-        <div
-          style={{
-            marginTop: 'var(--space-4)',
-            padding: 'var(--space-4)',
-            backgroundColor: 'var(--color-border-subtle)',
-            borderRadius: 'var(--radius-md)',
-            border: '1px dashed var(--color-border)',
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 'var(--space-2)',
-              color: 'var(--color-text-secondary)',
-              fontSize: 'var(--font-size-xs)',
-              fontWeight: 600,
-              textTransform: 'uppercase',
-              letterSpacing: '0.04em',
-              marginBottom: 'var(--space-1)',
-            }}
-          >
-            <Icon name="file-text" size={16} />
-            <span>{I18N.giochi.allegati}</span>
-          </div>
-          <p
-            style={{
-              margin: 0,
-              fontSize: 'var(--font-size-xs)',
-              color: 'var(--color-text-secondary)',
-            }}
-          >
-            Schemi di gioco e documenti PDF (Disponibile nella Fase 5).
-          </p>
-        </div>
+        {/* Galleria Allegati (Fase 5) */}
+        <AttachmentGallery
+          key={attachmentKey}
+          parentType="gioco"
+          parentId={gioco.id}
+          isAdmin={isAdmin}
+          onChanged={() => setAttachmentKey((k) => k + 1)}
+        />
+
+        {isAdmin && (
+          <AttachmentUploadManager
+            parent={{ type: 'gioco', id: gioco.id }}
+            onUploaded={() => setAttachmentKey((k) => k + 1)}
+          />
+        )}
       </div>
     </BottomSheet>
   );

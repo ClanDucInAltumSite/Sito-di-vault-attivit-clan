@@ -1,3 +1,4 @@
+import { useState } from 'preact/hooks';
 import { BottomSheet } from '../../ui/BottomSheet';
 import { Button } from '../../ui/Button';
 import { Badge } from '../../ui/Badge';
@@ -6,6 +7,8 @@ import { Canto } from '../../lib/db';
 import { I18N } from '../../lib/i18n';
 import { useAdmin } from '../../lib/auth';
 import { calculatePageCount, ChordProRenderer } from '../../lib/chordpro';
+import { AttachmentGallery } from '../allegati/AttachmentGallery';
+import { AttachmentUploadManager } from '../allegati/AttachmentUploadManager';
 
 export interface CantoDetailSheetProps {
   canto: Canto | null;
@@ -14,6 +17,7 @@ export interface CantoDetailSheetProps {
   onOpenReadingMode: (canto: Canto) => void;
   onEdit?: (canto: Canto) => void;
   onDelete?: (canto: Canto) => void;
+  onUpdated?: () => void;
 }
 
 export function CantoDetailSheet({
@@ -23,8 +27,10 @@ export function CantoDetailSheet({
   onOpenReadingMode,
   onEdit,
   onDelete,
+  onUpdated,
 }: CantoDetailSheetProps) {
   const { isAdmin } = useAdmin();
+  const [attachmentKey, setAttachmentKey] = useState(0);
 
   if (!isOpen || !canto) return null;
 
@@ -168,6 +174,28 @@ export function CantoDetailSheet({
             fontSizeRem={0.95}
           />
         </div>
+
+        {/* Galleria Allegati (Fase 5) */}
+        <AttachmentGallery
+          key={attachmentKey}
+          parentType="canto"
+          parentId={canto.id}
+          isAdmin={isAdmin}
+          onChanged={() => {
+            setAttachmentKey((k) => k + 1);
+            onUpdated?.();
+          }}
+        />
+
+        {isAdmin && (
+          <AttachmentUploadManager
+            parent={{ type: 'canto', id: canto.id }}
+            onUploaded={() => {
+              setAttachmentKey((k) => k + 1);
+              onUpdated?.();
+            }}
+          />
+        )}
       </div>
     </BottomSheet>
   );

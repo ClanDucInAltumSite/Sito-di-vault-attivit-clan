@@ -430,3 +430,40 @@ test.describe('CORREZIONE 2 — Verifica Stress UI con Dati Sporchi, Viewport Ri
   });
 });
 
+test.describe('FASE 5 — Verifica Componenti Allegati e Lightbox su #/design', () => {
+  test('Rendering galleria allegati, badge offline, card PDF e modale Lightbox zoom', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/#/design');
+    await page.waitForLoadState('networkidle');
+
+    // 1. Verifica presenza sezione Allegati (Sezione 12)
+    const allegatiHeader = page.locator('text=12. ALLEGATI');
+    await expect(allegatiHeader).toBeVisible();
+
+    // 2. Verifica presenza miniatura immagine e stato non scaricato
+    const thumbCards = page.locator('.attachment-thumb-card');
+    expect(await thumbCards.count()).toBeGreaterThanOrEqual(2);
+
+    const offlineBadge = page.locator('.attachment-offline-badge').first();
+    await expect(offlineBadge).toBeVisible();
+
+    // 3. Verifica card documento PDF
+    const pdfCard = page.locator('.attachment-pdf-card').first();
+    await expect(pdfCard).toBeVisible();
+    await expect(page.locator('text=Regolamento Completo del Gioco.pdf')).toBeVisible();
+
+    // 4. Test apertura e chiusura Lightbox zoom
+    const zoomableThumb = thumbCards.first();
+    await zoomableThumb.click();
+    await page.waitForSelector('.attachment-lightbox-backdrop');
+    const lightbox = page.locator('.attachment-lightbox-backdrop');
+    await expect(lightbox).toBeVisible();
+
+    // Chiudi lightbox con click sul bottone close
+    const closeBtn = lightbox.locator('button');
+    await closeBtn.click();
+    await page.waitForTimeout(200);
+    expect(await page.locator('.attachment-lightbox-backdrop').count()).toBe(0);
+  });
+});
+

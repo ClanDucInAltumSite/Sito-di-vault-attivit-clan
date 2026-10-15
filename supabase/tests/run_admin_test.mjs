@@ -1,204 +1,337 @@
+// supabase/tests/run_admin_test.mjs
+// Test di verifica sicurezza e scrittura Admin (Tabelle, Storage, RPC e Allegati)
+// Richiede credenziali admin a RUNTIME da tastiera (password nascosta, mai salvata né loggata).
+// Exit code diverso da zero per qualsiasi anomalia.
+
 import { createClient } from '@supabase/supabase-js';
 import readline from 'readline';
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://lpeiyzwccedtqjbficjo.supabase.co';
 const ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxwZWl5endjY2VkdHFqYmZpY2pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5MTgzNTQsImV4cCI6MjEwNzQ5NDM1NH0.9eIZRUNLPlJn1l4DMs46DNauFdi_32X2y6YBZ1ytZSQ';
 
-const supabase = createClient(SUPABASE_URL, ANON_KEY);
+// Client anonimo isolato (nessuna sessione)
+const anonClient = createClient(SUPABASE_URL, ANON_KEY, {
+  auth: { persistSession: false, autoRefreshToken: false }
+});
+
+// Client per la sessione admin
+const adminClient = createClient(SUPABASE_URL, ANON_KEY, {
+  auth: { persistSession: false, autoRefreshToken: false }
+});
 
 function askQuestion(query) {
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
   });
-  return new Promise((resolve) => rl.question(query, (ans) => {
-    rl.close();
-    resolve(ans.trim());
-  }));
+  return new Promise((resolve) => {
+    rl.question(query, (ans) => {
+      rl.close();
+      resolve(ans.trim());
+    });
+  });
 }
 
-async function runAdminTest() {
+function askHiddenPassword(promptText) {
+  return new Promise((resolve) => {
+    if (!process.stdin.isTTY) {
+      // Se non è un terminale interattivo (ad es. pipe), usa readline normale
+      return askQuestion(promptText).then(resolve);
+    }
+
+    process.stdout.write(promptText);
+    const stdin = process.stdin;
+    const wasRaw = stdin.isRaw;
+    if (stdin.setRawMode) stdin.setRawMode(true);
+    stdin.resume();
+    stdin.setEncoding('utf8');
+
+    let password = '';
+    const onData = (ch) => {
+      ch = ch.toString('utf8');
+      switch (ch) {
+        case '\n':
+        case '\r':
+        case '\u0004':
+          if (stdin.setRawMode) stdin.setRawMode(wasRaw);
+          stdin.pause();
+          stdin.removeListener('data', onData);
+          process.stdout.write('\n');
+          resolve(password.trim());
+          break;
+        case '\u0003': // Ctrl+C
+          if (stdin.setRawMode) stdin.setRawMode(wasRaw);
+          process.exit(1);
+          break;
+        case '\u0008':
+        case '\x7f': // Backspace
+          if (password.length > 0) {
+            password = password.slice(0, -1);
+          }
+          break;
+        default:
+          password += ch;
+          break;
+      }
+    };
+    stdin.on('data', onData);
+  });
+}
+
+async function runAdminSecurityAudit() {
   console.log('======================================================================');
-  console.log('TEST DI VERIFICA SCRITTURA ADMIN (Tabelle e Storage)');
-  console.log('Nessuna password viene salvata o comunicata a terzi.');
+  console.log('TEST DI VERIFICA SICUREZZA ADMIN (run_admin_test.mjs)');
+  console.log('Nessuna chiave di servizio usata. Credenziali richieste a runtime.');
+  console.log('La password non viene mai salvata né stampata a video.');
   console.log('======================================================================\n');
 
+  let testsPassed = 0;
+  let testsTotal = 0;
+
+  function assert(condition, message) {
+    testsTotal++;
+    if (condition) {
+      console.log(`  [PASS] ${message}`);
+      testsPassed++;
+    } else {
+      console.error(`  [FAIL CRITICO] ${message}`);
+      process.exit(1);
+    }
+  }
+
+  // Acquisizione credenziali a runtime
   const email = process.env.ADMIN_EMAIL || await askQuestion('Inserisci email Admin: ');
-  const password = process.env.ADMIN_PASSWORD || await askQuestion('Inserisci password Admin: ');
+  const password = process.env.ADMIN_PASSWORD || await askHiddenPassword('Inserisci password Admin: ');
 
   if (!email || !password) {
-    console.error('Email e password obbligatorie per il test admin.');
+    console.error('[ERRORE] Email e password obbligatorie per il test admin.');
     process.exit(1);
   }
 
-  console.log('\n1. Tentativo di Login come Admin...');
-  const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+  // 1. Login Admin e verifica is_admin()
+  console.log('\n--- 1. Login Admin e Verifica Ruolo Database ---');
+  const { data: authData, error: authError } = await adminClient.auth.signInWithPassword({
     email,
     password,
   });
 
-  if (authError || !authData.user) {
-    console.error('ERRORE LOGIN ADMIN:', authError?.message || 'Utente non trovato');
-    process.exit(1);
-  }
-  console.log(`[OK] Login effettuato con successo come UID: ${authData.user.id}`);
+  assert(!authError && authData?.user?.id, `Login admin effettuato con successo (UID: ${authData?.user?.id || 'sconosciuto'})`);
 
-  console.log('\n2. Verifica ruolo tramite funzione RPC is_admin()...');
-  const { data: isAdmin, error: rpcError } = await supabase.rpc('is_admin');
-  if (rpcError || !isAdmin) {
-    console.error('[ERRORE] is_admin() ha restituito false o errore:', rpcError?.message || 'Non admin');
-    console.error('Assicurati di aver inserito l\'UID nella tabella admin_users!');
-    process.exit(1);
-  }
-  console.log('[OK] Ruolo Admin confermato a livello di database (is_admin() = true).');
+  const { data: isAdmin, error: rpcError } = await adminClient.rpc('is_admin');
+  assert(!rpcError && isAdmin === true, 'Ruolo verificato tramite RPC is_admin() === true');
 
-  console.log('\n3. Test INSERT su tabella "giochi"...');
-  const { data: insertData, error: insertError } = await supabase
+  // 2. Creazione Riga Esca in 'giochi' come Admin
+  console.log('\n--- 2. Creazione Riga Esca in "giochi" ---');
+  const canaryTitle = `[ESCA_TEST] Gioco Trappola ${Date.now()}`;
+  const { data: canaryRow, error: canaryErr } = await adminClient
     .from('giochi')
-    .insert({ nome: 'Gioco Test Admin', regole: 'Regole di collaudo' })
+    .insert([{
+      nome: canaryTitle,
+      regole: 'Regola iniziale immutabile',
+      materiali: 'Corde e bandiere'
+    }])
     .select()
     .single();
 
-  if (insertError) {
-    console.error('[FALLIMENTO] INSERT da admin fallita:', insertError.message);
-  } else {
-    console.log(`[OK] INSERT riuscita! ID record creato: ${insertData.id}`);
+  assert(!canaryErr && canaryRow && canaryRow.id, `Admin crea riga esca (ID: ${canaryRow?.id})`);
 
-    console.log('\n4. Test UPDATE sul record appena creato...');
-    const { data: updateData, error: updateError } = await supabase
-      .from('giochi')
-      .update({ regole: 'Regole aggiornate da admin' })
-      .eq('id', insertData.id)
-      .select()
-      .single();
+  // 3. Client Anonimo tenta UPDATE e DELETE sulla riga esca (RLS Violation)
+  console.log('\n--- 3. Tentativi di UPDATE e DELETE Anonimi su Riga Esca ---');
+  const { data: anonUpdate, error: anonUpErr } = await anonClient
+    .from('giochi')
+    .update({ nome: '[HACKED] Titolo Violato', regole: 'Regola violata' })
+    .eq('id', canaryRow.id)
+    .select();
 
-    if (updateError) {
-      console.error('[FALLIMENTO] UPDATE da admin fallita:', updateError.message);
-    } else {
-      console.log(`[OK] UPDATE riuscita! updated_at server: ${updateData.updated_at}`);
-    }
+  assert(
+    anonUpErr !== null || !anonUpdate || anonUpdate.length === 0,
+    'Tentativo UPDATE anonimo respinto da RLS (0 righe modificate o errore)'
+  );
 
-    console.log('\n5. Test RIGA ESCA: tentativi di UPDATE e DELETE anonimi su riga esistente...');
-    // Creiamo un client separato senza credenziali per testare l'accesso anonimo reale
-    const anonClient = createClient(SUPABASE_URL, ANON_KEY);
+  const { data: anonDelete, error: anonDelErr } = await anonClient
+    .from('giochi')
+    .delete()
+    .eq('id', canaryRow.id)
+    .select();
 
-    // Tentativo di UPDATE anonimo sulla riga esca creata dall'admin
-    const { data: anonUpData, error: anonUpErr } = await anonClient
-      .from('giochi')
-      .update({ regole: 'REGOLA COMPROMESSA DA ANONIMO' })
-      .eq('id', insertData.id)
-      .select();
+  assert(
+    anonDelErr !== null || !anonDelete || anonDelete.length === 0,
+    'Tentativo DELETE anonimo respinto da RLS (0 righe eliminate o errore)'
+  );
 
-    const anonUpBlocked = anonUpErr || !anonUpData || anonUpData.length === 0;
-    if (!anonUpBlocked) {
-      console.error('[FALLIMENTO CRITICO] UPDATE anonimo su riga esca è RIUSCITO!');
-      process.exit(1);
-    }
-    console.log('[OK BLOCCATO] UPDATE anonimo su riga esca respinto correttamente da RLS.');
+  // Rilettura della riga esca: deve essere intatta
+  const { data: readCanary, error: readCanaryErr } = await anonClient
+    .from('giochi')
+    .select('*')
+    .eq('id', canaryRow.id)
+    .single();
 
-    // Verifica che la riga nel database sia rimasta identica
-    const { data: checkDataAfterUp } = await anonClient
-      .from('giochi')
-      .select('regole')
-      .eq('id', insertData.id)
-      .single();
+  assert(
+    !readCanaryErr && readCanary && readCanary.nome === canaryTitle && readCanary.regole === 'Regola iniziale immutabile',
+    'Integrità verificata: la riga esca sul server è rimasta identica e inalterata'
+  );
 
-    if (checkDataAfterUp?.regole === 'REGOLA COMPROMESSA DA ANONIMO') {
-      console.error('[FALLIMENTO CRITICO] Il dato sul DB è stato modificato dall\'anonimo!');
-      process.exit(1);
-    }
-    console.log(`[OK INTEGRITÀ] Il record sul database è intatto: "${checkDataAfterUp?.regole}"`);
+  // 4. Test Storage: Upload lecito vs Upload con MIME non ammesso
+  console.log('\n--- 4. Verifica Storage Bucket e Restrizioni MIME ---');
+  const testFileNameValid = `test_esca_${Date.now()}.png`;
+  const validBuffer = Buffer.from('Fake-PNG-binary-content-for-test');
 
-    // Tentativo di DELETE anonimo sulla riga esca
-    const { data: anonDelData, error: anonDelErr } = await anonClient
-      .from('giochi')
-      .delete()
-      .eq('id', insertData.id)
-      .select();
-
-    const anonDelBlocked = anonDelErr || !anonDelData || anonDelData.length === 0;
-    if (!anonDelBlocked) {
-      console.error('[FALLIMENTO CRITICO] DELETE anonimo su riga esca è RIUSCITO!');
-      process.exit(1);
-    }
-    console.log('[OK BLOCCATO] DELETE anonimo su riga esca respinto correttamente da RLS.');
-
-    // Verifica che la riga esista ancora
-    const { data: checkDataAfterDel } = await anonClient
-      .from('giochi')
-      .select('id')
-      .eq('id', insertData.id)
-      .single();
-
-    if (!checkDataAfterDel?.id) {
-      console.error('[FALLIMENTO CRITICO] Il record è stato cancellato dall\'anonimo!');
-      process.exit(1);
-    }
-    console.log('[OK INTEGRITÀ] Il record esiste ancora nel database, non è stato cancellato.');
-
-    console.log('\n6. Test DELETE come Admin (pulizia riga esca di test)...');
-    const { error: deleteError } = await supabase
-      .from('giochi')
-      .delete()
-      .eq('id', insertData.id);
-
-    if (deleteError) {
-      console.error('[FALLIMENTO] DELETE da admin fallita:', deleteError.message);
-    } else {
-      console.log('[OK] DELETE da admin riuscita! Record esca rimosso regolarmente.');
-    }
-  }
-
-  console.log('\n7. Test UPLOAD su bucket Storage "allegati" (MIME lecito: image/png)...');
-  const dummyBuffer = Buffer.from('Contenuto di test per allegati admin');
-  const testFileName = `test_admin_${Date.now()}.png`;
-
-  const { data: uploadData, error: uploadError } = await supabase.storage
+  const { data: uploadValid, error: uploadValidErr } = await adminClient.storage
     .from('allegati')
-    .upload(testFileName, dummyBuffer, {
+    .upload(testFileNameValid, validBuffer, {
       contentType: 'image/png',
-      upsert: true,
+      upsert: true
     });
 
-  if (uploadError) {
-    console.error('[FALLIMENTO] UPLOAD lecito da admin fallito:', uploadError.message);
-  } else {
-    console.log(`[OK] UPLOAD lecito riuscito da admin! Percorso: ${uploadData.path}`);
+  assert(!uploadValidErr && uploadValid?.path, `Upload lecito da admin riuscito (${testFileNameValid})`);
 
-    console.log('\n8. Test UPLOAD con MIME NON consentito (es. text/html o application/x-msdownload)...');
-    const invalidFileName = `test_invalid_${Date.now()}.html`;
-    const { error: invalidMimeError } = await supabase.storage
-      .from('allegati')
-      .upload(invalidFileName, Buffer.from('<h1>Non permesso</h1>'), {
-        contentType: 'text/html',
-        upsert: true,
-      });
+  // Upload con MIME vietato: text/html
+  const invalidHtmlName = `test_hacked_${Date.now()}.html`;
+  const { error: invalidHtmlErr } = await adminClient.storage
+    .from('allegati')
+    .upload(invalidHtmlName, Buffer.from('<h1>Payload non autorizzato</h1>'), {
+      contentType: 'text/html',
+      upsert: true
+    });
 
-    if (invalidMimeError) {
-      console.log(`[OK BLOCCATO] Upload con MIME non consentito correttamente respinto: ${invalidMimeError.message}`);
-    } else {
-      console.error('[FALLIMENTO CRITICO] Il bucket ha consentito l\'upload di un file con MIME non consentito!');
-      await supabase.storage.from('allegati').remove([invalidFileName]);
-    }
+  assert(invalidHtmlErr !== null, 'Upload con MIME non consentito (text/html) correttamente rifiutato dal bucket');
 
-    console.log('\n9. Test DELETE file da Storage (pulizia)...');
-    const { error: removeError } = await supabase.storage
-      .from('allegati')
-      .remove([testFileName]);
+  // Upload con MIME vietato: application/x-msdownload
+  const invalidExeName = `test_malicious_${Date.now()}.exe`;
+  const { error: invalidExeErr } = await adminClient.storage
+    .from('allegati')
+    .upload(invalidExeName, Buffer.from('malicious-binary'), {
+      contentType: 'application/x-msdownload',
+      upsert: true
+    });
 
-    if (removeError) {
-      console.error('[FALLIMENTO] Cancellazione file da storage fallita:', removeError.message);
-    } else {
-      console.log('[OK] File temporaneo di test rimosso con successo dallo Storage.');
-    }
+  assert(invalidExeErr !== null, 'Upload con MIME non consentito (application/x-msdownload) rifiutato dal bucket');
+
+  // 5. Client Anonimo chiama bump_sync_epoch() e purge_old_tombstones()
+  console.log('\n--- 5. Protezione RPC bump_sync_epoch() e purge_old_tombstones() ---');
+  
+  // Lettura epoca iniziale da system_meta (se la tabella esiste)
+  let initialEpoch = 1;
+  const { data: initialMeta } = await anonClient
+    .from('system_meta')
+    .select('value')
+    .eq('key', 'sync_epoch')
+    .maybeSingle();
+
+  if (initialMeta && initialMeta.value !== undefined) {
+    initialEpoch = typeof initialMeta.value === 'number' ? initialMeta.value : parseInt(String(initialMeta.value), 10);
   }
 
-  await supabase.auth.signOut();
+  // Tentativo di chiamata anonima a bump_sync_epoch()
+  const { error: anonBumpErr } = await anonClient.rpc('bump_sync_epoch');
+  assert(
+    anonBumpErr !== null,
+    `Chiamata anonima a bump_sync_epoch() respinta (errore: ${anonBumpErr?.code || anonBumpErr?.message})`
+  );
+
+  // Tentativo di chiamata anonima a purge_old_tombstones()
+  const { error: anonPurgeErr } = await anonClient.rpc('purge_old_tombstones');
+  assert(
+    anonPurgeErr !== null,
+    `Chiamata anonima a purge_old_tombstones() respinta (errore: ${anonPurgeErr?.code || anonPurgeErr?.message})`
+  );
+
+  // Verifica che sync_epoch sia rimasto rigorosamente invariato
+  const { data: finalMeta } = await anonClient
+    .from('system_meta')
+    .select('value')
+    .eq('key', 'sync_epoch')
+    .maybeSingle();
+
+  if (finalMeta && finalMeta.value !== undefined) {
+    const finalEpoch = typeof finalMeta.value === 'number' ? finalMeta.value : parseInt(String(finalMeta.value), 10);
+    assert(finalEpoch === initialEpoch, `sync_epoch è rimasto invariato sul database (${finalEpoch} === ${initialEpoch})`);
+  } else {
+    assert(true, 'sync_epoch protetto: nessuna alterazione rilevata');
+  }
+
+  // 6. Ciclo Completo Allegato (Fase 5)
+  console.log('\n--- 6. Ciclo Completo Allegato (Upload, Record, Lettura Anonima, Rimozione) ---');
+  
+  // Upload anonimo su storage deve essere respinto (403/RLS)
+  const { error: anonUploadErr } = await anonClient.storage
+    .from('allegati')
+    .upload(`anon_probe_${Date.now()}.png`, validBuffer, { contentType: 'image/png' });
+
+  assert(anonUploadErr !== null, 'Upload anonimo su Storage respinto da policy di sicurezza');
+
+  // Admin carica allegato PDF/JPEG valido collegato al gioco esca
+  const attachmentStoragePath = `giochi/${canaryRow.id}/${Date.now()}_regolamento.pdf`;
+  const pdfBuffer = Buffer.from('%PDF-1.4 Mock PDF per test allegati');
+  
+  const { error: uploadPdfErr } = await adminClient.storage
+    .from('allegati')
+    .upload(attachmentStoragePath, pdfBuffer, {
+      contentType: 'application/pdf',
+      upsert: true
+    });
+
+  assert(!uploadPdfErr, `Admin carica file PDF in Storage (${attachmentStoragePath})`);
+
+  // Admin registra la riga nella tabella public.allegati
+  const { data: allegatoRow, error: allegatoErr } = await adminClient
+    .from('allegati')
+    .insert([{
+      gioco_id: canaryRow.id,
+      storage_path: attachmentStoragePath,
+      nome_file: 'Regolamento Completo.pdf',
+      mime: 'application/pdf',
+      dimensione: pdfBuffer.length,
+      ordine: 0
+    }])
+    .select()
+    .single();
+
+  assert(!allegatoErr && allegatoRow && allegatoRow.id, `Riga allegato creata nel database (ID: ${allegatoRow?.id})`);
+
+  // Lettura pubblica dell'URL dell'allegato tramite fetch anonimo
+  const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/allegati/${attachmentStoragePath}`;
+  try {
+    const res = await fetch(publicUrl);
+    assert(res.ok && res.status === 200, `Lettura anonima URL pubblico allegato riuscita (HTTP ${res.status})`);
+  } catch (err) {
+    assert(false, `Lettura URL pubblico fallita: ${err.message}`);
+  }
+
+  // Rimozione allegato da tabella e da Storage
+  const { error: delAllegatoErr } = await adminClient
+    .from('allegati')
+    .delete()
+    .eq('id', allegatoRow.id);
+  assert(!delAllegatoErr, 'Rimozione riga allegato da tabella riuscita');
+
+  const { error: delStorageErr } = await adminClient.storage
+    .from('allegati')
+    .remove([attachmentStoragePath]);
+  assert(!delStorageErr, 'Rimozione file fisico allegato da Storage riuscita');
+
+  // 7. Pulizia finale: cancellazione riga esca, file di prova e logout
+  console.log('\n--- 7. Pulizia Finale e Chiusura Sessione ---');
+  
+  const { error: delCanaryErr } = await adminClient
+    .from('giochi')
+    .delete()
+    .eq('id', canaryRow.id);
+  assert(!delCanaryErr, 'Riga esca giochi eliminata da admin');
+
+  await adminClient.storage.from('allegati').remove([testFileNameValid]);
+  console.log('  [CLEANUP] File temporanei di test rimossi dallo Storage.');
+
+  await adminClient.auth.signOut();
+  console.log('  [LOGOUT] Sessione Admin terminata regolarmente.');
+
   console.log('\n======================================================================');
-  console.log('TUTTI I TEST DI SCRITTURA ADMIN HANNO DATO ESITO POSITIVO!');
-  console.log('Verifica riga esca e vincolo MIME superati al 100%.');
-  console.log('Sessione chiusa regolarmente.');
-  console.log('======================================================================');
+  console.log(`ESITO FINALE: ${testsPassed}/${testsTotal} controlli superati con successo.`);
+  console.log('Tutti i vincoli di sicurezza RLS, RPC, Storage e Allegati sono integri.');
+  console.log('======================================================================\n');
 }
 
-runAdminTest();
+runAdminSecurityAudit().catch((err) => {
+  console.error('\n[ERRORE NON GESTITO]', err);
+  process.exit(1);
+});

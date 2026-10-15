@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:admin": "node test/run_admin_test.mjs",
+    "test:admin": "node supabase/tests/run_admin_test.mjs",
     "verify:ui": "playwright test test/verify_ui.spec.ts"
   },
   "dependencies": {

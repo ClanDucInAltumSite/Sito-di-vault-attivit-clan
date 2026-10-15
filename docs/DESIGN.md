@@ -192,4 +192,27 @@ La suite di test automatizzati con **Playwright** e **Axe-Core** verifica ad ogn
 - Validazione morbida della sintassi con avvisi contestuali non bloccanti.
 - Anteprima live dinamica dello spartito aggiornata in tempo reale durante la digitazione.
 
+---
+
+## 10. Specifiche Componenti Allegati, Galleria e Lightbox (Fase 5)
+
+### 10.1 Galleria Allegati (`AttachmentGallery`)
+- **Griglia Miniature Immagini:** Miniature a rapporto d'aspetto fisso con `width` e `height` esplicite per eliminare qualsiasi Cumulative Layout Shift (CLS), raggio di curvatura coerente (`--radius-md`) e badge per l'ingrandimento (`zoom-in`).
+- **Card Documenti PDF:** Scheda orizzontale elegante con icona vettoriale documento, titolo file con troncamento ellittico protetto, dimensione formattata (KB/MB) e pulsante di apertura diretta in nuova scheda o viewer di sistema.
+- **Badge Risorsa Non Scaricata:** Se il dispositivo è offline e il file non è presente nella cache locale (`scout-attachments-v1`), compare un badge sobrio "Non scaricato — serve connessione" al posto della miniatura o accanto alla dimensione, senza generare errori di caricamento immagine o blocchi UI.
+- **Gating Amministrativo:** I pulsanti di cancellazione rapida (icona cestino rosso con conferma) sono visibili esclusivamente se `isAdmin === true`.
+
+### 10.2 Modale Ingrandimento Immagini (`Lightbox`)
+- **Esperienza Visiva:** Backdrop scuro profondo a schermo intero (`rgba(0, 0, 0, 0.88)`) per concentrare l'attenzione sullo schema o sulla fotografia.
+- **Dimensionamento Responsivo:** Immagine dimensionata dinamicamente con `max-width: 90vw; max-height: 82vh; object-fit: contain;` e bordi arrotondati.
+- **Accessibilità e Chiusura:** Barra superiore con nome file ad alto contrasto, pulsante di chiusura circolare ad ampia area di tocco ($\ge 44\times 44\text{px}$) con `aria-label="Chiudi zoom"`, chiusura al click su sfondo (backdrop) e prevenzione propagazione click sull'immagine.
+
+### 10.3 Gestione Caricamento Amministratore (`AttachmentUploadManager`)
+- **Duale Sorgente di Input:** Due pulsanti dedicati:
+  1. *Scatta foto:* Richiama direttamente la fotocamera dello smartphone tramite `capture="environment"`.
+  2. *Scegli file:* Apre il selettore documenti di sistema per file immagini o PDF preesistenti.
+- **Anteprima e Compressione:** Anteprima immediata prima del salvataggio definitivo con indicatore di compressione automatica WebP attiva (riduzione peso $> 85\%$).
+- **Barra di Avanzamento:** Barra di progresso grafica deterministica con feedback testuale in italiano durante il trasferimento verso il bucket Supabase.
+
+
 

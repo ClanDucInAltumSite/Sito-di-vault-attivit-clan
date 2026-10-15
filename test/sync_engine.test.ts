@@ -529,5 +529,72 @@ describe('FASE 2 — Test di Sicurezza, Sincronizzazione e Offline (Sync Engine)
     const meta = await getSyncMeta();
     expect(meta.sync_epoch).toBe(2);
   });
+
+  // TEST 9: Tabella system_meta mancante o con errore 404/non creata
+  it('9. system_meta mancante o errore query: non forza Full Resync, non genera errori e prosegue con la sync incrementale', async () => {
+    // 1. Client possiede già un record e un cursore
+    await upsertRecords('giochi', [
+      {
+        id: 'g-stabile',
+        nome: 'Gioco Stabile',
+        regole: 'Regola...',
+        materiali: '',
+        created_at: '2026-10-15T00:00:00Z',
+        updated_at: '2026-10-15T00:00:00Z',
+        deleted_at: null,
+      },
+    ]);
+    await updateSyncMeta({
+      last_sync_server_time: '2026-10-15T00:00:00Z',
+      sync_epoch: 1,
+      table_cursors: { giochi: '2026-10-15T00:00:00Z' },
+    });
+
+    let fullResyncCalled = false;
+    const mockClientWithMissingSystemMeta = {
+      from: (table: string) => {
+        if (table === 'system_meta') {
+          return {
+            select: () => ({
+              eq: () => ({
+                // Simula tabella non ancora creata (404 o 42P01)
+                maybeSingle: () => Promise.resolve({
+                  data: null,
+                  error: { code: '42P01', message: 'relation "system_meta" does not exist' },
+                }),
+              }),
+            }),
+          };
+        }
+        return {
+          select: () => {
+            const p: any = Promise.resolve({ data: [], error: null });
+            p.gte = () => Promise.resolve({ data: [], error: null });
+            p.abortSignal = () => {
+              fullResyncCalled = true;
+              return p;
+            };
+            return p;
+          },
+        };
+      },
+    };
+
+    await syncNow({ forceFull: false, trigger: 'routine_sync', client: mockClientWithMissingSystemMeta as any });
+
+    // Lo stato deve rimanere 'idle' senza errori
+    const state = getSyncState();
+    expect(state.status).toBe('idle');
+    expect(state.lastError).toBeNull();
+
+    // Il record esistente rimane integro
+    const giochi = await getGiochi();
+    expect(giochi.length).toBe(1);
+    expect(giochi[0].id).toBe('g-stabile');
+
+    // Non è stato scatenato il Full Resync atomico (fullResyncCalled rimane false)
+    expect(fullResyncCalled).toBe(false);
+  });
 });
+
 

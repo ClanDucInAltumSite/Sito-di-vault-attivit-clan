@@ -294,8 +294,10 @@ export async function syncNow(
     try {
       const query = client.from('system_meta').select('value').eq('key', 'sync_epoch');
       if (query && typeof query.maybeSingle === 'function') {
-        const { data: epochData } = await query.maybeSingle();
-        if (epochData && epochData.value !== undefined) {
+        const { data: epochData, error: epochErr } = await query.maybeSingle();
+        if (epochErr) {
+          console.warn('[SyncEngine] Tabella system_meta non disponibile o non creata (proseguo con sync incrementale):', epochErr.message);
+        } else if (epochData && epochData.value !== undefined) {
           const val = typeof epochData.value === 'number' ? epochData.value : parseInt(String(epochData.value), 10);
           if (!isNaN(val)) {
             serverEpoch = val;
@@ -307,8 +309,9 @@ export async function syncNow(
           }
         }
       }
-    } catch (_err) {
-      // Ignora se system_meta non è ancora creata sul database
+    } catch (err: any) {
+      // Registra l'anomalia e prosegue con la sync incrementale senza forzare Full Resync né sollevare errori
+      console.warn('[SyncEngine] system_meta non risponde (proseguo con sync incrementale):', err?.message || err);
     }
 
     const needsFullResync = forceFull || isFirstSync || isDbEmpty || isExpired || isEpochMismatch;
@@ -317,6 +320,15 @@ export async function syncNow(
       await performFullResync(client, trigger, serverEpoch);
     } else {
       await performIncrementalSync(client, trigger, serverEpoch);
+    }
+
+    // Auto-download in background degli allegati leggeri (<500 KB) per uso offline
+    if (typeof window !== 'undefined' && 'caches' in window) {
+      setTimeout(() => {
+        import('./storage-cache')
+          .then((m) => m.autoCacheSmallAttachments())
+          .catch(() => {});
+      }, 500);
     }
   } catch (error: any) {
     console.warn(`[SyncEngine] Errore sincronizzazione (${trigger}):`, error?.message || error);

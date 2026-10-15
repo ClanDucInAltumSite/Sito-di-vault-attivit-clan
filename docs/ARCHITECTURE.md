@@ -439,7 +439,7 @@ Meta-tag restrittivo in `index.html`:
 - **Rendering VDOM Sicuro (Zero `innerHTML`):**
   - Segmentazione in AST tipizzato (`ChordProAST`) e generazione ricorsiva di Virtual DOM nodi Preact.
   - Struttura tipografica `.song-chord-column` in `display: inline-flex; flex-direction: column; vertical-align: bottom;`:
-    - `.song-chord`: visualizzato sopra la sillaba in grassetto blu notte (`--color-navy`).
+    - `.song-chord`: visualizzato sopra la sillaba in grassetto Azzurro Scuro (`--color-calendario`: `oklch(0.42 0.15 255)`).
     - `.song-lyric`: testo sillabico ancorato verticalmente sotto l'accordo; non si disallinea se la riga subisce wrap orizzontale su schermi stretti (320px).
     - `.song-chorus-block`: blocco ritornello caratterizzato da barra laterale sinistra color giallo scout (`--color-yellow`) e padding ergonomico.
 - **Motore di Trasposizione Semitonale Circolare:**
