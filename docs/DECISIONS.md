@@ -205,3 +205,25 @@ Questa sezione tiene traccia delle implementazioni puntuali richieste e approvat
 4. **FASE 6 — Stampa:**
    - **Gestione Spezzatura Pagine Giochi e Bans:** La direttiva `break-inside: avoid` viene applicata unicamente agli elementi brevi (testo sotto i 600 caratteri o classe `.print-item-short`); gli elementi lunghi possono spezzarsi normalmente tra le pagine A4 per evitare spazi bianchi a fondo pagina. `break-after: avoid` rimane attivo sui titoli.
 
+---
+
+## Protocollo Operativo Permanente di Fine Fase e Regole Comuni
+
+Regole vincolanti applicate a tutte le fasi a partire dalla Fase 2:
+
+### Protocollo di Fine Fase
+1. **Test automatici tutti verdi:** Un test deve poter fallire (mai contare come "superato" un errore per risorsa mancante, mai indebolire un controllo per farlo passare).
+2. **Verifica UI e Lighthouse:** Eseguire `npm run verify:ui` includendo tutte le nuove schermate e riportando i risultati reali. Se la UI cambia, eseguire anche Lighthouse mobile verificando numeri reali (Performance e Accessibilità $\ge 90$).
+3. **Aggiornamento Documentazione:** Aggiornare `docs/` (`ARCHITECTURE.md`, `DECISIONS.md`, `DESIGN.md`, `TEST_CHECKLIST.md`, `SETUP_MANUALE.md` se necessario).
+4. **Git e Deploy:** Commit e push su `main`, conferma dell'hash e verifica che il deploy su GitHub Pages sia verde.
+5. **Riepilogo e Prove Reali:** Indicare cosa è stato fatto con PROVE reali (output effettivo dei comandi e test, non dichiarazioni generiche), cosa NON è stato fatto o eventuali limiti noti, e cosa deve essere verificato a mano da smartphone.
+6. **GATE Rigoroso:** Fermarsi e attendere il via esplicito prima di iniziare la fase successiva.
+
+### Regole Permanenti
+- **Design System:** Usare esclusivamente i token e i componenti di `docs/DESIGN.md`; nessuno stile nuovo scritto a mano. Colori con funzione come da documentazione. Nessuna copertina per i singoli elementi: le foto compaiono solo nelle 5 testate di sezione.
+- **Sicurezza e Integrità:** Nessun `innerHTML` con dati dinamici, nessuna libreria da CDN esterna, nessun segreto o chiave privata nel repository.
+- **Lingua e Stringhe:** Tutta l'interfaccia esclusivamente in italiano, con tutte le stringhe centralizzate in `src/lib/i18n.ts`.
+- **Modello Dati:** Modifiche consentite solo online; offline è sempre in sola lettura.
+- **Copertura UI:** Ogni nuova schermata va aggiunta a `verify:ui` (Playwright) e alla vista di collaudo `#/design`.
+- **Gestione Ambiguità:** Se un requisito è ambiguo, scegliere l'opzione più semplice, annotarla in `docs/DECISIONS.md` e procedere. Chiedere solo in caso di blocco.
+
