@@ -80,7 +80,6 @@
   .topo-contour-wrapper,
   .topo-ambient-glow,
   .topo-svg-container,
-  .topo-altimeter-hud,
   .scout-trail-svg,
   .scout-compass-widget,
   button:not(.print-keep),
@@ -468,3 +467,25 @@
     border-bottom: 1px solid var(--color-border);
   }
 }
+
+/* Contenitore invisibile per la misurazione reale dell'overflow A4 */
+.stampa-measure-host {
+  position: fixed !important;
+  left: -9999px !important;
+  top: -9999px !important;
+  width: 186mm !important;
+  height: 267mm !important;
+  max-height: 267mm !important;
+  overflow: hidden !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  box-sizing: border-box !important;
+  font-family: var(--font-sans, system-ui, -apple-system, sans-serif) !important;
+  line-height: 1.4 !important;
+  background: white !important;
+  color: black !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+}
+

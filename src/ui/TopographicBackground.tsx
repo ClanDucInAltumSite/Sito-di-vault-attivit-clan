@@ -45,16 +45,6 @@ export function TopographicBackground({ className = '' }: TopographicBackgroundP
     };
   }, []);
 
-  // Quota dinamica da 1000m (in cima alla pagina) a 0m (in fondo alla pagina)
-  const quota = Math.max(0, Math.round((1 - scrollProgress) * 1000));
-
-  // Tappa geografica corrispondente all'altitudine
-  let stageName = 'Vetta';
-  if (quota <= 50) stageName = 'Campo Base';
-  else if (quota <= 280) stageName = 'Fondovalle';
-  else if (quota <= 550) stageName = 'Sella';
-  else if (quota <= 820) stageName = 'Costone';
-
   // Parallasse di discesa: sposta le curve verso l'alto man mano che si scende
   const parallaxOffset = Math.round(scrollProgress * -90);
 
@@ -255,13 +245,6 @@ export function TopographicBackground({ className = '' }: TopographicBackgroundP
             />
           </g>
         </svg>
-      </div>
-
-      {/* Altimetro cartografico discreto in filigrana nell'angolo inferiore */}
-      <div className="topo-altimeter" aria-hidden="true">
-        <span className="topo-altimeter-pin">▲</span>
-        <span className="topo-altimeter-val tabular-nums">{quota} m</span>
-        <span className="topo-altimeter-stage">{stageName}</span>
       </div>
     </div>
   );

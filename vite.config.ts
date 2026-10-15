@@ -87,6 +87,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'happy-dom',
+    fileParallelism: false,
     include: ['test/**/*.test.ts'],
   },
 });

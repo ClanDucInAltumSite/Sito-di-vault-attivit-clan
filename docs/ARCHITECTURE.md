@@ -452,10 +452,18 @@ Meta-tag restrittivo in `index.html`:
 - **Editor Admin Live e Validatore Morbido:**
   - Componente `CantoFormSheet` con anteprima live in tempo reale, pulsanti di inserimento rapido per accordi `[Accordo]` e direttive alla posizione del cursore, controllo duplicati morbido (Levenshtein $\le 2$) e validatore sintattico morbido (`validateChordPro`).
 
-### 8.3 Calendario e Ordine del Giorno (ODG)
-- Fuso `Europe/Rome`, locale `it-IT`, inizio lunedì. Viste Mese e Lista prossimi eventi.
-- Dettaglio Evento completo.
-- **ODG:** Punti ordinabili, casella di spunta e pulsante *"Riporta punti non conclusi alla prossima riunione"*, che clona i punti non completati collegandoli con `riportato_da`. Stampa rapida ODG.
+### 8.3 Calendario e Ordine del Giorno (ODG) — Fase 7
+- **Fuso Orario e Localizzazione:** Fuso orario rigorosamente fissato su `Europe/Rome`, localizzazione `it-IT`, inizio settimana di Lunedì. Gestione matematica deterministica dei mesi (28, 29 bisestile, 30, 31 giorni) e immunità agli sfasamenti da ora legale (transizione estiva di marzo e solare di ottobre).
+- **Architettura a Due Viste:**
+  - **Vista Mese (`CalendarioMonthView`):** Griglia reattiva a 7 colonne (LUN-DOM), celle con giorno del mese, evidenziazione del giorno odierno in rosso accento (`.calendar-cell-today`), indicatori a pallini cromatici per ciascun tipo di attività, pulsanti di navigazione mese e salto rapido a "Oggi". Elenco dinamico delle attività della data selezionata sottostante alla griglia.
+  - **Vista Lista Prossimi Eventi (`CalendarioListView`):** Elenco cronologico raggruppato in attività in programma (ordine crescente) e attività passate (ordine decrescente), corredato di blocco data stile calendario da parete (`.calendar-date-block`), chip cromatico del tipo e contatore rosso dei punti ODG ancora aperti.
+- **Foglio di Dettaglio Integrato (`EventoDetailSheet`):** Presentazione completa dei dati logistici (luogo, orario, responsabile, cosa portare, note), galleria allegati (`AttachmentGallery` con upload admin) e sezione Ordine del Giorno. Supporto deep-link con parametro query `#/calendario?id=<uuid>`.
+- **Ordine del Giorno (ODG) e Permessi Rigorosi:**
+  - **Gating dei Permessi:** La spunta "fatto", il riordino su/giù, l'aggiunta e l'eliminazione di punti sono **esclusivi dell'amministratore** (`isAdmin`). Per i visitatori anonimi, le caselle sono disabilitate in sola lettura (`disabled`, `aria-checked`, nessun controllo di modifica o riordino visibile).
+  - **Spunta Animata:** Checkbox con transizione iOS e tracciamento SVG del checkmark (`stroke-dasharray` / `stroke-dashoffset` animato). Testo con barratura fluida (`line-through`).
+  - **Riporto Punti Non Conclusi:** Funzione `forwardUnfinishedOdgPunti(fromEventoId, toEventoId)` che identifica la prossima riunione futura (`tipo === 'riunione'`, `inizio > current.inizio`), clona i punti non completati impostando il vincolo `riportato_da = punto_originale.id`, e assegna ordine sequenziale progressivo.
+  - **Soft-Delete Gerarchica:** I punti ODG figli sono automaticamente esclusi dalle query UI se l'evento genitore è eliminato (`deleted_at !== null`) e ritornano visibili in caso di ripristino.
+- **Validazione e Protezione Dati:** Validazione stringente $fine \ge inizio$; avviso esplicito sui dati personali sensibili; RLS a livello database su `eventi` e `odg_punti`.
 
 ### 8.4 Motore di Ricerca e Ordinamento
 - **Campi indicizzati:** Multi-campo (titolo, testo, regole, materiali, note gesti; accordi esclusi dal match per non generare falsi positivi).

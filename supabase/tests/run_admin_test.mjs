@@ -310,6 +310,80 @@ async function runAdminSecurityAudit() {
     .remove([attachmentStoragePath]);
   assert(!delStorageErr, 'Rimozione file fisico allegato da Storage riuscita');
 
+  // 6B. Verifica RLS su Tabelle Calendario (eventi e odg_punti)
+  console.log('\n--- 6B. Verifica RLS su Tabelle Calendario ("eventi" e "odg_punti") ---');
+  
+  // Admin crea evento esca
+  const canaryEventTitle = `[ESCA_TEST] Evento Trappola ${Date.now()}`;
+  const { data: canaryEvento, error: canaryEventoErr } = await adminClient
+    .from('eventi')
+    .insert([{
+      titolo: canaryEventTitle,
+      tipo: 'riunione',
+      inizio: new Date().toISOString()
+    }])
+    .select()
+    .single();
+
+  assert(!canaryEventoErr && canaryEvento?.id, `Admin crea evento esca in "eventi" (ID: ${canaryEvento?.id})`);
+
+  // Admin crea punto ODG esca
+  const { data: canaryOdg, error: canaryOdgErr } = await adminClient
+    .from('odg_punti')
+    .insert([{
+      evento_id: canaryEvento.id,
+      testo: 'Punto ODG Trappola Iniziale',
+      ordine: 0,
+      completato: false
+    }])
+    .select()
+    .single();
+
+  assert(!canaryOdgErr && canaryOdg?.id, `Admin crea punto esca in "odg_punti" (ID: ${canaryOdg?.id})`);
+
+  // Client anonimo tenta INSERT in eventi
+  const { error: anonInsEventErr } = await anonClient
+    .from('eventi')
+    .insert([{ titolo: '[HACKED] Evento Anonimo', tipo: 'altro', inizio: new Date().toISOString() }]);
+  assert(anonInsEventErr !== null, 'Tentativo INSERT anonimo su "eventi" correttamente respinto da RLS');
+
+  // Client anonimo tenta UPDATE su evento esca
+  const { data: anonUpEvent, error: anonUpEventErr } = await anonClient
+    .from('eventi')
+    .update({ titolo: '[HACKED] Titolo Modificato' })
+    .eq('id', canaryEvento.id)
+    .select();
+  assert(anonUpEventErr !== null || !anonUpEvent || anonUpEvent.length === 0, 'Tentativo UPDATE anonimo su "eventi" respinto da RLS');
+
+  // Client anonimo tenta INSERT in odg_punti
+  const { error: anonInsOdgErr } = await anonClient
+    .from('odg_punti')
+    .insert([{ evento_id: canaryEvento.id, testo: '[HACKED] Punto Anonimo', ordine: 99 }]);
+  assert(anonInsOdgErr !== null, 'Tentativo INSERT anonimo su "odg_punti" correttamente respinto da RLS');
+
+  // Client anonimo tenta UPDATE (spunta) su odg_punti esca
+  const { data: anonUpOdg, error: anonUpOdgErr } = await anonClient
+    .from('odg_punti')
+    .update({ completato: true })
+    .eq('id', canaryOdg.id)
+    .select();
+  assert(anonUpOdgErr !== null || !anonUpOdg || anonUpOdg.length === 0, 'Tentativo UPDATE/spunta anonimo su "odg_punti" respinto da RLS');
+
+  // Client anonimo tenta DELETE su odg_punti
+  const { data: anonDelOdg, error: anonDelOdgErr } = await anonClient
+    .from('odg_punti')
+    .delete()
+    .eq('id', canaryOdg.id)
+    .select();
+  assert(anonDelOdgErr !== null || !anonDelOdg || anonDelOdg.length === 0, 'Tentativo DELETE anonimo su "odg_punti" respinto da RLS');
+
+  // Admin elimina punto ODG esca ed evento esca
+  const { error: delOdgErr } = await adminClient.from('odg_punti').delete().eq('id', canaryOdg.id);
+  assert(!delOdgErr, 'Admin elimina punto esca odg_punti');
+
+  const { error: delEventErr } = await adminClient.from('eventi').delete().eq('id', canaryEvento.id);
+  assert(!delEventErr, 'Admin elimina evento esca eventi');
+
   // 7. Pulizia finale: cancellazione riga esca, file di prova e logout
   console.log('\n--- 7. Pulizia Finale e Chiusura Sessione ---');
   

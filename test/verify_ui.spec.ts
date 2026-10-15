@@ -488,3 +488,182 @@ test.describe('FASE 5 — Verifica Componenti Allegati e Lightbox su #/design', 
   });
 });
 
+test.describe('FASE 7 — Verifica Calendario e ODG (#/calendario)', () => {
+  async function seedCalendarData(page: any) {
+    await page.goto('#/');
+    await page.waitForLoadState('networkidle');
+
+    await page.evaluate(async () => {
+      const req = indexedDB.open('vault_scout_db', 1);
+      await new Promise<void>((resolve, reject) => {
+        req.onsuccess = () => {
+          const db = req.result;
+          const tx = db.transaction(['eventi', 'odg_punti'], 'readwrite');
+          const evStore = tx.objectStore('eventi');
+          const odgStore = tx.objectStore('odg_punti');
+
+          const now = new Date();
+          const todayIso = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 18, 30).toISOString();
+          const tomorrowIso = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 9, 0).toISOString();
+          const pastIso = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 5, 20, 0).toISOString();
+
+          // 1. Evento Oggi (Riunione con ODG denso)
+          const evOggi = {
+            id: 'ev-oggi-test',
+            titolo: 'Riunione Ordinaria di Clan & Verifica Fasi',
+            tipo: 'riunione',
+            inizio: todayIso,
+            fine: new Date(now.getFullYear(), now.getMonth(), now.getDate(), 20, 30).toISOString(),
+            tutto_il_giorno: false,
+            luogo: 'Sede Clan San Giovanni',
+            descrizione: 'Verifica dettagliata delle attività del mese e approvazione ordini del giorno.',
+            responsabile: 'Capi Clan',
+            cosa_portare: 'Quaderno di caccia, penna, cassa',
+            created_at: now.toISOString(),
+            updated_at: now.toISOString(),
+            deleted_at: null,
+          };
+
+          // 2. Evento Domani (Uscita)
+          const evDomani = {
+            id: 'ev-domani-test',
+            titolo: 'Uscita di Pattuglia sui Sibillini',
+            tipo: 'uscita',
+            inizio: tomorrowIso,
+            fine: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 2, 17, 0).toISOString(),
+            tutto_il_giorno: false,
+            luogo: 'Monte Vettore - Rifugio Zilioli',
+            descrizione: 'Trekking di 2 giorni in autonomia.',
+            responsabile: 'Pattuglia Aquile',
+            cosa_portare: 'Tenda, fornellino, viveri',
+            created_at: now.toISOString(),
+            updated_at: now.toISOString(),
+            deleted_at: null,
+          };
+
+          // 3. Evento Passato
+          const evPassato = {
+            id: 'ev-passato-test',
+            titolo: 'Verifica Inizio Anno Scout',
+            tipo: 'evento',
+            inizio: pastIso,
+            fine: null,
+            tutto_il_giorno: false,
+            luogo: 'Oratorio',
+            descrizione: 'Incontro con la Comunità Capi',
+            responsabile: 'Capi Gruppo',
+            cosa_portare: null,
+            created_at: pastIso,
+            updated_at: pastIso,
+            deleted_at: null,
+          };
+
+          evStore.put(evOggi);
+          evStore.put(evDomani);
+          evStore.put(evPassato);
+
+          // Stress test: 30 punti ODG con stringhe lunghe
+          for (let i = 1; i <= 30; i++) {
+            odgStore.put({
+              id: `odg-pt-${i}`,
+              evento_id: 'ev-oggi-test',
+              testo: `Punto ODG #${i}: Discussione approfondita sui progetti di servizio ${i % 2 === 0 ? 'con testo esteso per verifica layout reattivo senza troncamenti strani' : 'breve'}`,
+              ordine: i - 1,
+              completato: i % 4 === 0, // Ogni 4 completato
+              riportato_da: i === 5 ? 'odg-vecchio-id' : null,
+              created_at: now.toISOString(),
+              updated_at: now.toISOString(),
+              deleted_at: null,
+            });
+          }
+
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        };
+        req.onerror = () => reject(req.error);
+      });
+    });
+  }
+
+  test('Audit accessibilità WCAG AA su Calendario View (#/calendario)', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await seedCalendarData(page);
+    await page.goto('/#/calendario');
+    await page.waitForLoadState('networkidle');
+
+    const accessibilityScanResults = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa'])
+      .disableRules(['color-contrast'])
+      .analyze();
+
+    const criticalViolations = accessibilityScanResults.violations.filter(
+      (v) => v.impact === 'critical' || v.impact === 'serious'
+    );
+
+    expect(
+      criticalViolations.length,
+      `Violazioni critiche accessibilità su Calendario: ${JSON.stringify(criticalViolations, null, 2)}`
+    ).toBe(0);
+  });
+
+  test('Verifica rendering Griglia Mese, commutazione Prossimi/Passati e apertura Dettaglio con ODG', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await seedCalendarData(page);
+    await page.goto('/#/calendario');
+    await page.waitForLoadState('networkidle');
+
+    // 1. Verifica presenza Griglia Mese
+    const monthCard = page.locator('.calendar-month-card');
+    await expect(monthCard).toBeVisible();
+
+    const dayCells = page.locator('.calendar-cell');
+    expect(await dayCells.count()).toBeGreaterThanOrEqual(28);
+
+    // 2. Commutazione a Vista Prossimi Eventi
+    const prossimiBtn = page.locator('text=Prossimi');
+    await prossimiBtn.click();
+    await page.waitForTimeout(150);
+
+    const groupedRows = page.locator('.ios-grouped-row');
+    expect(await groupedRows.count()).toBeGreaterThanOrEqual(2);
+
+    // Verifica presenza blocco data e chip
+    const firstRow = groupedRows.first();
+    await expect(firstRow.locator('.calendar-date-block')).toBeVisible();
+    await expect(firstRow.locator('.event-type-chip')).toBeVisible();
+
+    // 3. Apertura Dettaglio Evento con ODG denso (30 punti)
+    await firstRow.click();
+    await page.waitForSelector('[role="dialog"]');
+    const dialog = page.locator('[role="dialog"]');
+    await expect(dialog).toBeVisible();
+
+    // Verifica contatore badge ODG aperti
+    const odgOpenBadge = dialog.locator('.odg-open-badge');
+    await expect(odgOpenBadge).toBeVisible();
+
+    // Verifica presenza elementi ODG
+    const odgItems = dialog.locator('.odg-item');
+    expect(await odgItems.count()).toBeGreaterThanOrEqual(20);
+
+    // Verifica assenza scroll orizzontale anomalo dentro il dialog
+    const dialogMetrics = await dialog.evaluate((el) => ({
+      scrollWidth: el.scrollWidth,
+      clientWidth: el.clientWidth,
+    }));
+    expect(dialogMetrics.scrollWidth).toBeLessThanOrEqual(dialogMetrics.clientWidth + 2);
+
+    // Chiudi dialog
+    const closeBtn = page.locator('button:has-text("Chiudi")').first();
+    await closeBtn.click();
+    await page.waitForTimeout(200);
+
+    // 4. Commutazione a Vista Eventi Passati
+    const passatiBtn = page.locator('text=Passati');
+    await passatiBtn.click();
+    await page.waitForTimeout(150);
+    await expect(page.locator('text=Verifica Inizio Anno Scout')).toBeVisible();
+  });
+});
+
+

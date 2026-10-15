@@ -27,6 +27,7 @@ import {
   PrintableData,
   moveItemInArray,
   PrintableODG,
+  computePrintIndex,
 } from '../../lib/stampa';
 import { ChordProRenderer } from '../../lib/chordpro';
 
@@ -198,6 +199,12 @@ export function StampaView() {
       })),
     };
   }, [selectedEventId, eventi, odgPuntiMap]);
+
+  // Calcolo della numerazione reale per l'indice
+  const printIndex = useMemo(
+    () => computePrintIndex(printableData, config, printableODG),
+    [printableData, config, printableODG]
+  );
 
   const totalItemsCount = printableData.totalSelected + (printableODG ? 1 : 0);
 
@@ -859,50 +866,56 @@ export function StampaView() {
               <div className="print-index-page stampa-preview-paper">
                 <h2 className="print-index-title">{I18N.stampa.indice}</h2>
 
-                {printableData.giochi.length > 0 && (
+                {printIndex.giochi.length > 0 && (
                   <div className="print-index-section">
                     <div className="print-index-section-header">{I18N.stampa.giochi}</div>
-                    {printableData.giochi.map((pg, idx) => (
-                      <div key={pg.gioco.id} className="print-index-row">
-                        <span>{pg.gioco.nome}</span>
-                        <span className="print-index-row-num">{idx + 1}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {printableData.bans.length > 0 && (
-                  <div className="print-index-section">
-                    <div className="print-index-section-header">{I18N.stampa.bans}</div>
-                    {printableData.bans.map((pb, idx) => (
-                      <div key={pb.ban.id} className="print-index-row">
-                        <span>{pb.ban.nome}</span>
-                        <span className="print-index-row-num">{idx + 1}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {printableData.canti.length > 0 && (
-                  <div className="print-index-section">
-                    <div className="print-index-section-header">{I18N.stampa.canti}</div>
-                    {printableData.canti.map((pc) => (
-                      <div key={pc.canto.id} className="print-index-row">
-                        <span>{pc.canto.titolo}</span>
+                    {printIndex.giochi.map((entry) => (
+                      <div key={entry.id} className="print-index-row">
+                        <span>{entry.title}</span>
                         <span className="print-index-row-num">
-                          {pc.pageCount === 1 ? '1 pag.' : `${pc.pageCount} pagg.`}
+                          {entry.startPage !== null ? entry.startPage : ''}
                         </span>
                       </div>
                     ))}
                   </div>
                 )}
 
-                {printableODG && (
+                {printIndex.bans.length > 0 && (
+                  <div className="print-index-section">
+                    <div className="print-index-section-header">{I18N.stampa.bans}</div>
+                    {printIndex.bans.map((entry) => (
+                      <div key={entry.id} className="print-index-row">
+                        <span>{entry.title}</span>
+                        <span className="print-index-row-num">
+                          {entry.startPage !== null ? entry.startPage : ''}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {printIndex.canti.length > 0 && (
+                  <div className="print-index-section">
+                    <div className="print-index-section-header">{I18N.stampa.canti}</div>
+                    {printIndex.canti.map((entry) => (
+                      <div key={entry.id} className="print-index-row">
+                        <span>{entry.title}</span>
+                        <span className="print-index-row-num">
+                          {entry.startPage !== null ? entry.startPage : ''}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {printIndex.odg && (
                   <div className="print-index-section">
                     <div className="print-index-section-header">{I18N.stampa.schedaOdg}</div>
                     <div className="print-index-row">
-                      <span>{printableODG.titoloEvento}</span>
-                      <span className="print-index-row-num">1 pag.</span>
+                      <span>{printIndex.odg.title}</span>
+                      <span className="print-index-row-num">
+                        {printIndex.odg.startPage !== null ? printIndex.odg.startPage : ''}
+                      </span>
                     </div>
                   </div>
                 )}

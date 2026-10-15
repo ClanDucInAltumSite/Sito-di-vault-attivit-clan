@@ -1,12 +1,138 @@
-import { useState } from 'preact/hooks';
-import { I18N } from '../../lib/i18n';
-import { GroupedList } from '../../ui/GroupedList';
-import { GroupedRow } from '../../ui/GroupedRow';
-import { SegmentedControl } from '../../ui/SegmentedControl';
+// src/features/calendario/CalendarioView.tsx
+// Schermata principale del Calendario e Ordine del Giorno (ODG)
+// Lettura esclusiva da IndexedDB, commutazione tra Vista Mese e Vista Lista,
+// gestione Admin completa e supporto navigazione diretta tramite deep-link (?id=...).
+
+import { useState, useEffect } from 'preact/hooks';
 import { HeaderBanner } from '../../ui/HeaderBanner';
+import { SegmentedControl } from '../../ui/SegmentedControl';
+import { Button } from '../../ui/Button';
+import { Icon } from '../../ui/Icon';
+import { I18N } from '../../lib/i18n';
+import { Evento, OdgPunto, getEventi, getOdgPunti } from '../../lib/db';
+import { softDeleteRecord } from '../../lib/admin_actions';
+import { useAdmin } from '../../lib/auth';
+import { useRoute } from '../../app/router';
+import { CalendarioMonthView } from './CalendarioMonthView';
+import { CalendarioListView } from './CalendarioListView';
+import { EventoDetailSheet } from './EventoDetailSheet';
+import { EventoFormSheet } from './EventoFormSheet';
+import { parseDateOnly } from '../../lib/calendario';
 
 export function CalendarioView() {
-  const [viewMode, setViewMode] = useState<'prossimi' | 'passati' | 'tutti'>('prossimi');
+  const { isAdmin } = useAdmin();
+  const route = useRoute();
+
+  // Ripristino o impostazione vista da sessionStorage
+  const [viewMode, setViewMode] = useState<'mese' | 'prossimi' | 'passati'>(() => {
+    const saved = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('calendario_view_mode') : null;
+    return (saved as 'mese' | 'prossimi' | 'passati') || 'mese';
+  });
+
+  const [eventi, setEventi] = useState<Evento[]>([]);
+  const [odgMap, setOdgMap] = useState<Record<string, OdgPunto[]>>({});
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Stato modali
+  const [selectedEvento, setSelectedEvento] = useState<Evento | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingEvento, setEditingEvento] = useState<Evento | null>(null);
+
+  const loadData = async () => {
+    try {
+      const [evList, allOdg] = await Promise.all([
+        getEventi(false),
+        getOdgPunti(undefined, false),
+      ]);
+
+      setEventi(evList);
+
+      // Mappa ODG per evento_id
+      const map: Record<string, OdgPunto[]> = {};
+      for (const p of allOdg) {
+        if (!map[p.evento_id]) map[p.evento_id] = [];
+        map[p.evento_id]!.push(p);
+      }
+      setOdgMap(map);
+
+      // Deep-link query param (?id=...)
+      if (route.params.id) {
+        const target = evList.find((e) => e.id === route.params.id);
+        if (target) {
+          setSelectedEvento(target);
+          setIsDetailOpen(true);
+        }
+      }
+    } catch (err) {
+      console.error('Errore caricamento calendario:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, [route.params.id]);
+
+  const handleViewModeChange = (mode: string) => {
+    const m = mode as 'mese' | 'prossimi' | 'passati';
+    setViewMode(m);
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.setItem('calendario_view_mode', m);
+    }
+  };
+
+  const handleOpenDetail = (evento: Evento) => {
+    setSelectedEvento(evento);
+    setIsDetailOpen(true);
+  };
+
+  const handleNewEvento = () => {
+    setEditingEvento(null);
+    setIsFormOpen(true);
+  };
+
+  const handleEditEvento = (evento: Evento) => {
+    setIsDetailOpen(false);
+    setEditingEvento(evento);
+    setIsFormOpen(true);
+  };
+
+  const handleDeleteEvento = async (evento: Evento) => {
+    const confirmed = window.confirm(
+      `Sei sicuro di voler eliminare l'evento "${evento.titolo}"? Verrà spostato nel cestino.`
+    );
+    if (!confirmed) return;
+
+    try {
+      await softDeleteRecord('eventi', evento.id);
+      setIsDetailOpen(false);
+      setSelectedEvento(null);
+      await loadData();
+    } catch (err: any) {
+      alert(err.message || 'Errore durante l\'eliminazione dell\'evento.');
+    }
+  };
+
+  const handleSavedEvento = async (saved: Evento) => {
+    await loadData();
+    setSelectedEvento(saved);
+    setIsDetailOpen(true);
+  };
+
+  // Conteggio eventi futuri per la testata
+  const todayTime = new Date().setHours(0, 0, 0, 0);
+  const upcomingCount = eventi.filter((e) => {
+    if (e.deleted_at !== null) return false;
+    const start = parseDateOnly(e.inizio).getTime();
+    const end = e.fine ? parseDateOnly(e.fine).getTime() : start;
+    return end >= todayTime;
+  }).length;
+
+  const countBannerText = isLoading
+    ? 'Caricamento in corso…'
+    : `${upcomingCount} ${upcomingCount === 1 ? 'attività in programma' : 'attività in programma'}`;
 
   return (
     <div>
@@ -14,105 +140,89 @@ export function CalendarioView() {
       <HeaderBanner
         photoId="calendario"
         title={I18N.calendario.title}
-        count="6 attività in programma"
+        count={countBannerText}
         section="calendario"
       />
 
       <div className="container" style={{ paddingTop: 'var(--space-4)' }}>
-        {/* 2. FILTRI VISTA */}
-        <div style={{ marginBottom: 'var(--space-6)' }}>
-          <SegmentedControl
-            options={[
-              { value: 'prossimi', label: 'Prossimi Eventi' },
-              { value: 'passati', label: 'Eventi Passati' },
-              { value: 'tutti', label: 'Anno Completo' },
-            ]}
-            value={viewMode}
-            onChange={(val) => setViewMode(val as any)}
-          />
+        {/* 2. BARRA CONTROLLI SUPERIORE: FILTRI VISTA E PULSANTE NUOVO EVENTO ADMIN */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 'var(--space-3)',
+            marginBottom: 'var(--space-4)',
+          }}
+        >
+          <div style={{ flex: '1 1 280px', maxWidth: '380px' }}>
+            <SegmentedControl
+              options={[
+                { value: 'mese', label: I18N.calendario.vistaMese },
+                { value: 'prossimi', label: I18N.calendario.prossimiEventi },
+                { value: 'passati', label: 'Passati' },
+              ]}
+              value={viewMode}
+              onChange={handleViewModeChange}
+            />
+          </div>
+
+          {isAdmin && (
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleNewEvento}
+              style={{ whiteSpace: 'nowrap' }}
+            >
+              <Icon name="plus" size={16} />
+              <span>{I18N.calendario.nuovoEvento}</span>
+            </Button>
+          )}
         </div>
 
-        {/* 3. LISTA EVENTI CON BLOCCO DATA CALENDARIO DA PARETE E CHIP TIPO EVENTO */}
-        <GroupedList
-          header="ATTIVITÀ E ORDINE DEL GIORNO"
-          footer="Tocca un evento per visualizzare i dettagli logistici e l'Ordine del Giorno (ODG)."
-        >
-          {/* Evento 1: Oggi (Riunione) */}
-          <GroupedRow
-            leading={
-              <div className="calendar-date-block calendar-date-block-today">
-                <div className="calendar-date-month">OTT</div>
-                <div className="calendar-date-day">14</div>
-                <div className="calendar-date-weekday">OGGI</div>
-              </div>
-            }
-            title="Riunione di Clan e Verifica Fasi"
-            subtitle="18:30 - 20:30 • Sede Clan • 4 punti ODG"
-            trailing={<span className="event-type-chip event-chip-riunione">Riunione</span>}
-            chevron
+        {/* 3. VISTA ATTIVA */}
+        {viewMode === 'mese' ? (
+          <CalendarioMonthView
+            eventi={eventi}
+            odgMap={odgMap}
+            onSelectEvento={handleOpenDetail}
           />
-
-          {/* Evento 2: Uscita dei Passaggi */}
-          <GroupedRow
-            leading={
-              <div className="calendar-date-block">
-                <div className="calendar-date-month">OTT</div>
-                <div className="calendar-date-day">19</div>
-                <div className="calendar-date-weekday">SAB</div>
-              </div>
-            }
-            title="Uscita dei Passaggi sui Sibillini"
-            subtitle="Partenza 08:30 • Monte Vettore • Zaino spalla"
-            trailing={<span className="event-type-chip event-chip-uscita">Uscita</span>}
-            chevron
+        ) : (
+          <CalendarioListView
+            eventi={eventi}
+            odgMap={odgMap}
+            onSelectEvento={handleOpenDetail}
+            mode={viewMode}
           />
-
-          {/* Evento 3: Scadenza Iscrizioni */}
-          <GroupedRow
-            leading={
-              <div className="calendar-date-block">
-                <div className="calendar-date-month">OTT</div>
-                <div className="calendar-date-day">31</div>
-                <div className="calendar-date-weekday">GIO</div>
-              </div>
-            }
-            title="Scadenza Iscrizioni Route Invernale"
-            subtitle="Invio quota caparra e adesione definitiva"
-            trailing={<span className="event-type-chip event-chip-scadenza">Scadenza</span>}
-            chevron
-          />
-
-          {/* Evento 4: Evento di Gruppo */}
-          <GroupedRow
-            leading={
-              <div className="calendar-date-block">
-                <div className="calendar-date-month">NOV</div>
-                <div className="calendar-date-day">08</div>
-                <div className="calendar-date-weekday">VEN</div>
-              </div>
-            }
-            title="Veglia d'Armi e Rinnovo Promessa"
-            subtitle="21:00 • Chiesa Parrocchiale di San Giovanni"
-            trailing={<span className="event-type-chip event-chip-evento">Evento</span>}
-            chevron
-          />
-
-          {/* Evento 5: Altro / Manutenzione */}
-          <GroupedRow
-            leading={
-              <div className="calendar-date-block">
-                <div className="calendar-date-month">NOV</div>
-                <div className="calendar-date-day">15</div>
-                <div className="calendar-date-weekday">SAB</div>
-              </div>
-            }
-            title="Manutenzione Tende e Materiali"
-            subtitle="15:00 - 18:00 • Magazzino di Gruppo"
-            trailing={<span className="event-type-chip event-chip-altro">Altro</span>}
-            chevron
-          />
-        </GroupedList>
+        )}
       </div>
+
+      {/* 4. MODALE DETTAGLIO EVENTO & ODG */}
+      <EventoDetailSheet
+        evento={selectedEvento}
+        isOpen={isDetailOpen}
+        onClose={() => {
+          setIsDetailOpen(false);
+          setSelectedEvento(null);
+        }}
+        onEdit={handleEditEvento}
+        onDelete={handleDeleteEvento}
+        onChanged={loadData}
+      />
+
+      {/* 5. MODALE FORM CREAZIONE / MODIFICA EVENTO (ADMIN ONLY) */}
+      {isAdmin && (
+        <EventoFormSheet
+          isOpen={isFormOpen}
+          onClose={() => {
+            setIsFormOpen(false);
+            setEditingEvento(null);
+          }}
+          onSaved={handleSavedEvento}
+          initialEvento={editingEvento}
+        />
+      )}
     </div>
   );
 }

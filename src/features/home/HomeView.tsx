@@ -19,6 +19,11 @@ import {
   Evento,
 } from '../../lib/db';
 import {
+  getWallCalendarDate,
+  getEventCountdownText,
+  getEventTypeInfo,
+} from '../../lib/calendario';
+import {
   subscribeSyncState,
   syncNow,
   SyncState,
@@ -29,7 +34,11 @@ export function HomeView() {
   const [searchQuery, setSearchQuery] = useState('');
   const [counts, setCounts] = useState({ giochi: 0, bans: 0, canti: 0, calendario: 0 });
   const [recentItems, setRecentItems] = useState<RecentItem[]>([]);
-  const [nextEventData, setNextEventData] = useState<{ evento: Evento; odgCount: number } | null>(null);
+  const [nextEventData, setNextEventData] = useState<{
+    evento: Evento;
+    odgCount: number;
+    openOdgCount: number;
+  } | null>(null);
   const [syncState, setSyncState] = useState<SyncState>(getSyncState());
   const [isLoading, setIsLoading] = useState(true);
 
@@ -61,33 +70,6 @@ export function HomeView() {
 
     return () => unsubscribe();
   }, []);
-
-  // Formattazione data evento per card stile calendario
-  const renderEventDate = (isoString: string) => {
-    const d = new Date(isoString);
-    const months = ['GEN', 'FEB', 'MAR', 'APR', 'MAG', 'GIU', 'LUG', 'AGO', 'SET', 'OTT', 'NOV', 'DIC'];
-    const weekdays = ['DOM', 'LUN', 'MAR', 'MER', 'GIO', 'VEN', 'SAB'];
-    return {
-      month: months[d.getMonth()],
-      day: d.getDate(),
-      weekday: weekdays[d.getDay()],
-      time: d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }),
-    };
-  };
-
-  // Calcolo countdown giorni
-  const getDaysCountdown = (isoString: string) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const target = new Date(isoString);
-    target.setHours(0, 0, 0, 0);
-    const diffDays = Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-
-    if (diffDays === 0) return 'Oggi';
-    if (diffDays === 1) return 'Domani';
-    if (diffDays > 1) return `Tra ${diffDays} giorni`;
-    return 'In corso';
-  };
 
   return (
     <div>
@@ -141,45 +123,63 @@ export function HomeView() {
         {/* 6. CARD PROSSIMO EVENTO (CALENDARIO DA PARETE) CON STATO VUOTO CURATO */}
         {nextEventData ? (
           (() => {
-            const dateInfo = renderEventDate(nextEventData.evento.inizio);
-            const countdown = getDaysCountdown(nextEventData.evento.inizio);
-            const isUscita = nextEventData.evento.tipo === 'uscita';
-            const chipClass = isUscita ? 'event-type-chip event-chip-uscita' : 'event-type-chip';
+            const dateInfo = getWallCalendarDate(nextEventData.evento.inizio);
+            const countdown = getEventCountdownText(nextEventData.evento);
+            const typeInfo = getEventTypeInfo(nextEventData.evento.tipo);
+            const openOdg = nextEventData.openOdgCount ?? 0;
+            const timeStr = nextEventData.evento.tutto_il_giorno
+              ? 'Tutto il giorno'
+              : `Ore ${new Date(nextEventData.evento.inizio).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`;
 
             return (
               <div
                 className="home-event-card"
                 role="button"
                 tabIndex={0}
-                onClick={() => navigate('calendario')}
+                onClick={() => navigate(`calendario?id=${nextEventData.evento.id}`)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
-                    navigate('calendario');
+                    navigate(`calendario?id=${nextEventData.evento.id}`);
                   }
                 }}
                 aria-label={`Prossimo evento: ${nextEventData.evento.titolo}`}
               >
-                <div className="calendar-date-block" aria-hidden="true">
+                <div
+                  className={`calendar-date-block ${dateInfo.isToday ? 'calendar-date-block-today' : ''}`}
+                  aria-hidden="true"
+                >
                   <div className="calendar-date-month">{dateInfo.month}</div>
                   <div className="calendar-date-day">{dateInfo.day}</div>
                   <div className="calendar-date-weekday">{dateInfo.weekday}</div>
                 </div>
                 <div className="home-event-body">
                   <div className="home-event-header">
-                    <span className={chipClass}>{nextEventData.evento.tipo}</span>
-                    <span className="home-event-countdown">{countdown}</span>
+                    <span className={typeInfo.chipClass}>{typeInfo.label}</span>
+                    <span
+                      className="home-event-countdown"
+                      style={dateInfo.isToday ? { color: 'var(--color-bans)' } : undefined}
+                    >
+                      {countdown}
+                    </span>
                   </div>
                   <div className="home-event-title">{nextEventData.evento.titolo}</div>
                   <div className="home-event-meta">
                     <span>
-                      {dateInfo.time !== '00:00' ? `Ore ${dateInfo.time}` : 'Tutto il giorno'}
+                      {timeStr}
                       {nextEventData.evento.luogo ? ` • ${nextEventData.evento.luogo}` : ''}
                     </span>
-                    <span>
-                      {nextEventData.odgCount > 0
-                        ? `${nextEventData.odgCount} punt${nextEventData.odgCount === 1 ? 'o' : 'i'} all'ODG`
-                        : 'ODG in definizione'}
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                      {openOdg > 0 ? (
+                        <>
+                          <span className="odg-open-badge">{openOdg}</span>
+                          <span>punt{openOdg === 1 ? 'o' : 'i'} ODG apert{openOdg === 1 ? 'o' : 'i'}</span>
+                        </>
+                      ) : nextEventData.odgCount > 0 ? (
+                        <span>Tutti i {nextEventData.odgCount} punti ODG completati</span>
+                      ) : (
+                        <span>ODG in definizione</span>
+                      )}
                     </span>
                   </div>
                 </div>

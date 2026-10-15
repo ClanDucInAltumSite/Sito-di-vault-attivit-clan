@@ -494,6 +494,7 @@ export async function getRecentItems(limit = 4): Promise<RecentItem[]> {
 export async function getNextUpcomingEvent(): Promise<{
   evento: Evento;
   odgCount: number;
+  openOdgCount: number;
 } | null> {
   const eventi = await getEventi(false);
   const now = new Date();
@@ -511,9 +512,11 @@ export async function getNextUpcomingEvent(): Promise<{
   const next = upcoming[0];
   if (!next) return null;
   const odgPoints = await getOdgPunti(next.id, false);
+  const openCount = odgPoints.filter((p) => !p.completato).length;
 
   return {
     evento: next,
     odgCount: odgPoints.length,
+    openOdgCount: openCount,
   };
 }

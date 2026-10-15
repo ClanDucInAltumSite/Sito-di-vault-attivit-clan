@@ -8,6 +8,8 @@ import {
   saveStampaConfig,
   DEFAULT_STAMPA_CONFIG,
   SESSION_STORAGE_SELECTION_KEY,
+  computePrintIndex,
+  measureSongPageOverflow,
 } from '../src/lib/stampa';
 import { Gioco, Ban } from '../src/lib/db';
 
@@ -127,5 +129,159 @@ describe('FASE 6 — Stampa A4: Logica di Paginazione, Overflow e Configurazione
     const loaded = loadStampaConfig();
     expect(loaded).toEqual(customConfig);
     expect(sessionStorage.getItem(SESSION_STORAGE_SELECTION_KEY)).toBeTruthy();
+  });
+
+  it('6. computePrintIndex: calcola con precisione la pagina reale di ogni elemento del fascicolo', () => {
+    const fakeData = {
+      giochi: [
+        {
+          gioco: {
+            id: 'g1',
+            nome: 'Roverino al Buio',
+            materiali: 'Corda',
+            regole: 'Regole brevi del roverino',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            deleted_at: null,
+          },
+          isShort: true,
+          images: [],
+        },
+        {
+          gioco: {
+            id: 'g2',
+            nome: 'Palla Scalpo',
+            materiali: 'Fazzolettoni',
+            regole: 'Regole della palla scalpo',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            deleted_at: null,
+          },
+          isShort: true,
+          images: [],
+        },
+      ],
+      bans: [
+        {
+          ban: {
+            id: 'b1',
+            nome: 'Il Grande Re del Fuoco',
+            note_gesti: 'Gesti ampi',
+            testo: 'Testo del ban attorno al fuoco',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            deleted_at: null,
+          },
+          isShort: true,
+          images: [],
+        },
+      ],
+      canti: [
+        {
+          canto: {
+            id: 'c1',
+            titolo: 'Canto della Promessa',
+            autore: 'B-P',
+            tonalita: 'Re',
+            ritmo: '4/4',
+            tempo_bpm: 100,
+            misura: '4/4',
+            capotasto: 0,
+            testo_chordpro: '[Re]Dinanzi a voi',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            deleted_at: null,
+          },
+          pages: [
+            {
+              pageIndex: 1,
+              totalPages: 1,
+              isFirstPage: true,
+              rawChordpro: '[Re]Dinanzi a voi',
+              ast: { metadata: {}, directives: [], blocks: [] },
+              fontSizePt: 12,
+              hasOverflow: false,
+            },
+          ],
+          pageCount: 1,
+          hasAnyOverflow: false,
+          images: [],
+        },
+        {
+          canto: {
+            id: 'c2',
+            titolo: 'Al Fuoco di Bivacco',
+            autore: 'Clan',
+            tonalita: 'Mi',
+            ritmo: '4/4',
+            tempo_bpm: 90,
+            misura: '4/4',
+            capotasto: 0,
+            testo_chordpro: '[Mi]Scende la sera\n{nuova_pagina}\n[La]Fiamma che brilli',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            deleted_at: null,
+          },
+          pages: [
+            {
+              pageIndex: 1,
+              totalPages: 2,
+              isFirstPage: true,
+              rawChordpro: '[Mi]Scende la sera',
+              ast: { metadata: {}, directives: [], blocks: [] },
+              fontSizePt: 12,
+              hasOverflow: false,
+            },
+            {
+              pageIndex: 2,
+              totalPages: 2,
+              isFirstPage: false,
+              rawChordpro: '[La]Fiamma che brilli',
+              ast: { metadata: {}, directives: [], blocks: [] },
+              fontSizePt: 12,
+              hasOverflow: false,
+            },
+          ],
+          pageCount: 2,
+          hasAnyOverflow: false,
+          images: [],
+        },
+      ],
+      totalSelected: 4,
+      hasAnyOverflow: false,
+    };
+
+    const config = {
+      selectedGiochiIds: ['g1', 'g2'],
+      selectedBansIds: ['b1'],
+      selectedCantiIds: ['c1', 'c2'],
+      includeImages: false,
+      includeCoverAndIndex: true, // Pag 1 = Cover, Pag 2 = Index, Pag 3 = Content start
+    };
+
+    const index = computePrintIndex(fakeData, config);
+    // Giochi e Bans brevi stanno entrambi a Pagina 3 (flusso continuo)
+    expect(index.giochi[0].startPage).toBe(3);
+    expect(index.giochi[1].startPage).toBe(3);
+    expect(index.bans[0].startPage).toBe(3);
+
+    // Canto 1 inizia su nuova pagina (Pagina 4)
+    expect(index.canti[0].startPage).toBe(4);
+    // Canto 2 ha 2 pagine: inizia a Pagina 5
+    expect(index.canti[1].startPage).toBe(5);
+    // Totale pagine calcolate: 1 (cover) + 1 (index) + 1 (giochi/bans) + 1 (canto1) + 2 (canto2) = 6
+    expect(index.totalPages).toBe(6);
+  });
+
+  it('7. measureSongPageOverflow: calcola il font step-down e rileva overflow sia in DOM che in fallback', () => {
+    const normalText = '[Re]Dinanzi a voi prometto sul mio onore';
+    const normalRes = measureSongPageOverflow(normalText, true, { titolo: 'Promessa' });
+    expect(normalRes.hasOverflow).toBe(false);
+    expect(normalRes.fontSizePt).toBe(12);
+
+    const hugeText = Array(65).fill('[Re]Strofa lunghissima con tante parole e note [Sol]accordi').join('\n');
+    const hugeRes = measureSongPageOverflow(hugeText, true, { titolo: 'Canto Gigante' });
+    expect(hugeRes.hasOverflow).toBe(true);
+    expect(hugeRes.fontSizePt).toBe(9.5);
   });
 });

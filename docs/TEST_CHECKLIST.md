@@ -326,6 +326,46 @@ Questo documento definisce la matrice dei test per ciascuna fase di sviluppo del
 
 ---
 
+## FASE 7 — Calendario Clan e Ordine del Giorno (ODG)
+
+- [x] **701. Gestione Matematica del Tempo e Mesi (`src/lib/calendario.ts`):**
+  - Fuso orario `Europe/Rome`, localizzazione `it-IT`, inizio settimana rigorosamente Lunedì.
+  - Calcolo esatto per mesi da 28, 29 (febbraio bisestile), 30 e 31 giorni con settimane complete da 7 celle.
+  - Immunità da transizione ora legale/solare di fine marzo (23h) e fine ottobre (25h) con calcolo basato su date assolute di calendario.
+- [x] **702. Eventi Multi-Day e Tutto il Giorno:**
+  - `isEventOnDate`: evento di più giorni risulta attivo per tutti i giorni dell'intervallo e non fuori.
+  - Gestione eventi a cavallo di fine mese (es. 30 ott - 2 nov).
+  - Formattazione intervallo date con dicitura "Tutto il giorno" se privo di orario orologio.
+- [x] **703. Vista Mese Interattiva (`CalendarioMonthView`):**
+  - Griglia reattiva a 7 colonne (LUN-DOM), navigazione avanti/indietro tra mesi e pulsante "Oggi".
+  - Giorno odierno evidenziato in rosso accento (`.calendar-cell-today`).
+  - Indicatori a pallino colorato (`.calendar-dot`) per tipologie di attività presenti nella data.
+  - Selezione del giorno con elenco attività dinamico sottostante.
+- [x] **704. Vista Lista Prossimi e Passati (`CalendarioListView`):**
+  - Raggruppamento cronologico (prossimi in ordine crescente, passati in ordine decrescente).
+  - Blocco data da parete (`.calendar-date-block`) con testata inchiostro o rossa (se oggi).
+  - Chip cromatico del tipo e contatore badge rosso per punti ODG ancora aperti.
+- [x] **705. Foglio di Dettaglio Completo (`EventoDetailSheet`):**
+  - Dati logistici (luogo, responsabile, cosa portare, note), galleria allegati (`AttachmentGallery` con upload admin).
+  - Gestore Ordine del Giorno integrato.
+  - Deep-link automatico con parametro query `#/calendario?id=<uuid>`.
+- [x] **706. Ordine del Giorno (ODG) e Permessi Rigorosi (`OdgManager`):**
+  - Casella di spunta animata con glifo SVG tracciato (`stroke-dasharray` / `stroke-dashoffset`).
+  - Gating dei permessi: per visitatori anonimi (`!isAdmin`), la spunta e le modifiche sono disabilitate in sola lettura.
+  - Riordino sequenziale Su/Giù per amministratori (`reorderOdgPunti`).
+  - Algoritmo di riporto: *"Riporta alla prossima"* clona i punti aperti sulla prossima riunione programmata valorizzando `riportato_da`.
+  - Soft-delete gerarchica: punti nascosti automaticamente se l'evento genitore è eliminato e ripristinati congiuntamente.
+- [x] **707. Form Amministratore e Validazione Date (`EventoFormSheet`):**
+  - Controllo di coerenza stringente: blocco se $fine < inizio$.
+  - Avviso informativo visibile sui dati personali e sensibili.
+  - RLS Supabase attiva su `eventi` e `odg_punti` (scritture anonime respinte).
+- [x] **708. Integrazione Card Home ("Prossimo Evento"):**
+  - Collegamento diretto a `getNextUpcomingEvent()` con blocco data parete, chip colore, conto alla rovescia, contatore punti aperti rosso e deep-link a Calendario.
+- [x] **709. Vetrina Design System (`#/design`, Sezione 19):**
+  - Esposizione di chip per 5 tipi evento, blocchi data standard e odierna, spunta ODG animata.
+
+---
+
 ## Comandi di Verifica
 
 ```bash

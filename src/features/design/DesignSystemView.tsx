@@ -591,6 +591,87 @@ export function DesignSystemView() {
         </div>
       </GroupedList>
 
+      {/* 19. CALENDARIO E ORDINE DEL GIORNO (ODG) — FASE 7 */}
+      <GroupedList
+        header="19. CALENDARIO E ORDINE DEL GIORNO (ODG — FASE 7)"
+        footer="Chip cromatici per i 5 tipi di attività, blocchi data da parete, indicatore 'Oggi' in rosso e spunta ODG animata riservata ad Admin."
+      >
+        <GroupedRow
+          leading={<SectionIcon section="calendario" size="sm" />}
+          title="Vai alla Schermata Calendario (#/calendario)"
+          subtitle="Vista Mese, Vista Lista, Dettaglio e gestione ODG"
+          chevron
+          onClick={() => navigate('calendario')}
+        />
+        <div style={{ padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+          {/* Chip Tipi Evento */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
+            <span className="event-type-chip event-chip-riunione">Riunione</span>
+            <span className="event-type-chip event-chip-uscita">Uscita</span>
+            <span className="event-type-chip event-chip-scadenza">Scadenza</span>
+            <span className="event-type-chip event-chip-evento">Evento Clan</span>
+            <span className="event-type-chip event-chip-altro">Altro</span>
+          </div>
+
+          {/* Blocchi Data Calendario da Parete */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+            <div className="calendar-date-block" aria-hidden="true">
+              <div className="calendar-date-month">OTT</div>
+              <div className="calendar-date-day">19</div>
+              <div className="calendar-date-weekday">SAB</div>
+            </div>
+
+            <div className="calendar-date-block calendar-date-block-today" aria-hidden="true">
+              <div className="calendar-date-month">OTT</div>
+              <div className="calendar-date-day">15</div>
+              <div className="calendar-date-weekday">OGGI</div>
+            </div>
+
+            <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', lineHeight: 1.4 }}>
+              Data standard (testata blu inchiostro) vs Data odierna (testata e numero in rosso accento)
+            </div>
+          </div>
+
+          {/* Esempio Punti ODG e Spunta Animata */}
+          <div style={{ marginTop: 'var(--space-2)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-ink)' }}>ORDINE DEL GIORNO</span>
+              <span className="odg-open-badge">1 aperto</span>
+            </div>
+
+            <div className="odg-item">
+              <div className="odg-item-left">
+                <button
+                  type="button"
+                  className="odg-check-btn"
+                  aria-checked={false}
+                  role="checkbox"
+                  aria-label="Verifica adesioni route estiva (In attesa)"
+                />
+                <span className="odg-text">Verifica adesioni route estiva</span>
+              </div>
+            </div>
+
+            <div className="odg-item odg-item-completed">
+              <div className="odg-item-left">
+                <button
+                  type="button"
+                  className="odg-check-btn odg-check-btn-checked"
+                  aria-checked={true}
+                  role="checkbox"
+                  aria-label="Approvazione cassa di clan (Completato)"
+                >
+                  <svg className="odg-check-svg" viewBox="0 0 24 24" aria-hidden="true">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                </button>
+                <span className="odg-text odg-text-completed">Approvazione bilancio e cassa di Clan</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </GroupedList>
+
       {/* BOTTOM SHEET DIMOSTRATIVO */}
       <BottomSheet
         isOpen={isSheetOpen}

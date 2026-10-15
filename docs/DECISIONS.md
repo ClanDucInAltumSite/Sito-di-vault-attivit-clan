@@ -465,3 +465,56 @@ La Fase 6 richiede la generazione e stampa di fascicoli personalizzati composti 
    - Gli accordi sono renderizzati in nero puro con peso 700 (`font-weight: 700; color: oklch(0 0 0)`).
    - Rimozione completa di gradienti e ombreggiature (`box-shadow: none; text-shadow: none`).
    - Gli elementi decorativi e le curve di livello (`.topo-contour-wrapper`, `.topo-ambient-glow`, `.topo-svg-container`, `.scout-trail-svg`, `.scout-compass-widget`) sono soppressi con `display: none !important`.
+
+---
+
+## ADR-0014: Calendario Interno, Vista Mese, Ordine del Giorno (ODG) e Riporto alla Riunione Successiva (Fase 7)
+
+### Data
+2026-10-15
+
+### Contesto
+La Fase 7 richiede la realizzazione del modulo Calendario e Ordine del Giorno (ODG) per la pianificazione e verifica delle attività del Clan Scout (riunioni, uscite, scadenze, eventi e attività varie).
+I requisiti cardine impongono:
+1. Zero dipendenze esterne o sincronizzazioni di terze parti (nessun Google Calendar, Microsoft Exchange, iCal / WebCal o plugin pesanti da CDN): tutto risiede nel database locale IndexedDB sincronizzato con Supabase.
+2. Fuso orario rigorosamente fissato a `Europe/Rome`, localizzazione `it-IT` e inizio della settimana di Lunedì.
+3. Vista Mese interattiva con griglia da 7 colonne (LUN-DOM), celle con giorno del mese, evidenziazione del giorno odierno in rosso accento (`.calendar-cell-today`), indicatori a pallini colorati per tipo di evento e dettaglio degli eventi del giorno selezionato sotto la griglia.
+4. Vista Lista Prossimi Eventi con blocco data da parete (`.calendar-date-block`), chip colorati per tipologia, distinzione tra attività in programma e passate, e contatore rosso dei punti ODG ancora da completare.
+5. Foglio di Dettaglio in `BottomSheet` accessibile con logistica, note, galleria allegati (immagini/PDF) e gestore dell'Ordine del Giorno.
+6. Permessi rigorosi per l'ODG: la spunta "fatto", il riordino su/giù e l'aggiunta di punti sono **riservati esclusivamente all'Amministratore** (`isAdmin`). Gli utenti anonimi possono consultare l'ODG solo in lettura (checkbox disabilitate, nessun tasto di aggiunta o riordino).
+7. Riporto automatico dei punti non conclusi alla prossima riunione futura programmata (`riportato_da` valorizzato).
+8. Soft-delete gerarchica per i punti ODG e validazione stringente delle date ($fine \ge inizio$).
+
+### Decisioni Architetturali
+
+1. **Gestione del Tempo e Generazione Griglia Senza Librerie Esterne:**
+   - Implementazione nativa in `src/lib/calendario.ts`:
+     - `getDaysInMonth(year, month)` calcola esattamente i giorni di ogni mese gestendo anni bisestili (29 giorni a febbraio nel 2024, 28 nel 2023, 29 nel 2000, 28 nel 2100).
+     - La griglia mensile (`buildMonthGrid`) posiziona Lunedì come primo giorno calcolando l'offset `(jsDay === 0 ? 6 : jsDay - 1)`. I giorni cuscinetto del mese precedente e successivo completano righe da 7 colonne.
+     - Tutte le date sono manipolate con componenti assolute di calendario (anno, mese, giorno) anziché incrementi fissi di 86.400.000 ms, garantendo totale immunità agli sfasamenti da transizione ora solare/legale a fine marzo (giorno da 23 ore) e a fine ottobre (giorno da 25 ore).
+
+2. **Gating Rigoroso dei Permessi su Ordine del Giorno (ODG):**
+   - Nel componente `OdgManager`, le checkbox utilizzano un pulsante con `role="checkbox"`. Se l'utente non è autenticato come amministratore (`!isAdmin`):
+     - L'attributo `disabled={true}` e `aria-disabled="true"` impediscono l'interazione;
+     - Un titolo esplicativo informa l'utente anonimo che la spunta è riservata ai capi;
+     - Nessun controllo per riordinare su/giù, aggiungere o eliminare punti viene renderizzato nel DOM.
+   - A livello database, la migrazione `0002_security_rls.sql` applica Row Level Security su `odg_punti`: SELECT pubblica consentita per consultazione offline, mentre INSERT, UPDATE e DELETE richiedono tassativamente `public.is_admin()`.
+
+3. **Spunta Animata e Feedback Visivo:**
+   - La casella di spunta `.odg-check-btn` esegue una transizione fluida: al completamento acquisisce sfondo azzurro/canti e anima un glifo SVG con stroke progressivo (`@keyframes odgCheckDraw` su `stroke-dashoffset`).
+   - Il testo associato riceve la classe `.odg-text-completed` con barratura `line-through` e opacità attenuata.
+
+4. **Algoritmo di Riporto Punti Non Conclusi (`forwardUnfinishedOdgPunti`):**
+   - Quando l'admin tocca *"Riporta alla prossima"*:
+     1. Si cercano i punti non completati (`!p.completato && p.deleted_at === null`) dell'evento corrente.
+     2. Tramite `findNextFutureMeeting(current.inizio)`, si ricerca la prima riunione attiva (`tipo === 'riunione'`) con data di inizio successiva.
+     3. Se trovata, viene richiesta conferma con il numero di punti aperti e il titolo della riunione bersaglio.
+     4. Per ogni punto, viene inserito un nuovo record associato alla nuova riunione con `riportato_da` valorizzato sull'id del punto originario, `completato = false` e ordine progressivo accodato ai punti già presenti.
+     5. Scrittura immediata su Supabase e sincronizzazione locale in IndexedDB.
+
+5. **Soft-Delete Gerarchica:**
+   - Nel metodo di lettura `getOdgPunti(eventoId)` in `src/lib/db.ts`, se l'evento genitore risulta eliminato (`parent.deleted_at !== null`), la funzione restituisce una lista vuota `[]`. Al ripristino dell'evento dal cestino, i punti ODG ricompaiono automaticamente.
+
+6. **Integrazione Home ("Prossimo Evento"):**
+   - La funzione `getNextUpcomingEvent()` calcola il primo evento cronologicamente futuro (o in corso) ed estrae il conteggio dei punti ODG ancora aperti (`openOdgCount`).
+   - La card nella Home renderizza il blocco data con `.calendar-date-block-today` se l'evento ricade oggi, il chip cromatico corrispondente al tipo (`riunione`, `uscita`, `scadenza`, `evento`, `altro`), e un badge rosso con i punti aperti. Il tocco naviga direttamente a `#/calendario?id=<uuid>`.

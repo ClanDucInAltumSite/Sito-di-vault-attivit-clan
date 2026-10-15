@@ -5,8 +5,13 @@ import {
   Gioco,
   Ban,
   Canto,
+  Evento,
+  OdgPunto,
+  TipoEvento,
   Allegato,
   getDb,
+  getEventi,
+  getOdgPunti,
   upsertRecords,
 } from './db';
 import { I18N } from './i18n';
@@ -234,6 +239,275 @@ export async function saveCanto(input: {
 
   await upsertRecords('canti', [savedRecord]);
   return savedRecord;
+}
+
+/**
+ * Salva o aggiorna un evento del calendario (online-only).
+ * Valida che fine >= inizio (se fine è specificata).
+ */
+export async function saveEvento(input: {
+  id?: string;
+  titolo: string;
+  tipo: TipoEvento;
+  inizio: string;
+  fine?: string | null;
+  tutto_il_giorno?: boolean;
+  luogo?: string | null;
+  descrizione?: string | null;
+  responsabile?: string | null;
+  cosa_portare?: string | null;
+}): Promise<Evento> {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    throw new Error(I18N.status.offlineNotice);
+  }
+
+  const titolo = input.titolo.trim();
+  if (!titolo) {
+    throw new Error('Il titolo dell\'evento è obbligatorio.');
+  }
+
+  if (input.fine && new Date(input.fine).getTime() < new Date(input.inizio).getTime()) {
+    throw new Error(I18N.calendario.erroreDateFine);
+  }
+
+  const now = new Date().toISOString();
+  let savedRecord: Evento;
+
+  const payload = {
+    titolo,
+    tipo: input.tipo,
+    inizio: input.inizio,
+    fine: input.fine ? input.fine : null,
+    tutto_il_giorno: Boolean(input.tutto_il_giorno),
+    luogo: (input.luogo || '').trim() || null,
+    descrizione: (input.descrizione || '').trim() || null,
+    responsabile: (input.responsabile || '').trim() || null,
+    cosa_portare: (input.cosa_portare || '').trim() || null,
+    updated_at: now,
+  };
+
+  if (input.id) {
+    const { data, error } = await supabase
+      .from('eventi')
+      .update(payload)
+      .eq('id', input.id)
+      .select()
+      .single();
+
+    if (error) throw new Error(error.message);
+    savedRecord = data;
+  } else {
+    const newId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `e_${Date.now()}`;
+    const { data, error } = await supabase
+      .from('eventi')
+      .insert({
+        ...payload,
+        id: newId,
+        created_at: now,
+        deleted_at: null,
+      })
+      .select()
+      .single();
+
+    if (error) throw new Error(error.message);
+    savedRecord = data;
+  }
+
+  await upsertRecords('eventi', [savedRecord]);
+  return savedRecord;
+}
+
+/**
+ * Salva o aggiorna un punto all'Ordine del Giorno (online-only).
+ */
+export async function saveOdgPunto(input: {
+  id?: string;
+  evento_id: string;
+  testo: string;
+  ordine?: number;
+  completato?: boolean;
+  riportato_da?: string | null;
+}): Promise<OdgPunto> {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    throw new Error(I18N.status.offlineNotice);
+  }
+
+  const testo = input.testo.trim();
+  if (!testo) {
+    throw new Error('Il testo del punto ODG è obbligatorio.');
+  }
+
+  const now = new Date().toISOString();
+  let savedRecord: OdgPunto;
+
+  if (input.id) {
+    const updatePayload: any = {
+      testo,
+      updated_at: now,
+    };
+    if (typeof input.ordine === 'number') updatePayload.ordine = input.ordine;
+    if (typeof input.completato === 'boolean') updatePayload.completato = input.completato;
+    if (input.riportato_da !== undefined) updatePayload.riportato_da = input.riportato_da;
+
+    const { data, error } = await supabase
+      .from('odg_punti')
+      .update(updatePayload)
+      .eq('id', input.id)
+      .select()
+      .single();
+
+    if (error) throw new Error(error.message);
+    savedRecord = data;
+  } else {
+    let assignedOrdine = input.ordine;
+    if (typeof assignedOrdine !== 'number') {
+      const existing = await getOdgPunti(input.evento_id, true);
+      const maxOrd = existing.reduce((max, p) => Math.max(max, p.ordine), -1);
+      assignedOrdine = maxOrd + 1;
+    }
+
+    const newId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `odg_${Date.now()}`;
+    const { data, error } = await supabase
+      .from('odg_punti')
+      .insert({
+        id: newId,
+        evento_id: input.evento_id,
+        testo,
+        ordine: assignedOrdine,
+        completato: Boolean(input.completato),
+        riportato_da: input.riportato_da || null,
+        created_at: now,
+        updated_at: now,
+        deleted_at: null,
+      })
+      .select()
+      .single();
+
+    if (error) throw new Error(error.message);
+    savedRecord = data;
+  }
+
+  await upsertRecords('odg_punti', [savedRecord]);
+  return savedRecord;
+}
+
+/**
+ * Spunta/despunta un punto ODG (online-only, riservato ad admin).
+ */
+export async function toggleOdgPunto(id: string, completato: boolean): Promise<OdgPunto> {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    throw new Error(I18N.status.offlineNotice);
+  }
+
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from('odg_punti')
+    .update({ completato, updated_at: now })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) throw new Error(error.message);
+
+  await upsertRecords('odg_punti', [data]);
+  return data;
+}
+
+/**
+ * Riordina una lista di punti ODG assegnando 'ordine' in base alla sequenza fornita.
+ */
+export async function reorderOdgPunti(_eventoId: string, orderedIds: string[]): Promise<void> {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    throw new Error(I18N.status.offlineNotice);
+  }
+
+  const now = new Date().toISOString();
+  const db = await getDb();
+
+  for (let i = 0; i < orderedIds.length; i++) {
+    const pointId = orderedIds[i];
+    if (!pointId) continue;
+
+    const { error } = await supabase
+      .from('odg_punti')
+      .update({ ordine: i, updated_at: now })
+      .eq('id', pointId);
+
+    if (error) throw new Error(error.message);
+
+    const local = await db.get('odg_punti', pointId);
+    if (local) {
+      local.ordine = i;
+      local.updated_at = now;
+      await db.put('odg_punti', local);
+    }
+  }
+}
+
+/**
+ * Trova la prossima riunione futura programmata rispetto alla data inizio specificata.
+ */
+export async function findNextFutureMeeting(currentInizio: string): Promise<Evento | null> {
+  const allEvents = await getEventi(false);
+  const currentTime = new Date(currentInizio).getTime();
+
+  const futureMeetings = allEvents.filter(
+    (e) => e.tipo === 'riunione' && new Date(e.inizio).getTime() > currentTime && e.deleted_at === null
+  );
+
+  futureMeetings.sort((a, b) => new Date(a.inizio).getTime() - new Date(b.inizio).getTime());
+  return futureMeetings[0] || null;
+}
+
+/**
+ * Riporta tutti i punti ODG non completati dall'evento sorgente alla riunione di destinazione.
+ * Imposta il campo 'riportato_da' sull'id del punto di origine.
+ */
+export async function forwardUnfinishedOdgPunti(
+  fromEventoId: string,
+  toEventoId: string
+): Promise<number> {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    throw new Error(I18N.status.offlineNotice);
+  }
+
+  const fromPoints = await getOdgPunti(fromEventoId, false);
+  const unfinished = fromPoints.filter((p) => !p.completato && p.deleted_at === null);
+
+  if (unfinished.length === 0) return 0;
+
+  const toExisting = await getOdgPunti(toEventoId, true);
+  let nextOrdine = toExisting.reduce((max, p) => Math.max(max, p.ordine), -1) + 1;
+
+  const now = new Date().toISOString();
+  const newRecords: OdgPunto[] = [];
+
+  for (const point of unfinished) {
+    const newId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `odg_${Date.now()}_${Math.random()}`;
+    const payload = {
+      id: newId,
+      evento_id: toEventoId,
+      testo: point.testo,
+      ordine: nextOrdine++,
+      completato: false,
+      riportato_da: point.id,
+      created_at: now,
+      updated_at: now,
+      deleted_at: null,
+    };
+
+    const { data, error } = await supabase
+      .from('odg_punti')
+      .insert(payload)
+      .select()
+      .single();
+
+    if (error) throw new Error(error.message);
+    newRecords.push(data);
+  }
+
+  await upsertRecords('odg_punti', newRecords);
+  return newRecords.length;
 }
 
 /**

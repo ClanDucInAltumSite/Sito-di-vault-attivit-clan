@@ -257,3 +257,34 @@ La suite di test automatizzati con **Playwright** e **Axe-Core** verifica ad ogn
   4. Foglio di anteprima A4 in miniatura con accordi e barre ritornello;
   5. Casella di spunta quadrata per la stampa dell'Ordine del Giorno.
 
+---
+
+## 12. Specifiche Componenti Calendario e Ordine del Giorno (ODG — Fase 7)
+
+### 12.1 Token e Indicatori Cromatici dei Tipi di Evento
+I 5 tipi di attività previsti dal Clan utilizzano token OKLCH armonizzati:
+- `riunione`: Azzurro (`--color-canti-tenue` / `--color-canti-text`, glifo su `--color-canti`).
+- `uscita`: Giallo Scout (`--color-giochi-tenue` / `--color-giochi-text`, glifo su `--color-giochi`).
+- `scadenza`: Rosso Vivo (`--color-bans-tenue` / `--color-bans-text`, glifo su `--color-bans`).
+- `evento`: Blu Notte Calendario (`--color-calendario-tenue` / `--color-calendario-text`, glifo su `--color-calendario`).
+- `altro`: Neutro Grigio (`--color-neutral-tenue` / `--color-neutral-text`).
+
+### 12.2 Blocco Data Stile Parete (`.calendar-date-block`)
+- Contenitore compatto ($54\times 58\text{px}$) con testatina superiore scura (`.calendar-date-month` in `--color-ink`, testo bianco in maiuscoletto), numero del giorno in cifre tabulari grandi a forte contrasto (`.calendar-date-day`), e sigla del giorno della settimana (`.calendar-date-weekday`).
+- Variante Giorno Odierno (`.calendar-date-block-today`): testata e numero del giorno acquisiscono il rosso accento (`--color-bans`) e la sigla visualizza "OGGI".
+
+### 12.3 Griglia Mensile Reattiva (`.calendar-month-card`)
+- Intestazione di navigazione con mese, anno, pulsanti di avanzamento/retrocessione e tasto "Oggi".
+- Griglia a 7 colonne (LUN-DOM) conforme al fuso `Europe/Rome`.
+- Celle (`.calendar-cell`): giorno del mese, evidenziazione odierna (`.calendar-cell-today`), indicatori a pallini cromatici (`.calendar-cell-dots` con `.calendar-dot`) per le tipologie di attività presenti nella giornata, stato selezionato (`.calendar-cell-selected`).
+
+### 12.4 Spunta Animata e Gestore ODG (`.odg-section`)
+- Pulsante di spunta `.odg-check-btn`: transizione fluida con transizione di colore su `--color-canti` e tracciamento del segno di spunta SVG (`stroke-dasharray: 20`, animazione `@keyframes odgCheckDraw`).
+- Testo `.odg-text`: barratura progressiva `line-through` con attenuazione cromatica per i punti completati.
+- Pillola di riporto `.odg-reported-pill`: icona refresh e dicitura "Riportato da riunione precedente".
+- Contatore punti aperti `.odg-open-badge`: badge circolare rosso vivo a sfondo solido con font tabulare grassetto.
+- Accessibilità e Permessi: per gli utenti anonimi (`!isAdmin`), i controlli interattivi sono disabilitati (`disabled`, `aria-checked`), mentre per gli amministratori sono disponibili pulsanti per spostare i punti Su/Giù, eliminarli e riportarli alla riunione successiva.
+
+### 12.5 Vetrina Design System (`#/design`, Sezione 19)
+- Esposizione di tutti i chip dei 5 tipi di evento, confronto diretto tra data standard e data odierna, e dimostrazione interattiva della spunta ODG completata e in attesa.
+
