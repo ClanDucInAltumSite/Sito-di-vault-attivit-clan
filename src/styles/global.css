@@ -86,17 +86,17 @@ body {
   }
 }
 
-/* Layout container centrale fluido */
+/* Layout container centrale fluido con padding inferiore sicuro per la tab bar fissa */
 .container {
   width: 100%;
   max-width: 680px;
   margin: 0 auto;
-  padding: var(--space-4) var(--space-4);
+  padding: var(--space-4) var(--space-4) calc(64px + env(safe-area-inset-bottom, 0px) + var(--space-8));
 }
 
 @media (min-width: 768px) {
   .container {
     max-width: 740px;
-    padding: var(--space-6) var(--space-6);
+    padding: var(--space-6) var(--space-6) calc(64px + env(safe-area-inset-bottom, 0px) + var(--space-8));
   }
 }

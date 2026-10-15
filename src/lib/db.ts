@@ -99,6 +99,7 @@ export interface SyncMeta {
   table_cursors: Record<string, string>;
   status: 'idle' | 'syncing' | 'error';
   last_error: string | null;
+  sync_epoch?: number;
 }
 
 export interface RecentItem {
@@ -191,6 +192,7 @@ export async function atomicFullReplace(
       table_cursors: meta.table_cursors ?? existing?.table_cursors ?? {},
       status: meta.status ?? 'idle',
       last_error: meta.last_error ?? null,
+      sync_epoch: meta.sync_epoch ?? existing?.sync_epoch ?? 1,
     };
     await metaStore.put(updatedMeta);
 
@@ -235,6 +237,7 @@ export async function getSyncMeta(): Promise<SyncMeta> {
       table_cursors: {},
       status: 'idle',
       last_error: null,
+      sync_epoch: 1,
     };
   }
   return meta;

@@ -159,3 +159,37 @@ La suite di test automatizzati con **Playwright** e **Axe-Core** verifica ad ogn
 - **Segnalazione Morbida Duplicati:** Se il nome inserito ha una distanza di Levenshtein $\le 2$ da un elemento esistente, compare un avviso visivo in giallo che avvisa l'utente senza bloccare il salvataggio.
 - **Eliminazione in Due Passaggi (`DeleteConfirmModal`):** Richiede la digitazione esatta del nome completo dell'elemento per abilitare il pulsante rosso "Elimina".
 
+---
+
+## 9. Specifiche Componenti Canti e Canzoniere (Fase 4)
+
+### 9.1 Lista Canti, Ricerca e Metadati
+- **Pill SearchField & 4-way Sort:** Condivide gli stessi componenti di Giochi e Bans. La ricerca pulisce prima gli accordi dal testo (`stripChords`), eliminando falsi positivi quando si cercano parole coincidenti con note musicali.
+- **Pillola Sezione Azzurra:** Sezione contrassegnata dal colore interattivo guida (`oklch(0.53 0.18 245)`).
+- **Badge e Informazioni Rapide:** Autore, tonalità originale, ritmo, BPM e stima pagine di stampa A4 calcolata in tempo reale.
+- **Badge "Nuovo":** Evidenzia brani aggiunti da meno di 7 giorni.
+
+### 9.2 Foglio di Dettaglio Canto (`CantoDetailSheet`)
+- Testata con titolo in inchiostro viola profondo (`--color-ink`), autore ed etichette metadati raggruppate.
+- Informazioni di esecuzione: Ritmo, BPM, Battito, Capotasto raccomandato, Tonalità e Pagine A4.
+- Anteprima integrata dello spartito ChordPro formattato.
+- Pulsante primario per l'avvio della Modalità Lettura a tutto schermo ("Avvia Modalità Esecuzione").
+- Gating amministrativo con pulsanti Modifica ed Elimina (con modale di conferma).
+
+### 9.3 Modalità Lettura / Esecuzione a Tutto Schermo (`CantoReadingMode`)
+- **Fullscreen pulito e rilassante:** Tipografia chiara, alto contrasto, fondo neutro calmante.
+- **Controlli ergonomici fissati in testata:**
+  - Pulsante Chiudi a sinistra.
+  - Regolazione dimensione caratteri (`A-` e `A+` da 14px a 32px) con persistenza in `localStorage`.
+  - Toggle mostra/nascondi accordi ("Accordi").
+  - Trasposizione semitonale istantanea (`-1`, `+1`, `Orig`) con chip indicatore del semitono attivo rispetto all'originale.
+- **Screen Wake Lock:** Mantiene il display costantemente acceso durante l'esecuzione del canto attorno al fuoco o alla messa, riattivandosi automaticamente se l'app torna in primo piano.
+
+### 9.4 Editor Admin Canto (`CantoFormSheet`)
+- Bottom sheet a tutto schermo con campi metadati: Titolo, Autore, Tonalità, Ritmo, BPM, Misura, Capotasto.
+- Area testo con sintassi ChordPro assistita: pulsanti rapidi per inserire alla posizione del cursore `[Accordo]`, `{ritornello}`, `{strofa}`, `{ponte}`, `{nuova_pagina}`.
+- Segnalazione duplicati con distanza di Levenshtein $\le 2$.
+- Validazione morbida della sintassi con avvisi contestuali non bloccanti.
+- Anteprima live dinamica dello spartito aggiornata in tempo reale durante la digitazione.
+
+

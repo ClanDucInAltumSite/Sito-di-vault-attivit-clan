@@ -17,7 +17,9 @@ import { PHOTOS } from '../../lib/photos';
 import { HighlightText } from '../../lib/search';
 import { DeleteConfirmModal } from '../../ui/DeleteConfirmModal';
 import { BanReadingMode } from '../bans/BanReadingMode';
-import { Ban } from '../../lib/db';
+import { CantoReadingMode } from '../canti/CantoReadingMode';
+import { ChordProRenderer } from '../../lib/chordpro';
+import { Ban, Canto } from '../../lib/db';
 
 export function DesignSystemView() {
   const [searchValue, setSearchValue] = useState('avvelenata');
@@ -26,9 +28,25 @@ export function DesignSystemView() {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isReadingModeOpen, setIsReadingModeOpen] = useState(false);
+  const [isCantoReadingOpen, setIsCantoReadingOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [currentTheme, setCurrentTheme] = useState<'auto' | 'light' | 'dark'>('auto');
+
+  const demoCanto: Canto = {
+    id: 'demo-canto-1',
+    titolo: 'Strade e Pensieri per Domani',
+    autore: 'Clan Duc In Altum',
+    tonalita: 'Re',
+    ritmo: 'Marcia scout',
+    tempo_bpm: 112,
+    misura: '4/4',
+    capotasto: 2,
+    testo_chordpro: `[Re]Sai da dove viene, [Sol]sai dove ti porta\n[La]questo camminare, [Re]questa strada aperta...\n\n{ritornello}\n[Sol]Canta con noi, [La]batti le mani\n[Fa#m]Danza sui passi dei [Sim]tuoi domani`,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    deleted_at: null,
+  };
 
   const demoBan: Ban = {
     id: 'demo-ban-1',
@@ -426,6 +444,46 @@ export function DesignSystemView() {
         />
       </GroupedList>
 
+      {/* 11. CANZONIERE, ACCORDI CHORDPRO & MODALITÀ LETTURA */}
+      <GroupedList
+        header="11. CANZONIERE & ACCORDI CHORDPRO (FASE 4)"
+        footer="Accordi posizionati in colonna sopra le sillabe, DOM virtuale sicuro, trasposizione semitonale e ritornello con barra gialla."
+      >
+        <div style={{ padding: 'var(--space-4)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-3)' }}>
+            <div>
+              <span className="ios-badge ios-badge-sm ios-badge-azzurro">Esempio ChordPro Live</span>
+              <h3 className="song-title-display" style={{ fontSize: 'var(--font-size-lg)', marginTop: '4px' }}>
+                Strade e Pensieri per Domani
+              </h3>
+            </div>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setIsCantoReadingOpen(true)}
+            >
+              <Icon name="eye" size={16} />
+              <span>Modalità Lettura Canti</span>
+            </Button>
+          </div>
+
+          <div
+            style={{
+              padding: 'var(--space-3)',
+              backgroundColor: 'var(--color-surface)',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--color-border)',
+            }}
+          >
+            <ChordProRenderer
+              chordproText={`[Re]Sai da dove viene, [Sol]sai dove ti porta\n[La]questo camminare, [Re]questa strada aperta...\n\n{ritornello}\n[Sol]Canta con noi, [La]batti le mani\n[Fa#m]Danza sui passi dei [Sim]tuoi domani`}
+              showChords={true}
+              fontSizeRem={0.95}
+            />
+          </div>
+        </div>
+      </GroupedList>
+
       {/* BOTTOM SHEET DIMOSTRATIVO */}
       <BottomSheet
         isOpen={isSheetOpen}
@@ -473,6 +531,13 @@ export function DesignSystemView() {
         ban={demoBan}
         isOpen={isReadingModeOpen}
         onClose={() => setIsReadingModeOpen(false)}
+      />
+
+      {/* MODALITÀ LETTURA CANTI */}
+      <CantoReadingMode
+        canto={demoCanto}
+        isOpen={isCantoReadingOpen}
+        onClose={() => setIsCantoReadingOpen(false)}
       />
     </div>
   );

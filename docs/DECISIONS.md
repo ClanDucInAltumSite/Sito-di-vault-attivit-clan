@@ -309,5 +309,57 @@ Le sezioni Giochi e Bans rappresentano il nucleo operativo per l'animazione e le
 8. **Backup JSON Completo:**
    - Funzione `exportBackupJson()` esporta l'intero archivio (tutte le 6 tabelle) in formato JSON standard scaricabile con marcatura temporale.
 
+---
+
+## ADR-0010: Cestino, Epoca di Sincronizzazione (`sync_epoch`) e Bonifica Tombstone a 180 Giorni
+- **Stato:** Approvato e implementato (Fase 3 Correzione 1 / Fase 4)
+- **Contesto:**
+  Nella versione precedente, lo svuotamento o eliminazione definitiva immediata ("Elimina subito") di un elemento dal cestino sul server poteva eliminare fisicamente la riga senza lasciare tombstone. Un dispositivo client rimasto offline durante tale cancellazione non avrebbe mai ricevuto un segnale di cancellazione nella sincronizzazione incrementale successiva, mostrando perciò record "fantasma" in IndexedDB locale.
+- **Decisione e Architettura Adottata:**
+  1. **Tabella Metadati di Sistema (`system_meta`):**
+     - Creata tabella `system_meta (key text primary key, value jsonb, updated_at timestamptz)` con riga iniziale `sync_epoch = 1`.
+     - RLS: SELECT aperta a tutti (anonimi e admin), INSERT/UPDATE/DELETE vietati a chiunque fuorché funzioni security definer.
+  2. **Funzione SQL `bump_sync_epoch()`:**
+     - Procedura `SECURITY DEFINER` con `SET search_path = public` riservata all'amministratore (`is_admin()`).
+     - Incrementa atomicamente il valore numerico di `sync_epoch`.
+  3. **Funzione SQL `purge_old_tombstones()`:**
+     - Procedura `SECURITY DEFINER` con `SET search_path = public` e controllo `is_admin()`.
+     - Esegue l'eliminazione fisica permanente SOLO ed ESCLUSIVAMENTE delle righe che hanno `deleted_at < now() - interval '180 days'`, salvaguardando il principio dei tombstone per la sincronizzazione incrementale dei client regolari.
+  4. **"Elimina subito" con Incremento Epoca e Avviso:**
+     - L'eliminazione definitiva immediata dal cestino di una singola riga recente resta consentita all'amministratore, ma con dialogo di avviso esplicito (*"Gli altri dispositivi potrebbero mostrare questo elemento fino al prossimo aggiornamento completo"*).
+     - L'azione richiama `bump_sync_epoch()` su Supabase.
+  5. **Rilevamento Mismatch Epoca sul Client:**
+     - All'inizio di ogni sincronizzazione (incrementale o avviata da Realtime), il client interroga `system_meta` per ottenere il `sync_epoch` del server.
+     - Se `server_epoch !== local_epoch`, il client scarta la pull incrementale e forza immediatamente un **Full Resync Atomico** (`performFullResync()`), riallineando IndexedDB e ripulendo qualsiasi record fantasma.
+
+---
+
+## ADR-0011: Canzoniere in Formato ChordPro Semplificato, Rendering ad Albero VDOM e Trasposizione Semitonale (Fase 4)
+- **Stato:** Approvato e implementato (Fase 4)
+- **Contesto:**
+  Il repertorio canti scout comprende centinaia di brani con accordi, ritornelli, ritmi, tonalità e battiti per minuto (BPM). Il sistema deve permettere la digitazione facile e leggibile da parte dell'amministratore, una ricerca che non confonda gli accordi con le parole del testo, un rendering tipografico impeccabile anche a capo riga, la trasposizione in tempo reale di tonalità per la chitarra (con accordi sia italiani che anglosassoni) e una modalità di esecuzione a tutto schermo con schermo sempre attivo (Screen Wake Lock).
+- **Decisione e Architettura Adottata:**
+  1. **Formato ChordPro Semplificato:**
+     - Sintassi `[Accordo]sillaba` integrata con direttive di sezione `{strofa}`, `{ritornello}` (o `{soc}` / `{eoc}`), `{ponte}`, `{nuova_pagina}` e metadati `{ritmo}`, `{bpm}`, `{misura}`, `{capo}`.
+     - Validatore morbido `validateChordPro`: segnala parentesi non chiuse, caratteri anomali o direttive sconosciute come warning informativi senza bloccare il salvataggio.
+  2. **Rendering DOM/VDOM Puro (Zero `innerHTML`):**
+     - Il testo viene segmentato da un tokenizer dedicato in un Abstract Syntax Tree (AST).
+     - Ogni combinazione accordo/sillaba è renderizzata come container `.song-chord-column` in `display: inline-flex; flex-direction: column; vertical-align: bottom;`:
+       - `.song-chord`: visualizzato sopra la sillaba in grassetto e colore blu notte (`var(--color-navy)`).
+       - `.song-lyric`: testo della sillaba posizionato esattamente sotto l'accordo corrispondente.
+     - Se una riga va a capo nel viewport dello smartphone, la colonna si sposta unitamente impedendo il disallineamento orizzontale accordo-sillaba.
+     - I blocchi ritornello ricevono lo stile `.song-chorus-block` con barra laterale sinistra color giallo scout (`var(--color-yellow)`).
+  3. **Motore di Trasposizione Semitonale:**
+     - Algoritmo circolare sui 12 semitoni temperati (`normalizeChordName`, `transposeChord`, `transposeChordPro`).
+     - Supporto completo della notazione italiana (`Do, Do#, Reb, Re, Mib, Mi, Fa, Fa#, Solb, Sol, Lab, La, Sib, Si`) e anglosassone (`C, C#, Db, D, Eb, E, F, F#, Gb, G, Ab, A, Bb, B`).
+     - Gestione trasparente di alterazioni, estensioni (es. `m, 7, maj7, sus4, add9, dim, 5+`) e slash chords con basso alternativo (es. `Sol/Si` $\rightarrow$ `La/Do#`).
+     - Pulsanti `-1`, `+1`, `Orig` nella vista lettura: la trasposizione è puramente visiva in memoria, non altera il testo originale archiviato.
+  4. **Ricerca Testuale con Esclusione Accordi:**
+     - La funzione `stripChords(testo_chordpro)` rimuove tutti i marcatori `[...]` e le direttive `{...}` prima di passare il testo al motore di ricerca. In questo modo una ricerca per "Do" o "Sol" trova solo i brani che contengono realmente quelle parole nel testo o nel titolo, evitando falsi positivi massivi su canzoni che hanno quegli accordi.
+  5. **Modalità Lettura Canti e Screen Wake Lock:**
+     - Componente `CantoReadingMode`: controlli a contrasto elevato, regolazione dinamica dimensione caratteri (`+/-`), commutatore di visibilità accordi on/off e trasposizione di tonalità.
+     - Acquisizione automatica del Wake Lock all'apertura dello spartito e rilascio controllato alla chiusura, con ripristino su `visibilitychange`.
+
+
 
 

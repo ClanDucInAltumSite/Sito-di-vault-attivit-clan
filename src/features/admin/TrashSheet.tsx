@@ -53,7 +53,11 @@ export function TrashSheet({ isOpen, onClose, onItemsChanged }: TrashSheetProps)
   };
 
   const handleHardDelete = async (item: TrashItem) => {
-    if (!confirm(`Sei sicuro di voler eliminare DEFINITIVAMENTE «${item.title}»? L'operazione non può essere annullata.`)) {
+    if (
+      !confirm(
+        `Sei sicuro di voler eliminare DEFINITIVAMENTE «${item.title}»?\n\nAttenzione: gli altri dispositivi potrebbero mostrarlo fino al prossimo aggiornamento completo. L'operazione non può essere annullata.`
+      )
+    ) {
       return;
     }
     setActionLoadingId(item.id);

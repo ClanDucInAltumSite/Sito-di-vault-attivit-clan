@@ -377,10 +377,15 @@ La UI legge **sempre e solo da IndexedDB**.
    - `visibilitychange` (quando l'utente riattiva lo schermo o la scheda).
    - Notifiche Realtime: usate esclusivamente come **segnale di notifica** per avviare una pull incrementale con debounce a 300 ms.
 
-### 6.4 Gestione Gerarchica Soft-Delete e Pulizia Storage (180 giorni)
+### 6.4 Gestione Gerarchica Soft-Delete, Epoca di Sincronizzazione e Bonifica (180 giorni)
 - **Regola Gerarchica:** Se un genitore (`gioco`, `ban`, `canto`, `evento`) subisce soft-delete, tutti i figli correlati (`odg_punti`, `allegati`) vengono nascosti automaticamente dalla UI. In caso di ripristino del genitore dal Cestino, anche i figli tornano visibili.
-- **Conservazione Tombstone:** I tombstone su server vengono conservati per **180 giorni** (soglia superiore ai 90 giorni di resync client).
-- **Pulizia Definitiva Cestino (Hard Delete):** Procedura attivata da admin per eliminare fisicamente i record con `deleted_at < now() - interval '180 days'` (o forzata dall'admin), che cancella congiuntamente anche i file fisici corrispondenti da Supabase Storage (`storage.objects`).
+- **Conservazione Tombstone:** I tombstone su server vengono conservati per **180 giorni** (soglia di garanzia per la sincronizzazione incrementale dei client offline).
+- **Funzione SQL `purge_old_tombstones()`:** Procedura RPC admin-only (`SECURITY DEFINER`, `search_path = public`) che elimina fisicamente dal server SOLO le righe con `deleted_at < now() - interval '180 days'`, preservando l'integrità dei tombstone recenti.
+- **Epoca di Sincronizzazione (`sync_epoch` in `system_meta`):**
+  - Per consentire l'eliminazione definitiva immediata ("Elimina subito") di singoli record senza lasciare orfani i dispositivi offline, il server mantiene un contatore `sync_epoch`.
+  - La funzione `bump_sync_epoch()` incrementa tale contatore a ogni hard-delete manuale.
+  - Se un client confronta la propria epoca locale con quella del server e rileva una discrepanza, invalida immediatamente la cache incrementale e scatena un **Full Resync Atomico**, garantendo l'eliminazione di record fantasma su qualsiasi dispositivo al ritorno online.
+- **Pulizia Storage Fisico (Fase 5):** Predisposizione in `admin_actions.ts` della cancellazione congiunta degli oggetti dal bucket Supabase Storage (`storage.objects`).
 
 ---
 
@@ -427,11 +432,25 @@ Meta-tag restrittivo in `index.html`:
   - Distinzione tipografica tra testo del canto e note sui gesti.
   - Attivazione della **Screen Wake Lock API** durante la modalità lettura con ri-aggancio automatico su `visibilitychange`.
 
-### 8.2 Canti e Parser ChordPro
-- **Grammatica:** Formato `[Accordo]sillaba`, notazione italiana (`Do, Re, Mi...`) e anglosassone (`C, D, E...`), direttive `{strofa}`, `{ritornello}`, `{ponte}`, `{nuova_pagina}`.
-- **Rendering sicuro:** Coppie verticali strutturate in nodi DOM Preact, nessun uso di `innerHTML`. Accordo posizionato sopra la sillaba e ancorato anche quando la riga va a capo.
-- **Trasposizione Tonale:** Mappatura su 12 semitoni con calcolo intelligente dell'armatura (diesis/bemolli) solo a livello visivo.
-- **Editor Admin Live:** Anteprima live, inserimento accordi rapido `[]` e validazione sintattica morbida.
+### 8.2 Canti e Parser ChordPro (Fase 4)
+- **Grammatica e Tokenizer:**
+  - Sintassi `[Accordo]sillaba`, supporto bilingue nativo (notazione italiana `Do, Re, Mi...` e notazione internazionale `C, D, E...`, con alterazioni `#`, `b` e suffissi complessi come `m7`, `sus4`, `dim`, `/Basso`).
+  - Direttive strutturali riconosciute: `{strofa}`, `{ritornello}` / `{soc}` / `{eoc}`, `{ponte}`, `{nuova_pagina}` e metadati `{ritmo}`, `{bpm}`, `{misura}`, `{capo}`.
+- **Rendering VDOM Sicuro (Zero `innerHTML`):**
+  - Segmentazione in AST tipizzato (`ChordProAST`) e generazione ricorsiva di Virtual DOM nodi Preact.
+  - Struttura tipografica `.song-chord-column` in `display: inline-flex; flex-direction: column; vertical-align: bottom;`:
+    - `.song-chord`: visualizzato sopra la sillaba in grassetto blu notte (`--color-navy`).
+    - `.song-lyric`: testo sillabico ancorato verticalmente sotto l'accordo; non si disallinea se la riga subisce wrap orizzontale su schermi stretti (320px).
+    - `.song-chorus-block`: blocco ritornello caratterizzato da barra laterale sinistra color giallo scout (`--color-yellow`) e padding ergonomico.
+- **Motore di Trasposizione Semitonale Circolare:**
+  - Trasposizione a 12 semitoni temperati in memoria (`transposeChord`, `transposeChordPro`) che preserva la notazione originale (italiana o anglosassone) e gestisce con precisione i bassi alternativi (slash chords).
+  - Controlli rapidi `-1`, `+1`, `Orig` nella vista esecuzione per adattare istantaneamente il brano alla voce della comunità o al capotasto.
+- **Ricerca Intelligente Senza Falsi Positivi:**
+  - `stripChords(testo_chordpro)` elimina accordi e direttive prima dell'indicizzazione nella ricerca; una ricerca per parole come "Do", "Re" o "Fa" matcha esclusivamente parole effettive del testo, azzerando i falsi positivi.
+- **Modalità Lettura / Esecuzione a Tutto Schermo:**
+  - Componente `CantoReadingMode`: regolazione del font (+/−), toggle accordi visibili/nascosti, tonalità trasposta e acquisizione del **Screen Wake Lock** per mantenere acceso il display durante l'animazione di clan o il fuoco di bivacco.
+- **Editor Admin Live e Validatore Morbido:**
+  - Componente `CantoFormSheet` con anteprima live in tempo reale, pulsanti di inserimento rapido per accordi `[Accordo]` e direttive alla posizione del cursore, controllo duplicati morbido (Levenshtein $\le 2$) e validatore sintattico morbido (`validateChordPro`).
 
 ### 8.3 Calendario e Ordine del Giorno (ODG)
 - Fuso `Europe/Rome`, locale `it-IT`, inizio lunedì. Viste Mese e Lista prossimi eventi.

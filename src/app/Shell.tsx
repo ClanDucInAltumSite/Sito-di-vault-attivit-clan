@@ -172,7 +172,7 @@ export function Shell({
       <TopographicBackground />
 
       {/* Contenuto Principale con scroll e padding sicuro */}
-      <main style={{ flex: 1, minHeight: 0, position: 'relative', zIndex: 1 }}>
+      <main style={{ flex: 1, minHeight: 0, position: 'relative' }}>
         {children}
       </main>
 

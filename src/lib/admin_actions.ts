@@ -4,6 +4,7 @@ import {
   ContentTableName,
   Gioco,
   Ban,
+  Canto,
   Allegato,
   getDb,
   upsertRecords,
@@ -172,6 +173,70 @@ export async function saveBan(input: {
 }
 
 /**
+ * Salva o aggiorna un canto con accordi (online-only).
+ */
+export async function saveCanto(input: {
+  id?: string;
+  titolo: string;
+  autore?: string;
+  tonalita?: string;
+  ritmo?: string;
+  tempo_bpm?: number | null;
+  misura?: string;
+  capotasto?: number | null;
+  testo_chordpro: string;
+}): Promise<Canto> {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    throw new Error(I18N.status.offlineNotice);
+  }
+
+  const now = new Date().toISOString();
+  let savedRecord: Canto;
+
+  const payload = {
+    titolo: input.titolo.trim(),
+    autore: (input.autore || '').trim() || null,
+    tonalita: (input.tonalita || '').trim() || null,
+    ritmo: (input.ritmo || '').trim() || null,
+    tempo_bpm: typeof input.tempo_bpm === 'number' && !isNaN(input.tempo_bpm) ? input.tempo_bpm : null,
+    misura: (input.misura || '').trim() || null,
+    capotasto: typeof input.capotasto === 'number' && !isNaN(input.capotasto) ? input.capotasto : null,
+    testo_chordpro: input.testo_chordpro.trim(),
+    updated_at: now,
+  };
+
+  if (input.id) {
+    const { data, error } = await supabase
+      .from('canti')
+      .update(payload)
+      .eq('id', input.id)
+      .select()
+      .single();
+
+    if (error) throw new Error(error.message);
+    savedRecord = data;
+  } else {
+    const newId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `c_${Date.now()}`;
+    const { data, error } = await supabase
+      .from('canti')
+      .insert({
+        ...payload,
+        id: newId,
+        created_at: now,
+        deleted_at: null,
+      })
+      .select()
+      .single();
+
+    if (error) throw new Error(error.message);
+    savedRecord = data;
+  }
+
+  await upsertRecords('canti', [savedRecord]);
+  return savedRecord;
+}
+
+/**
  * Soft delete di un record (imposta deleted_at = now() sia su Supabase che in IndexedDB).
  */
 export async function softDeleteRecord(table: ContentTableName, id: string): Promise<void> {
@@ -236,6 +301,13 @@ export async function hardDeleteRecord(table: ContentTableName, id: string): Pro
 
   const db = await getDb();
   await db.delete(table, id);
+
+  // Incrementa l'epoca sul server per forzare il Full Resync atomico sui client offline
+  try {
+    await supabase.rpc('bump_sync_epoch');
+  } catch (err) {
+    console.warn('[Admin] Impossibile invocare bump_sync_epoch (migrazione non ancora applicata?):', err);
+  }
 }
 
 /**
@@ -292,14 +364,23 @@ export async function getTrashItems(): Promise<TrashItem[]> {
  * Se olderThanDays è fornito, elimina solo quelli eliminati più di N giorni fa (es. 180 giorni).
  * Altrimenti svuota tutto il cestino.
  */
-export async function purgeTrash(olderThanDays?: number): Promise<number> {
+export async function purgeTrash(olderThanDays = 180): Promise<number> {
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
     throw new Error(I18N.status.offlineNotice);
   }
 
+  // Se eliminiamo i tombstone scaduti (> 180 giorni), invoca l'RPC admin su Supabase
+  if (olderThanDays >= 180) {
+    try {
+      await supabase.rpc('purge_old_tombstones');
+    } catch (err) {
+      console.warn('[Admin] RPC purge_old_tombstones non eseguibile (migrazione non ancora applicata?):', err);
+    }
+  }
+
   const trash = await getTrashItems();
   const now = Date.now();
-  const thresholdMs = olderThanDays ? olderThanDays * 24 * 60 * 60 * 1000 : 0;
+  const thresholdMs = olderThanDays * 24 * 60 * 60 * 1000;
   let count = 0;
 
   for (const item of trash) {

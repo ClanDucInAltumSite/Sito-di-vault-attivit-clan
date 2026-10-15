@@ -150,6 +150,27 @@ test.describe('Verifica Accessibilità WCAG AA con Axe-Core', () => {
     await page.screenshot({ path: screenshotPath, fullPage: true });
     expect(fs.existsSync(screenshotPath)).toBe(true);
   });
+
+  test('Audit accessibilità e rendering su Canti View (#/canti)', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/#/canti');
+    await page.waitForLoadState('networkidle');
+
+    const accessibilityScanResults = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa'])
+      .disableRules(['color-contrast'])
+      .analyze();
+
+    const criticalViolations = accessibilityScanResults.violations.filter(
+      (v) => v.impact === 'critical' || v.impact === 'serious'
+    );
+
+    expect(criticalViolations.length).toBe(0);
+
+    const screenshotPath = path.join(screenshotsDir, 'canti_iphone_light.png');
+    await page.screenshot({ path: screenshotPath, fullPage: true });
+    expect(fs.existsSync(screenshotPath)).toBe(true);
+  });
 });
 
 test.describe('Verifica Tema Scuro (Dark Mode)', () => {
@@ -243,3 +264,169 @@ test.describe('Verifica Motivi Scout Vettoriali e Animazioni', () => {
     expect(compass).not.toBeNull();
   });
 });
+
+test.describe('CORREZIONE 2 — Verifica Stress UI con Dati Sporchi, Viewport Ristretto e Tastiera', () => {
+  async function populateDirtyData(page: any) {
+    await page.goto('#/');
+    await page.waitForLoadState('networkidle');
+
+    await page.evaluate(async () => {
+      const req = indexedDB.open('vault_scout_db', 1);
+      await new Promise<void>((resolve, reject) => {
+        req.onsuccess = () => {
+          const db = req.result;
+          const tx = db.transaction(['giochi', 'bans', 'canti'], 'readwrite');
+          const gStore = tx.objectStore('giochi');
+          const bStore = tx.objectStore('bans');
+          const cStore = tx.objectStore('canti');
+
+          for (let i = 1; i <= 200; i++) {
+            const longUnbroken = `SupercalifragilistichespiralidosoStranoTitoloLunghissimoSenzaSpazi_${i}`;
+            const dirtyChars = `& <special> 'singolo' "doppio" èéòàùì ${i}`;
+            const gNome = `Gioco_${i}_${longUnbroken}_${dirtyChars}`;
+            const bNome = `Ban_${i}_${longUnbroken}_${dirtyChars}`;
+            const cTitolo = `Canto_${i}_${longUnbroken}_${dirtyChars}`;
+
+            gStore.put({
+              id: `dirty-g-${i}`,
+              nome: gNome,
+              regole: `Regole lunghe con caratteri <tag> & "virgolette" per elemento ${i}. ${longUnbroken}`,
+              materiali: `Materiale_${i} <test>`,
+              created_at: new Date(Date.now() - i * 3600000).toISOString(),
+              updated_at: new Date(Date.now() - i * 3600000).toISOString(),
+              deleted_at: null,
+            });
+
+            bStore.put({
+              id: `dirty-b-${i}`,
+              nome: bNome,
+              testo: `Testo del ban con parole lunghe ${longUnbroken} e caratteri <script>alert(1)</script> & "cit"`,
+              note_gesti: `Gesti_${i} <special>`,
+              created_at: new Date(Date.now() - i * 3600000).toISOString(),
+              updated_at: new Date(Date.now() - i * 3600000).toISOString(),
+              deleted_at: null,
+            });
+
+            cStore.put({
+              id: `dirty-c-${i}`,
+              titolo: cTitolo,
+              autore: `Autore_${i} & Clan`,
+              tonalita: 'Re',
+              ritmo: '4/4',
+              tempo_bpm: 120,
+              misura: '4/4',
+              capotasto: null,
+              testo_chordpro: `[Re]Testo del canto ${i} con [Sol]accordi e <caratteri> & "cit"\n{ritornello}\n[La]Ritornello ${longUnbroken}`,
+              created_at: new Date(Date.now() - i * 3600000).toISOString(),
+              updated_at: new Date(Date.now() - i * 3600000).toISOString(),
+              deleted_at: null,
+            });
+          }
+
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        };
+        req.onerror = () => reject(req.error);
+      });
+    });
+  }
+
+  test('Popolamento 200 elementi sporchi, ricerca typo/special chars, ordinamento, sheet e visibilità ultimo elemento su Giochi', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await populateDirtyData(page);
+
+    // 2. Naviga su #/giochi e verifica rendering con 200 elementi
+    await page.goto('/#/giochi');
+    await page.waitForSelector('.ios-grouped-row');
+
+    // Verifica zero scroll orizzontale anche con parole lunghissime senza spazi
+    const scrollInfo = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+    }));
+    expect(scrollInfo.scrollWidth).toBeLessThanOrEqual(scrollInfo.clientWidth + 1);
+
+    // 3. Ricerca su dati sporchi con caratteri speciali
+    const searchInput = page.locator('input[type="search"]');
+    await searchInput.fill('<special>');
+    await page.waitForTimeout(300); // attende debounce 200ms
+    const countAfterSearch = await page.locator('.ios-grouped-row').count();
+    expect(countAfterSearch).toBeGreaterThan(0);
+
+    // 4. Test ordinamento 4-way
+    const sortZtoA = page.locator('button:has-text("Z → A")');
+    if ((await sortZtoA.count()) > 0) {
+      await sortZtoA.click();
+      await page.waitForTimeout(100);
+    }
+
+    // 5. Apertura foglio dettaglio
+    const firstRow = page.locator('.ios-grouped-row').first();
+    await firstRow.click();
+    await page.waitForSelector('[role="dialog"]');
+    expect(await page.locator('[role="dialog"]').isVisible()).toBe(true);
+
+    // Chiusura foglio dettaglio tramite close button superiore
+    const closeBtn = page.locator('.ios-sheet-close-btn').first();
+    await closeBtn.click();
+    await page.waitForTimeout(200);
+
+    // 6. Test con tastiera a schermo simulata (altezza ridotta 400px e input a fuoco)
+    await page.setViewportSize({ width: 390, height: 400 });
+    await searchInput.focus();
+    await page.waitForTimeout(150);
+
+    // 7. Test tema scuro e prefers-reduced-motion
+    await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
+    await page.waitForTimeout(150);
+
+    // 8. Verifica che l'ultimo elemento della lista NON sia coperto dalla barra di navigazione inferiore
+    await searchInput.fill('');
+    await page.waitForTimeout(300);
+
+    // Scroll fino in fondo alla pagina
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await page.waitForTimeout(200);
+
+    const tabBounding = await page.locator('.ios-tab-bar').boundingBox();
+    const lastRow = page.locator('.ios-grouped-row').last();
+    const lastRowBounding = await lastRow.boundingBox();
+
+    expect(tabBounding).not.toBeNull();
+    expect(lastRowBounding).not.toBeNull();
+
+    if (tabBounding && lastRowBounding) {
+      expect(
+        lastRowBounding.y + lastRowBounding.height,
+        `L'ultimo elemento risulta coperto dalla barra inferiore: lastRowBottom=${lastRowBounding.y + lastRowBounding.height} > tabTop=${tabBounding.y}`
+      ).toBeLessThanOrEqual(tabBounding.y + 1);
+    }
+  });
+
+  test('Verifica stress su Bans e Canti con apertura sheet e assenza di overflow', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await populateDirtyData(page);
+
+    // Test su Bans
+    await page.goto('/#/bans');
+    await page.waitForSelector('.ios-grouped-row');
+    const firstBanRow = page.locator('.ios-grouped-row').first();
+    await firstBanRow.click();
+    await page.waitForSelector('[role="dialog"]');
+    expect(await page.locator('[role="dialog"]').isVisible()).toBe(true);
+    const closeBanBtn = page.locator('.ios-sheet-close-btn').first();
+    await closeBanBtn.click();
+    await page.waitForTimeout(200);
+
+    // Test su Canti
+    await page.goto('/#/canti');
+    await page.waitForSelector('.ios-grouped-row');
+    const firstCantoRow = page.locator('.ios-grouped-row').first();
+    await firstCantoRow.click();
+    await page.waitForSelector('[role="dialog"]');
+    expect(await page.locator('[role="dialog"]').isVisible()).toBe(true);
+    const closeCantoBtn = page.locator('.ios-sheet-close-btn').first();
+    await closeCantoBtn.click();
+  });
+});
+

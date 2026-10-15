@@ -109,7 +109,8 @@ function extractServerTime(data: any[], fallback = new Date().toISOString()): st
  */
 export async function performFullResync(
   client = supabase,
-  trigger = 'manual'
+  trigger = 'manual',
+  serverEpoch?: number
 ): Promise<void> {
   const tempData: Record<string, any[]> = {};
   const tableCursors: Record<string, string> = {};
@@ -148,6 +149,7 @@ export async function performFullResync(
     table_cursors: tableCursors,
     status: 'idle',
     last_error: null,
+    sync_epoch: serverEpoch || 1,
   });
 
   currentState = {
@@ -170,7 +172,8 @@ export async function performFullResync(
  */
 export async function performIncrementalSync(
   client = supabase,
-  trigger = 'incremental'
+  trigger = 'incremental',
+  serverEpoch?: number
 ): Promise<void> {
   const meta = await getSyncMeta();
   const cursors = { ...meta.table_cursors };
@@ -223,6 +226,7 @@ export async function performIncrementalSync(
     table_cursors: cursors,
     status: 'idle',
     last_error: null,
+    sync_epoch: serverEpoch || meta.sync_epoch || 1,
   });
 
   currentState = {
@@ -284,12 +288,35 @@ export async function syncNow(
       meta.last_sync_server_time &&
       Date.now() - new Date(meta.last_sync_server_time).getTime() > TOMBSTONE_RETENTION_MS;
 
-    const needsFullResync = forceFull || isFirstSync || isDbEmpty || isExpired;
+    // Controllo epoca server da system_meta (se la tabella esiste)
+    let isEpochMismatch = false;
+    let serverEpoch = meta.sync_epoch || 1;
+    try {
+      const query = client.from('system_meta').select('value').eq('key', 'sync_epoch');
+      if (query && typeof query.maybeSingle === 'function') {
+        const { data: epochData } = await query.maybeSingle();
+        if (epochData && epochData.value !== undefined) {
+          const val = typeof epochData.value === 'number' ? epochData.value : parseInt(String(epochData.value), 10);
+          if (!isNaN(val)) {
+            serverEpoch = val;
+            const localEpoch = meta.sync_epoch || 1;
+            if (serverEpoch !== localEpoch) {
+              console.log(`[SyncEngine] Epoca server diversa (${serverEpoch} vs locale ${localEpoch}). Forzo Full Resync Atomico.`);
+              isEpochMismatch = true;
+            }
+          }
+        }
+      }
+    } catch (_err) {
+      // Ignora se system_meta non è ancora creata sul database
+    }
+
+    const needsFullResync = forceFull || isFirstSync || isDbEmpty || isExpired || isEpochMismatch;
 
     if (needsFullResync) {
-      await performFullResync(client, trigger);
+      await performFullResync(client, trigger, serverEpoch);
     } else {
-      await performIncrementalSync(client, trigger);
+      await performIncrementalSync(client, trigger, serverEpoch);
     }
   } catch (error: any) {
     console.warn(`[SyncEngine] Errore sincronizzazione (${trigger}):`, error?.message || error);

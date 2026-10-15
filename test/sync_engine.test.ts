@@ -467,4 +467,67 @@ describe('FASE 2 — Test di Sicurezza, Sincronizzazione e Offline (Sync Engine)
     const counts = await getSectionCounts();
     expect(counts.giochi).toBe(1);
   });
+
+  // TEST 8: Sync Epoch mismatch e pulizia record fantasma
+  it('8. Sync Epoch mismatch: un record eliminato fisicamente sul server mentre il client è offline viene rimosso al ritorno online grazie all\'epoca', async () => {
+    // 1. Client possiede localmente un gioco sincronizzato in epoca 1
+    await upsertRecords('giochi', [
+      {
+        id: 'g-fantasma',
+        nome: 'Gioco da eliminare fisicamente',
+        regole: 'Regola...',
+        materiali: '',
+        created_at: '2026-10-15T00:00:00Z',
+        updated_at: '2026-10-15T00:00:00Z',
+        deleted_at: null,
+      },
+    ]);
+    await updateSyncMeta({
+      last_sync_server_time: '2026-10-15T00:00:00Z',
+      sync_epoch: 1,
+      table_cursors: { giochi: '2026-10-15T00:00:00Z' },
+    });
+
+    let giochi = await getGiochi();
+    expect(giochi.length).toBe(1);
+    expect(giochi[0].id).toBe('g-fantasma');
+
+    // 2. Mentre il client è offline, sul server g-fantasma viene eliminato fisicamente senza tombstone
+    // e l'epoca viene incrementata a 2 tramite bump_sync_epoch().
+    // Sul server la tabella giochi ora è vuota (o contiene altri record, ma non g-fantasma).
+    const mockClientWithNewEpoch = {
+      from: (table: string) => {
+        if (table === 'system_meta') {
+          return {
+            select: () => ({
+              eq: (field: string, val: string) => ({
+                maybeSingle: () => Promise.resolve({ data: { key: 'sync_epoch', value: 2 }, error: null }),
+              }),
+            }),
+          };
+        }
+        // Le altre tabelle sul server restituiscono array vuoti (il record è stato cancellato fisicamente)
+        return {
+          select: () => {
+            const p: any = Promise.resolve({ data: [], error: null });
+            p.gte = () => Promise.resolve({ data: [], error: null });
+            p.abortSignal = () => p;
+            return p;
+          },
+        };
+      },
+    };
+
+    // 3. Il client torna online ed esegue syncNow()
+    await syncNow({ forceFull: false, trigger: 'online_reconnect', client: mockClientWithNewEpoch as any });
+
+    // 4. Il client deve aver rilevato che serverEpoch (2) !== localEpoch (1),
+    // scatenando un Full Resync atomico che ha ripulito il record fantasma!
+    giochi = await getGiochi();
+    expect(giochi.length).toBe(0);
+
+    const meta = await getSyncMeta();
+    expect(meta.sync_epoch).toBe(2);
+  });
 });
+

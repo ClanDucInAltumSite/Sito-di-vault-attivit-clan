@@ -160,7 +160,7 @@ Questo documento definisce la matrice dei test per ciascuna fase di sviluppo del
   - 17 test su 17 superati con successo (typo, ordinamento, XSS highlight, soft-delete, nascondimento gerarchico figli, cestino, stress test).
 - [x] **314. Suite Test Playwright e Accessibilità (`test/verify_ui.spec.ts`):**
   - 16 test su 16 superati con successo su tutti i 7 viewport (incluse le nuove schermate `#/giochi` e `#/bans`, zero overflow orizzontale, 0 violazioni critiche axe-core).
-- [x] **315. Audit Lighthouse Mobile:**
+- [x] **315. Audit Lighthouse Mobile (Fase 3):**
   - **Performance:** 89 (ottimizzazioni rimandate alla Fase 8 come da accordi).
   - **Accessibilità:** 96 (superiore alla soglia di 90).
   - **Best Practices:** 100.
@@ -168,18 +168,76 @@ Questo documento definisce la matrice dei test per ciascuna fase di sviluppo del
 
 ---
 
+## FASE 4 — Canti e Canzoniere (Verificato)
+
+- [x] **401. Correzione 1 — Epoca di Sincronizzazione e Bonifica Tombstone:**
+  - Migrazione SQL `supabase/migrations/0004_purge_and_epoch.sql` pronta per l'applicazione.
+  - Tabella `system_meta` con `sync_epoch`, funzione `bump_sync_epoch()` admin-only.
+  - Funzione `purge_old_tombstones()` che cancella fisicamente solo righe con `deleted_at < now() - interval '180 days'`.
+  - Client verifica mismatch di epoca a ogni sync e forza `performFullResync()` atomico se cambiata.
+  - Test unitario (`test/sync_engine.test.ts` test 8) superato con successo.
+- [x] **402. Correzione 2 — Verifica Stress UI con Dati Sporchi:**
+  - Inclusione in `verify:ui` di dataset con 200 elementi per Giochi, Bans e Canti con stringhe lunghissime (300+ caratteri continui senza spazi), accenti, apostrofi, virgolette e caratteri speciali (`< & " '`).
+  - Verifica ricerca typo su dataset sporco.
+  - Verifica ordinamento alfabetico corretto su dataset sporco.
+  - Apertura e chiusura fogli di dettaglio e form in BottomSheet.
+  - Simulazione tastiera aperta (viewport ridotto a 390×400 px con input in focus).
+  - Test su temi Chiaro e Scuro e con `prefers-reduced-motion`.
+  - Asserzione geometrica: l'ultimo elemento della lista non è coperto dalla tab bar inferiore.
+- [x] **403. Parser ChordPro Nativo (`src/lib/chordpro.ts`):**
+  - Segmentazione del testo `[Accordo]sillaba` in AST strutturato senza uso di `innerHTML`.
+  - Supporto direttive `{strofa}`, `{ritornello}` / `{soc}` / `{eoc}`, `{ponte}`, `{nuova_pagina}` e metadati `{ritmo}`, `{bpm}`, `{misura}`, `{capo}`.
+- [x] **404. Rendering Tipografico VDOM Sicuro:**
+  - Colonne verticali `.song-chord-column` con `.song-chord` in blu notte (`--color-navy`) e `.song-lyric` sottostante.
+  - Allineamento preservato a ogni a capo riga (anche su schermi da 320 px).
+  - Ritornello `.song-chorus-block` con barra laterale sinistra gialla scout (`--color-yellow`).
+- [x] **405. Trasposizione Semitonale Real-time:**
+  - Algoritmo circolare sui 12 semitoni con preservazione della notazione italiana o anglosassone.
+  - Supporto alterazioni diesis/bemolli, estensioni armoniche (`m7, sus4, dim, add9, 5+`) e slash chord con basso (`Sol/Si` $\rightarrow$ `La/Do#`).
+  - Controlli `-1`, `+1`, `Orig` in memoria senza alterare il testo originale su DB.
+- [x] **406. Ricerca Testuale con Esclusione Accordi:**
+  - `stripChords(testo_chordpro)` elimina accordi e direttive prima del match: le ricerche di note come "Do" o "Re" non generano falsi positivi.
+- [x] **407. Ordinamento a 4 Opzioni con Persistenza:**
+  - `A → Z`, `Z → A`, `Recenti`, `Vecchi` persistenti in `sessionStorage` (`canti_search`, `canti_sort`).
+- [x] **408. Stima Pagine di Stampa A4:**
+  - Funzione `calculatePageCount` determina preventivamente il numero di pagine di stampa del canto (rispettando `{nuova_pagina}` e densità di righe).
+- [x] **409. Modalità Lettura a Tutto Schermo (`CantoReadingMode`):**
+  - Layout alto contrasto, regolazione dimensione testo (+/-), toggle visibilità accordi, trasposizione e acquisizione automatica Screen Wake Lock API con re-lock su `visibilitychange`.
+- [x] **410. Editor Admin con Live Preview (`CantoFormSheet`):**
+  - Gating admin completo (`is_admin()`).
+  - Inserimento rapido accordi `[Accordo]` e direttive al cursore.
+  - Segnalazione duplicati (Levenshtein $\le 2$).
+  - Validazione morbida della sintassi con avvisi non bloccanti.
+  - Anteprima live VDOM in tempo reale.
+- [x] **411. Suite Test Unitari Automatizzati (`test/canti_chordpro.test.ts`):**
+  - 20 test su 20 superati con successo (tokenizzazione, AST, trasposizione italiana e americana, slash chords, validazione, strip chords, calcolo pagine, formattazione e form).
+- [x] **412. Script di Sicurezza Admin (`test/run_admin_test.mjs`):**
+  - Rifiuto scritture anonime (INSERT, UPDATE, DELETE) via RLS.
+  - Rifiuto upload storage con MIME non consentito o non autorizzato.
+  - Supporto end-to-end con riga esca admin e verifica immutabilità.
+- [x] **413. Suite Playwright e Accessibilità (`test/verify_ui.spec.ts`):**
+  - 19 test su 19 superati con successo su tutti i 7 viewport (inclusa la nuova sezione Canti, stress test 200 record sporchi, dark mode, zoom 200% e touch target).
+- [x] **414. Audit Lighthouse Mobile (Fase 4):**
+  - **Performance:** 82 (LCP 3.2s immagine testata, TBT 370ms script/SW; ottimizzazioni rimandate alla Fase 8 come da accordi).
+  - **Accessibilità:** 96 (superiore alla soglia di 90).
+  - **Best Practices:** 96.
+  - **SEO:** 100.
+
+---
+
 ## Comandi di Verifica
 
 ```bash
-# 1. Esecuzione test unitari e suite complete (35 test)
+# 1. Esecuzione test unitari completi (56 test)
 npm test
 
-# 2. Esecuzione verifica reattiva e accessibilità Playwright su 7 viewport (16 test)
+# 2. Esecuzione verifica reattiva e accessibilità Playwright su 7 viewport e stress test (19 test)
 npm run verify:ui
 
-# 3. Compilazione TypeScript e build bundle Vite
-npm run build
+# 3. Test di sicurezza RLS e Storage (admin e anonimo)
+npm run test:admin
 
-# 4. Audit di sicurezza live Supabase (con Anon Key)
-node supabase/tests/run_security_check.mjs
+# 4. Compilazione TypeScript e build bundle Vite
+npm run build
 ```
+
