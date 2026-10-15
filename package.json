@@ -10,7 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:admin": "node supabase/tests/run_admin_test.mjs",
-    "verify:ui": "playwright test test/verify_ui.spec.ts"
+    "verify:ui": "playwright test"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.1",
@@ -22,8 +22,10 @@
     "@playwright/test": "^1.64.1",
     "@preact/preset-vite": "^2.9.5",
     "@types/node": "^22.13.1",
+    "@types/pdf-parse": "^1.1.5",
     "fake-indexeddb": "^6.2.5",
     "happy-dom": "^17.1.8",
+    "pdf-parse": "^2.4.5",
     "playwright": "^1.64.1",
     "typescript": "^5.7.3",
     "vite": "^6.2.0",

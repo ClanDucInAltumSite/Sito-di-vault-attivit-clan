@@ -14,10 +14,21 @@ import {
   generateSafeStoragePath,
   compressImageToWebp,
   getStorageUsageInfo,
+  findOrphanStorageFiles,
+  softDeleteAttachment,
+  restoreAttachment,
+  hardDeleteAttachment,
   MAX_FILE_SIZE_BYTES,
   SUPABASE_FREE_TIER_STORAGE_BYTES,
 } from '../src/lib/attachments';
-import { resolveAttachmentSource } from '../src/lib/storage-cache';
+import {
+  resolveAttachmentSource,
+  removeAttachmentFromCache,
+  enforceAttachmentsCacheCap,
+  onAttachmentsCacheQuotaExceeded,
+  MAX_ATTACHMENTS_CACHE_BYTES,
+} from '../src/lib/storage-cache';
+import { supabase } from '../src/lib/supabase';
 import {
   getDb,
   resetDbInstanceForTesting,
@@ -222,6 +233,220 @@ describe('FASE 5 — Allegati: Validazione, Storage, Cache e Resilienza', () => 
       expect(res.src).toBeNull();
     } finally {
       Object.defineProperty(globalThis.navigator, 'onLine', { value: origOnLine ?? true, configurable: true });
+    }
+  });
+
+  // 9. CORREZIONE 1: Pulizia File Orfani Sicura (> 24h e NESSUNA riga nemmeno nel cestino)
+  it('9. CORREZIONE 1: File appena caricato (<24h) o con riga nel cestino NON viene toccato; file vecchio (>24h) senza riga viene segnalato', async () => {
+    // Inserisci un record nel cestino (deleted_at != null)
+    await upsertRecords('allegati', [
+      {
+        id: 'att-in-trash',
+        gioco_id: 'g-1',
+        ban_id: null,
+        canto_id: null,
+        evento_id: null,
+        storage_path: 'giochi/g-1/file_in_trash.webp',
+        nome_file: 'Nel Cestino.webp',
+        mime: 'image/webp',
+        dimensione: 300 * 1024,
+        ordine: 0,
+        created_at: new Date(Date.now() - 48 * 3600000).toISOString(),
+        updated_at: new Date(Date.now() - 48 * 3600000).toISOString(),
+        deleted_at: new Date().toISOString(), // Nel cestino!
+      },
+    ]);
+
+    // Mock della list di Supabase Storage
+    const origStorage = supabase.storage;
+    (supabase as any).storage = {
+      from: () => ({
+        list: async (folder: string) => {
+          if (folder === 'giochi') {
+            return { data: [{ id: null, name: 'g-1' }], error: null };
+          }
+          if (folder === 'giochi/g-1') {
+            return {
+              data: [
+                // 1. File appena caricato (2 ore fa) SENZA riga (es. upload in corso o interrotto)
+                {
+                  id: 'f1',
+                  name: 'file_recent_no_row.webp',
+                  created_at: new Date(Date.now() - 2 * 3600000).toISOString(),
+                  metadata: { size: 120 * 1024 },
+                },
+                // 2. File vecchio (48 ore fa) MA con riga nel cestino
+                {
+                  id: 'f2',
+                  name: 'file_in_trash.webp',
+                  created_at: new Date(Date.now() - 48 * 3600000).toISOString(),
+                  metadata: { size: 300 * 1024 },
+                },
+                // 3. File vecchio (72 ore fa) SENZA alcuna riga nel database
+                {
+                  id: 'f3',
+                  name: 'file_old_orphan.webp',
+                  created_at: new Date(Date.now() - 72 * 3600000).toISOString(),
+                  metadata: { size: 450 * 1024 },
+                },
+              ],
+              error: null,
+            };
+          }
+          return { data: [], error: null };
+        },
+      }),
+    };
+
+    try {
+      const orphans = await findOrphanStorageFiles();
+      // Solo il file 3 (vecchio >24h e senza riga) deve essere segnalato
+      expect(orphans.length).toBe(1);
+      expect(orphans[0].name).toBe('file_old_orphan.webp');
+      expect(orphans[0].path).toBe('giochi/g-1/file_old_orphan.webp');
+      expect(orphans[0].ageHours).toBeGreaterThanOrEqual(24);
+    } finally {
+      (supabase as any).storage = origStorage;
+    }
+  });
+
+  // 10. CORREZIONE 2: Semantica Ciclo Elimina -> Ripristina -> Elimina Definitivamente
+  it('10. CORREZIONE 2: Ciclo elimina (soft) -> ripristina -> elimina definitiva (con rimozione file da Storage)', async () => {
+    // 1. Inserisci allegato attivo
+    const testAttachment: Allegato = {
+      id: 'att-cycle-test',
+      gioco_id: 'g-1',
+      ban_id: null,
+      canto_id: null,
+      evento_id: null,
+      storage_path: 'giochi/g-1/cycle_photo.webp',
+      nome_file: 'Cycle Photo.webp',
+      mime: 'image/webp',
+      dimensione: 200 * 1024,
+      ordine: 0,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      deleted_at: null,
+    };
+    await upsertRecords('allegati', [testAttachment]);
+
+    let storageRemovedPaths: string[] = [];
+    const origStorage = supabase.storage;
+    (supabase as any).storage = {
+      from: () => ({
+        remove: async (paths: string[]) => {
+          storageRemovedPaths.push(...paths);
+          return { data: paths, error: null };
+        },
+      }),
+    };
+
+    const origFrom = supabase.from;
+    (supabase as any).from = () => ({
+      update: () => ({
+        eq: async () => ({ error: null }),
+      }),
+      delete: () => ({
+        eq: async () => ({ error: null }),
+      }),
+      rpc: async () => ({ data: 2, error: null }),
+    });
+
+    try {
+      // A. Soft Delete: deleted_at != null, file FISICO NON rimosso da Storage
+      await softDeleteAttachment('att-cycle-test');
+      const db = await getDb();
+      let row = await db.get('allegati', 'att-cycle-test');
+      expect(row.deleted_at).not.toBeNull();
+      expect(storageRemovedPaths.length).toBe(0); // File ancora integro in Storage!
+
+      // B. Ripristino dal cestino: deleted_at torna null
+      await restoreAttachment('att-cycle-test');
+      row = await db.get('allegati', 'att-cycle-test');
+      expect(row.deleted_at).toBeNull();
+      expect(storageRemovedPaths.length).toBe(0);
+
+      // C. Hard Delete definitivo: file FISICO rimosso da Storage e riga rimossa dal DB
+      await hardDeleteAttachment(row);
+      expect(storageRemovedPaths).toContain('giochi/g-1/cycle_photo.webp');
+      const deletedRow = await db.get('allegati', 'att-cycle-test');
+      expect(deletedRow).toBeUndefined();
+    } finally {
+      (supabase as any).storage = origStorage;
+      (supabase as any).from = origFrom;
+    }
+  });
+
+  // 11. CORREZIONE 3: Cache Offline rimozione per tombstones
+  it('11. CORREZIONE 3: removeAttachmentFromCache elimina il file da scout-attachments-v1', async () => {
+    let deletedUrl: string | null = null;
+    const mockCache = {
+      delete: async (url: string) => {
+        deletedUrl = url;
+        return true;
+      },
+    };
+
+    (globalThis as any).caches = {
+      open: async () => mockCache,
+    };
+
+    const removed = await removeAttachmentFromCache('giochi/g-1/test_photo.webp');
+    expect(removed).toBe(true);
+    expect(deletedUrl).toContain('giochi/g-1/test_photo.webp');
+  });
+
+  // 12. CORREZIONE 3: Tetto 150 MB Cache API con rimozione elementi meno recenti e listener quota
+  it('12. CORREZIONE 3: enforceAttachmentsCacheCap rimuove i file meno recenti se si supera il tetto di 150 MB e notifica', async () => {
+    let quotaAlertFired = false;
+    const unsub = onAttachmentsCacheQuotaExceeded(() => {
+      quotaAlertFired = true;
+    });
+
+    // Mock cache con 2 file: 1 vecchio da 100 MB e 1 recente da 70 MB (totale 170 MB > 150 MB)
+    const deletedRequests: any[] = [];
+    const mockEntries = [
+      {
+        req: new Request('http://test/vecchio.webp'),
+        size: 100 * 1024 * 1024, // 100 MB
+        date: new Date('2026-01-01').toUTCString(),
+      },
+      {
+        req: new Request('http://test/recente.webp'),
+        size: 70 * 1024 * 1024, // 70 MB
+        date: new Date('2026-10-01').toUTCString(),
+      },
+    ];
+
+    const mockCache = {
+      keys: async () => mockEntries.map((e) => e.req),
+      match: async (req: Request) => {
+        const found = mockEntries.find((e) => e.req.url === req.url);
+        if (!found) return null;
+        return {
+          blob: async () => new Blob([new Uint8Array(found.size)]),
+          headers: new Headers({ date: found.date }),
+        };
+      },
+      delete: async (req: Request) => {
+        deletedRequests.push(req.url);
+        return true;
+      },
+    };
+
+    (globalThis as any).caches = {
+      open: async () => mockCache,
+    };
+
+    try {
+      const result = await enforceAttachmentsCacheCap();
+      expect(result.evictedCount).toBe(1);
+      // Il file più vecchio (100 MB) deve essere stato rimosso
+      expect(deletedRequests).toContain('http://test/vecchio.webp');
+      expect(deletedRequests).not.toContain('http://test/recente.webp');
+      expect(quotaAlertFired).toBe(true);
+    } finally {
+      unsub();
     }
   });
 });

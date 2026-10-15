@@ -217,27 +217,36 @@ export async function uploadAttachment(
     evento_id: parent.type === 'evento' ? parent.id : null,
   };
 
-  const { data: insertedRow, error: insertErr } = await supabase
-    .from('allegati')
-    .insert([rowPayload])
-    .select()
-    .single();
+  try {
+    const { data: insertedRow, error: insertErr } = await supabase
+      .from('allegati')
+      .insert([rowPayload])
+      .select()
+      .single();
 
-  if (insertErr) {
-    // Rollback storage file se l'insert del record fallisce
-    await supabase.storage.from('allegati').remove([storagePath]);
-    throw new Error(`Errore salvataggio metadati allegato: ${insertErr.message}`);
+    if (insertErr) {
+      throw insertErr;
+    }
+
+    if (onProgress) onProgress(100);
+
+    // 6. Scrittura locale immediata in IndexedDB
+    await upsertRecords('allegati', [insertedRow]);
+    return insertedRow as Allegato;
+  } catch (err: any) {
+    // Se l'INSERT della riga fallisce dopo l'upload, rimuovi subito il file appena caricato e segnala l'errore
+    try {
+      await supabase.storage.from('allegati').remove([storagePath]);
+    } catch (cleanupErr) {
+      console.warn('[Storage] Fallita rimozione file orfano post-errore insert:', cleanupErr);
+    }
+    throw new Error(`Errore salvataggio metadati allegato: ${err.message || err}`);
   }
-
-  if (onProgress) onProgress(100);
-
-  // 6. Scrittura locale immediata in IndexedDB
-  await upsertRecords('allegati', [insertedRow]);
-  return insertedRow as Allegato;
 }
 
 /**
  * Soft delete di un allegato (online-only).
+ * Il file FISICO rimane in Storage per permettere il ripristino dal cestino.
  */
 export async function softDeleteAttachment(attachmentId: string): Promise<void> {
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
@@ -256,6 +265,31 @@ export async function softDeleteAttachment(attachmentId: string): Promise<void> 
   const existing = (await db.get('allegati', attachmentId)) as Allegato | undefined;
   if (existing) {
     existing.deleted_at = now;
+    existing.updated_at = now;
+    await db.put('allegati', existing);
+  }
+}
+
+/**
+ * Ripristino di un allegato dal cestino (online-only).
+ */
+export async function restoreAttachment(attachmentId: string): Promise<void> {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    throw new Error(I18N.status.offlineNotice);
+  }
+
+  const now = new Date().toISOString();
+  const { error } = await supabase
+    .from('allegati')
+    .update({ deleted_at: null, updated_at: now })
+    .eq('id', attachmentId);
+
+  if (error) throw new Error(error.message);
+
+  const db = await getDb();
+  const existing = (await db.get('allegati', attachmentId)) as Allegato | undefined;
+  if (existing) {
+    existing.deleted_at = null;
     existing.updated_at = now;
     await db.put('allegati', existing);
   }
@@ -327,26 +361,56 @@ export async function getStorageUsageInfo(): Promise<{
   };
 }
 
+export interface OrphanFileInfo {
+  path: string;
+  name: string;
+  size: number;
+  sizeFormatted: string;
+  createdAt: string;
+  ageHours: number;
+}
+
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
 /**
  * Scansione e individuazione file orfani in Supabase Storage.
- * Restituisce i percorsi dei file fisici presenti nel bucket che non corrispondono
- * a nessun record attivo nella tabella public.allegati.
+ * REGOLA DI SICUREZZA:
+ * Un file è orfano SOLO SE:
+ * 1. Non esiste alcuna riga in 'allegati' che lo referenzi (nemmeno con deleted_at valorizzato).
+ * 2. E il file ha più di 24 ore di età (created_at < now() - 24h).
  */
-export async function findOrphanStorageFiles(): Promise<string[]> {
+export async function findOrphanStorageFiles(): Promise<OrphanFileInfo[]> {
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
     return [];
   }
 
   const db = await getDb();
-  const activeAllegati = (await db.getAll('allegati')) as Allegato[];
+  const allAllegati = (await db.getAll('allegati')) as Allegato[];
+  // Include QUALSIASI riga esistente in 'allegati', anche con deleted_at valorizzato (cestino)!
   const knownPaths = new Set(
-    activeAllegati
-      .filter((a) => a.deleted_at === null && a.storage_path)
-      .map((a) => a.storage_path)
+    allAllegati.map((a) => a.storage_path).filter(Boolean)
   );
 
+  // Se online, verifica anche su Supabase per avere la situazione server più aggiornata
+  try {
+    const { data: remoteRows } = await supabase.from('allegati').select('storage_path');
+    if (remoteRows) {
+      for (const r of remoteRows) {
+        if (r.storage_path) knownPaths.add(r.storage_path);
+      }
+    }
+  } catch (_e) {
+    // Continua con il db locale
+  }
+
   const folders = ['giochi', 'bans', 'canti', 'eventi'];
-  const orphanPaths: string[] = [];
+  const orphanFiles: OrphanFileInfo[] = [];
+  const now = Date.now();
 
   for (const folder of folders) {
     try {
@@ -367,17 +431,56 @@ export async function findOrphanStorageFiles(): Promise<string[]> {
           if (files) {
             for (const f of files) {
               const fullFilePath = `${subPath}/${f.name}`;
-              if (!knownPaths.has(fullFilePath)) {
-                orphanPaths.push(fullFilePath);
+              // 1. Se il file è referenziato da una riga (anche con deleted_at), NON è orfano
+              if (knownPaths.has(fullFilePath)) {
+                continue;
               }
+
+              // 2. Un file senza riga è orfano SOLO SE ha più di 24 ore
+              const fileCreatedAt = f.created_at ? new Date(f.created_at).getTime() : 0;
+              const ageMs = now - fileCreatedAt;
+              const ageHours = Math.floor(ageMs / (1000 * 60 * 60));
+
+              // Se ha meno di 24 ore (o appena caricato), NON è orfano
+              if (ageHours < 24) {
+                continue;
+              }
+
+              const size = f.metadata?.size || 0;
+              orphanFiles.push({
+                path: fullFilePath,
+                name: f.name,
+                size,
+                sizeFormatted: formatBytes(size),
+                createdAt: f.created_at || new Date(fileCreatedAt).toISOString(),
+                ageHours,
+              });
             }
           }
         } else {
           // File direttamente nella cartella di sezione
           const fullFilePath = `${folder}/${sub.name}`;
-          if (!knownPaths.has(fullFilePath)) {
-            orphanPaths.push(fullFilePath);
+          if (knownPaths.has(fullFilePath)) {
+            continue;
           }
+
+          const fileCreatedAt = sub.created_at ? new Date(sub.created_at).getTime() : 0;
+          const ageMs = now - fileCreatedAt;
+          const ageHours = Math.floor(ageMs / (1000 * 60 * 60));
+
+          if (ageHours < 24) {
+            continue;
+          }
+
+          const size = sub.metadata?.size || 0;
+          orphanFiles.push({
+            path: fullFilePath,
+            name: sub.name,
+            size,
+            sizeFormatted: formatBytes(size),
+            createdAt: sub.created_at || new Date(fileCreatedAt).toISOString(),
+            ageHours,
+          });
         }
       }
     } catch (_err) {
@@ -385,11 +488,11 @@ export async function findOrphanStorageFiles(): Promise<string[]> {
     }
   }
 
-  return orphanPaths;
+  return orphanFiles;
 }
 
 /**
- * Ripulisce tutti i file orfani individuati nello Storage.
+ * Ripulisce i file orfani selezionati dopo conferma esplicita dell'utente.
  */
 export async function purgeOrphanStorageFiles(orphanPaths: string[]): Promise<number> {
   if (orphanPaths.length === 0) return 0;

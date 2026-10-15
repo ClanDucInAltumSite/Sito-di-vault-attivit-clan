@@ -398,3 +398,70 @@ Le sezioni Giochi e Bans rappresentano il nucleo operativo per l'animazione e le
 
 
 
+
+
+---
+
+## ADR-0013: Stampa A4, Controllo Overflow dei Canti e Gestione Particolarità Safari iOS (Fase 6)
+
+### Data
+2026-10-15
+
+### Contesto
+La Fase 6 richiede la generazione e stampa di fascicoli personalizzati composti da Giochi, Bans, Canti ed Ordini del Giorno (ODG). I requisiti fondamentali impongono:
+1. Nessun popup o nuova scheda (`window.open` è intercettato dai popup blocker mobili): l'anteprima e la stampa avvengono nella stessa finestra tramite `window.print()` e direttive `@media print`.
+2. Impaginazione rigorosa A4 (`@page { size: A4 portrait; margin: 15mm 12mm; }`), testo nero su fondo bianco puro (`oklch(0 0 0)` su `oklch(1 0 0)`), corpo del testo non inferiore a 12 pt.
+3. Flusso continuo per Giochi e Bans: separatore sottile tra elementi, titoli con `break-after: avoid`, `orphans: 3`, `widows: 3`. Gli elementi brevi (< 600 caratteri) hanno `break-inside: avoid`, mentre quelli estesi scorrono liberamente su più pagine.
+4. Canti a pagina singola o doppia: ogni canto inizia su nuova pagina (`break-before: page`). I cambi pagina espliciti `{nuova_pagina}` (ChordPro) spezzano il canto. Nelle pagine successive alla prima, la testata è ridotta al solo titolo con indicatore di pagina ("Titolo — 2/2"). Accordi in nero grassetto posizionati sopra il testo.
+5. Controllo di capienza (overflow): algoritmo deterministico con 4 gradini di riduzione del carattere (da 12 pt a 9.5 pt); se il testo supera comunque l'altezza utile del foglio A4, compare l'avviso giallo *"Questa pagina non entra: aggiungi un'interruzione di pagina"*.
+6. Opzioni: copertina con `logo-completo` su fondo chiaro e indice con numeri di pagina calcolati; interruttore per includere le sole immagini allegate (i PDF non sono mai inclusi nel flusso di stampa).
+7. Preparazione ODG: impaginazione A4 per riunioni con caselle quadrate di spunta.
+
+### Decisioni Architetturali
+
+1. **Unico Motore di Rendering e Nessun Popup:**
+   - La vista `StampaView` (`#/stampa`) renderizza sia i controlli di selezione e configurazione (schede, checkbox, riordino con frecce Su/Giù, interruttori) sia il contenitore `.print-document` con classe `.print-preview-mode`.
+   - Il pulsante "Stampa fascicolo" invoca direttamente `window.print()`. Le regole `@media print` nascondono l'intera interfaccia applicativa (navigazione, header, banner, controlli, HUD altimetrico e wrapper curve di livello) e mostrano esclusivamente `.print-document`.
+
+2. **Risoluzione del Bug di Paginazione dei Motori Chromium e WebKit:**
+   - Quando elementi antenati come `html`, `body`, `#app` o `main` possiedono `display: flex` o `overflow-x: hidden`, i motori di stampa Chromium e WebKit troncano la paginazione interrompendo la generazione dopo 3 o 4 pagine o stampando solo la prima schermata.
+   - Per risolvere in modo definitivo questo difetto, `src/styles/print.css` forza a livello globale:
+     ```css
+     @media print {
+       html, body, #app, main, .container {
+         display: block !important;
+         overflow: visible !important;
+         height: auto !important;
+         min-height: 0 !important;
+       }
+       .print-document, .print-song-wrapper, .print-song-page {
+         display: block !important;
+       }
+     }
+     ```
+
+3. **Algoritmo di Stima dell'Ingombro e Step-Down del Font (`estimatePageOverflow`):**
+   - L'altezza stampabile di un foglio A4 (297 mm - 30 mm di margini = 267 mm) equivale a circa 756 pt.
+   - Il calcolo somma:
+     - Margini e padding pagina (20 pt);
+     - Intestazione (titolo, autore, tonalità: ~65 pt a pag. 1; ~30 pt su pagine successive);
+     - Righe di testo e righe con accordi: una riga testo consuma 1.45 * fontSize; una riga con accordi richiede un'altezza doppia (2.4 * fontSize);
+     - Spaziatura tra strofe e blocchi ritornello (10 pt).
+   - Si testano 4 gradini tipografici:
+     - Livello 0: 12.0 pt (default standard)
+     - Livello 1: 11.0 pt
+     - Livello 2: 10.2 pt
+     - Livello 3: 9.5 pt (limite minimo di leggibilità per canto su stativo/chitarra)
+   - Se anche a 9.5 pt l'altezza supera 756 pt, la pagina viene contrassegnata con `fits: false`, applicando la classe `.print-page-overflow` e stampando a video l'avviso per l'utente.
+
+4. **Particolarità e Limiti Noti di Safari iOS (AirPrint):**
+   - **Modalità PWA a Schermo Intero (Standalone):** Safari iOS in modalità standalone può posticipare o ignorare chiamate asincrone a `window.print()`. L'invocazione deve avvenire in risposta diretta e sincrona all'evento `click`/`touchend` dell'utente, senza `setTimeout` o chiamate a `fetch` interposte.
+   - **Supporto `@page` limitato:** Safari iOS ignora i selettori pseudo-pagina `@page :first` o `@page :left/:right` complessi. La numerazione di pagina e le intestazioni speciali devono quindi essere marcate come elementi DOM ordinari (`.print-cover-page`, `.print-index-page`, `.print-song-page`) con direttive CSS `break-before: page`.
+   - **Render dei Font Web:** In Safari Mobile AirPrint, i font caricati via `@font-face` devono essere già pronti (`document.fonts.ready`). L'applicazione usa font di sistema o fallback immediati per garantire che il testo venga rasterizzato senza sfarfallio o caratteri mancanti.
+   - **Gestione Fogli Bianchi:** Per impedire la creazione di fogli bianchi finali su Safari e Chrome, ogni pagina di canto dichiara `break-before: page`, eccetto la primissima pagina dopo indice o copertina ove già presente un'interruzione naturale, e l'ultimo elemento non ha `break-after: always`.
+
+5. **Isolamento Grafico e Inchiostro:**
+   - La barra del ritornello è renderizzata con bordo nero solido (`border-left: 3pt solid oklch(0 0 0)`).
+   - Gli accordi sono renderizzati in nero puro con peso 700 (`font-weight: 700; color: oklch(0 0 0)`).
+   - Rimozione completa di gradienti e ombreggiature (`box-shadow: none; text-shadow: none`).
+   - Gli elementi decorativi e le curve di livello (`.topo-contour-wrapper`, `.topo-ambient-glow`, `.topo-svg-container`, `.scout-trail-svg`, `.scout-compass-widget`) sono soppressi con `display: none !important`.

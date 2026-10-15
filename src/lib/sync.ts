@@ -152,6 +152,18 @@ export async function performFullResync(
     sync_epoch: serverEpoch || 1,
   });
 
+  // Se abbiamo ricevuto allegati nel full resync, ripulisci dalla Cache API i file non più attivi
+  if (tempData.allegati) {
+    const activePaths = new Set<string>(
+      tempData.allegati
+        .filter((a: any) => a.deleted_at === null && a.storage_path)
+        .map((a: any) => a.storage_path)
+    );
+    import('./storage-cache')
+      .then((m) => m.pruneDeletedFromCache(activePaths))
+      .catch(() => {});
+  }
+
   currentState = {
     ...currentState,
     status: 'idle',
@@ -211,6 +223,18 @@ export async function performIncrementalSync(
     if (newRecords.length > 0) {
       // Scrittura idempotente in IndexedDB
       await upsertRecords(table, newRecords);
+
+      // Se la tabella è allegati, ripulisci dalla Cache API i file corrispondenti ai tombstones ricevuti
+      if (table === 'allegati') {
+        for (const rec of newRecords) {
+          if (rec.deleted_at && rec.storage_path) {
+            import('./storage-cache')
+              .then((m) => m.removeAttachmentFromCache(rec.storage_path))
+              .catch(() => {});
+          }
+        }
+      }
+
       const batchMaxTime = extractServerTime(newRecords, queryCursor || undefined);
       cursors[table] = batchMaxTime;
       if (batchMaxTime > maxServerTime) {

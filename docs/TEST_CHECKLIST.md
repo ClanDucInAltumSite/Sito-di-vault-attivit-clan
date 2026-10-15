@@ -278,19 +278,70 @@ Questo documento definisce la matrice dei test per ciascuna fase di sviluppo del
 
 ---
 
+## FASE 6 — Stampa A4, Fascicoli Personalizzati, Overflow Canti e Test Binario PDF
+
+- [x] **601. Risoluzione Correzioni 1–5 (Fase 5 -> 6):**
+  - Correzione 1: Scansione orfani sicura: verifica referenze attive e soft-delete, esclusione file recenti (< 24h); tabella dettagliata (nome, dimensione, età) e doppia conferma in Admin; rimozione atomica da Storage se INSERT della riga fallisce.
+  - Correzione 2: Semantica eliminazione allegato: soft-delete con file preservato in Storage per consentire il ripristino dal Cestino; eliminazione fisica da Storage solo al purge definitivo. Test completo del ciclo elimina -> ripristina -> svuota.
+  - Correzione 3: Cache offline: rimozione del file da `scout-attachments-v1` alla ricezione del tombstone; tetto di 150 MB con algoritmo di evizione LRU e notifica utente.
+  - Correzione 4: Test statico CSP (`test/csp_compliance.test.ts`): verifica assenza di tag insicuri (`<object>`, `<embed>`), domini Supabase validati in `index.html` (4/4 superati).
+  - Correzione 5: Migrazione 0005 aggiornata in `supabase/migrations/0005_revoke_rpc_permissions.sql`.
+- [x] **602. Schermata Centro Stampa (`StampaView`, `#/stampa`):**
+  - Navigazione a schede per categoria (Giochi, Bans, Canti, ODG) con contatori dedicati per ciascuna tipologia.
+  - Selezione multi-checkbox con controlli rapidi "Seleziona tutti" e "Deseleziona tutti".
+  - Riordino dinamico degli elementi selezionati con pulsanti Su e Giù (`chevron-up`, `chevron-down`).
+  - Persistenza dello stato di selezione in `sessionStorage`.
+- [x] **603. Opzioni del Fascicolo e Integrazione Immagini:**
+  - Interruttore "Includi immagini allegate" (default disattivato, include esclusivamente schemi e immagini; documenti PDF categoricamente esclusi dal flusso di stampa; badge sobrio se offline).
+  - Interruttore "Aggiungi copertina e indice" (default disattivato; copertina con marchio `logo-completo` su targa chiara e indice con numeri di pagina calcolati).
+- [x] **604. Motore di Stampa In-Page e Fogli di Stile A4 (`src/styles/print.css`):**
+  - Esecuzione in-page tramite `window.print()` senza popup o nuove schede (`window.open` vietato per prevenire blocchi browser).
+  - Dimensionamento foglio `@page { size: A4 portrait; margin: 15mm 12mm; }`.
+  - Corpo del testo in nero assoluto su bianco puro (`oklch(0 0 0)` su `oklch(1 0 0)`), corpo $\ge 12\text{ pt}$.
+  - Reset dei contenitori antenati (`html, body, #app, main, .container`) a `display: block !important; overflow: visible !important; height: auto !important;` per sbloccare la paginazione Chromium/Safari.
+  - Soppressione totale della UI applicativa (TopBar, BottomNav, banner, modali, HUD altimetrico, wrapper curve di livello e motivi vettoriali).
+- [x] **605. Flusso Continuo Giochi e Bans:**
+  - Nessuna interruzione di pagina forzata tra elementi consecutivi; separatore sottile orizzontale.
+  - Intestazioni con `break-after: avoid`, `orphans: 3`, `widows: 3` per scongiurare titoli orfani.
+  - `break-inside: avoid` per elementi brevi ($< 600$ caratteri); gli elementi estesi scorrono liberamente tra le pagine per evitare vuoti.
+- [x] **606. Paginazione Canti e Formattazione Spartito:**
+  - Ogni canto inizia su una pagina nuova (`break-before: page !important`).
+  - Rispetto rigoroso dei tag di cambio pagina espliciti `{nuova_pagina}`.
+  - Pagine successive ($N \ge 2$): testata ridotta al solo titolo con indicatore ("Titolo — 2/2"), escludendo metadati ripetuti.
+  - Accordi musicali posizionati sopra il testo in nero grassetto (`font-weight: 700`); barra laterale del ritornello con bordo nero solido.
+- [x] **607. Rilevamento Overflow e Step-Down Tipografico (`src/lib/stampa.ts`):**
+  - Algoritmo `estimatePageOverflow`: 4 gradini tipografici decrescenti ($12.0\text{ pt} \rightarrow 11.0\text{ pt} \rightarrow 10.2\text{ pt} \rightarrow 9.5\text{ pt}$).
+  - Allarme visivo in anteprima se il testo eccede l'altezza utile: *"Questa pagina non entra: aggiungi un'interruzione di pagina"*.
+- [x] **608. Preparazione Ordine del Giorno (ODG) per Riunioni:**
+  - Layout compatto per riunioni con data, luogo, responsabile, testo evento e caselle quadrate stampabili `[ ]` ($14\times 14\text{px}$) per la spunta a penna.
+- [x] **609. Test Automatizzato Binario PDF (`test/stampa_pdf.spec.ts`):**
+  - Generazione di un PDF reale A4 tramite Playwright `page.pdf()`.
+  - Parsing del file binario con libreria `pdf-parse`: verifica di 7 pagine complessive, flusso continuo, canto su 2 pagine con testata "2/2", riga con 40 accordi, caratteri speciali (`<`, `&`, `"`, `'`), e assenza di pagine bianche.
+- [x] **610. Vetrina Design System (`#/design`, Sezione 18):**
+  - Componenti di stampa, preview in miniatura, badge avviso overflow e casella quadrata ODG.
+- [x] **611. Suite Test Completa e Audit Qualità (Fase 6):**
+  - Test unitari completi (`npm test`): **78 su 78 superati** (9 file di test).
+  - Test UI Playwright (`npm run verify:ui`): **22 su 22 superati** (incluso audit axe-core su `#/stampa`).
+  - Audit Mobile Lighthouse (mediana di 3 run): **Performance 90** (90, 89, 90), **Accessibilità 96** (96, 96, 96), **Best Practices 100**, **SEO 100**.
+
+---
+
 ## Comandi di Verifica
 
 ```bash
-# 1. Esecuzione test unitari completi (65 test)
+# 1. Esecuzione test unitari completi (78 test su 9 file)
 npm test
 
-# 2. Esecuzione verifica reattiva e accessibilità Playwright su 7 viewport, stress test e Allegati (20 test)
+# 2. Esecuzione verifica reattiva e accessibilità Playwright su 7 viewport, stress test, Allegati e Stampa (22 test)
 npm run verify:ui
 
-# 3. Test di sicurezza RLS e Storage (admin e anonimo, richiesta credenziali a runtime)
+# 3. Test di generazione e validazione binaria del PDF di stampa (7 pagine, pdf-parse)
+npx playwright test test/stampa_pdf.spec.ts
+
+# 4. Test di sicurezza RLS e Storage (admin e anonimo, richiesta credenziali a runtime)
 npm run test:admin
 
-# 4. Compilazione TypeScript e build bundle Vite
+# 5. Compilazione TypeScript e build bundle Vite
 npm run build
 ```
 

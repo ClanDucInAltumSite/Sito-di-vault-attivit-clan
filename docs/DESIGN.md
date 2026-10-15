@@ -214,5 +214,46 @@ La suite di test automatizzati con **Playwright** e **Axe-Core** verifica ad ogn
 - **Anteprima e Compressione:** Anteprima immediata prima del salvataggio definitivo con indicatore di compressione automatica WebP attiva (riduzione peso $> 85\%$).
 - **Barra di Avanzamento:** Barra di progresso grafica deterministica con feedback testuale in italiano durante il trasferimento verso il bucket Supabase.
 
+---
 
+## 11. Specifiche Centro Stampa e Fascicoli A4 (Fase 6)
+
+### 11.1 Architettura della Schermata (`StampaView`, `#/stampa`)
+- **Visuale Unificata Selezione & Anteprima:** La schermata integra in un unico flusso la configurazione del fascicolo (selezione a schede per Giochi, Bans, Canti e ODG), i comandi operativi e il contenitore di anteprima impaginata A4.
+- **Selettore a Schede per Categoria:** Navigazione orizzontale a pillola tra Giochi, Bans, Canti e Ordine del Giorno, con indicatore numerico del totale elementi selezionati per ciascuna sezione.
+- **Lista di Selezione ed Ergonomia:**
+  - Controlli "Seleziona tutti" e "Deseleziona tutti" specifici per la categoria visualizzata.
+  - Checkbox accessibile con etichetta ad ampia area tattile ($ge 44	imes 44\text{px}$).
+  - Pulsanti di riordino Su e Giù con icone vettoriali (`chevron-up`, `chevron-down`) per personalizzare l'ordine di apparizione nel fascicolo stampato.
+  - Conservazione dello stato di selezione in `sessionStorage` per prevenire perdite accidentali durante la navigazione nell'app.
+- **Interruttori Opzioni Fascicolo:**
+  - *Aggiungi copertina e indice:* Se attivo, genera una copertina istituzionale con il marchio `logo-completo` su targa chiara, titolo del fascicolo, data e contatore elementi, seguita da una seconda pagina di Indice Generale con computo dinamico delle pagine.
+  - *Includi immagini allegate:* Se attivo, renderizza le miniature e gli schemi grafici associati a ciascun elemento. I documenti PDF non vengono mai inseriti nel flusso di stampa cartaceo per evitare salti di pagina non controllati.
+
+### 11.2 Regole Tipografiche e Impaginazione A4 (`src/styles/print.css`)
+- **Parametri di Pagina:** `@page { size: A4 portrait; margin: 15mm 12mm; }`.
+- **Inchiostro e Contrasto:** Nero assoluto su bianco puro (`color: oklch(0 0 0) !important; background: oklch(1 0 0) !important;`), corpo del testo $\ge 12\text{ pt}$ per massima leggibilità all'aperto o attorno al fuoco.
+- **Flusso Continuo Giochi e Bans:**
+  - Gli elementi scorrono in sequenza continua senza salti pagina forzati, separati da una linea sottile di 1pt (`oklch(0.80 0 0)`).
+  - Titoli con `break-after: avoid`, `orphans: 3`, `widows: 3` per evitare titoli isolati a fondo pagina.
+  - `break-inside: avoid` attivo solo sugli elementi brevi ($< 600$ caratteri); gli elementi estesi scorrono liberamente per scongiurare spazi vuoti sul foglio.
+- **Paginazione Canti:**
+  - Ogni canto inizia tassativamente su una pagina nuova (`break-before: page !important`).
+  - Ripartizione automatica su più pagine tramite tag `{nuova_pagina}`.
+  - Pagine successive ($N \ge 2$): testata ridotta al solo titolo con indicatore di pagina ("Titolo del Canto — 2/2"), escludendo metadati secondari.
+  - Accordi musicali posizionati sopra il testo in nero solido grassetto (`font-weight: 700`).
+  - Barra laterale del ritornello con bordo spesso solido (`border-left: 3pt solid oklch(0 0 0)`).
+- **Controllo di Capienza (Overflow):**
+  - Calcolo preventivo dell'ingombro verticale con step-down a 4 livelli tipografici ($12.0\text{ pt} \rightarrow 11.0\text{ pt} \rightarrow 10.2\text{ pt} \rightarrow 9.5\text{ pt}$).
+  - In caso di superamento della pagina anche a $9.5\text{ pt}$, emissione dell'avviso di overflow: *"Questa pagina non entra: aggiungi un'interruzione di pagina"*.
+- **Preparazione Ordine del Giorno (ODG):**
+  - Layout A4 per riunioni con intestazione evento, data, luogo, responsabile e caselle quadrate stampabili (`[ ]`, $14\times 14\text{px}$) per la spunta manuale con penna.
+
+### 11.3 Vetrina Design System (`#/design`, Sezione 18)
+- La Sezione 18 di `DesignSystemView` espone tutti gli elementi tipografici e i componenti del Centro Stampa:
+  1. Pulsante primario di avvio stampa;
+  2. Toggle e opzioni del fascicolo (immagini, copertina/indice);
+  3. Badge di stato e avviso di overflow (*"Questa pagina non entra..."*);
+  4. Foglio di anteprima A4 in miniatura con accordi e barre ritornello;
+  5. Casella di spunta quadrata per la stampa dell'Ordine del Giorno.
 

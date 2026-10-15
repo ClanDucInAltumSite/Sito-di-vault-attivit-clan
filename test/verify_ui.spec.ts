@@ -171,6 +171,27 @@ test.describe('Verifica Accessibilità WCAG AA con Axe-Core', () => {
     await page.screenshot({ path: screenshotPath, fullPage: true });
     expect(fs.existsSync(screenshotPath)).toBe(true);
   });
+
+  test('Audit accessibilità e rendering su Stampa View (#/stampa)', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/#/stampa');
+    await page.waitForLoadState('networkidle');
+
+    const accessibilityScanResults = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa'])
+      .disableRules(['color-contrast'])
+      .analyze();
+
+    const criticalViolations = accessibilityScanResults.violations.filter(
+      (v) => v.impact === 'critical' || v.impact === 'serious'
+    );
+
+    expect(criticalViolations.length).toBe(0);
+
+    const screenshotPath = path.join(screenshotsDir, 'stampa_iphone_light.png');
+    await page.screenshot({ path: screenshotPath, fullPage: true });
+    expect(fs.existsSync(screenshotPath)).toBe(true);
+  });
 });
 
 test.describe('Verifica Tema Scuro (Dark Mode)', () => {

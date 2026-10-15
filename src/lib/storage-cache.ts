@@ -6,16 +6,146 @@ import { getDb, Allegato } from './db';
 import { getAttachmentPublicUrl, AUTO_CACHE_SIZE_LIMIT_BYTES } from './attachments';
 
 export const ATTACHMENTS_CACHE_NAME = 'scout-attachments-v1';
+export const MAX_ATTACHMENTS_CACHE_BYTES = 150 * 1024 * 1024; // Tetto di 150 MB
+export const EVICTION_TARGET_BYTES = 120 * 1024 * 1024; // 120 MB target dopo rimozione meno recenti
+
+export type QuotaExceededListener = (freedBytes: number, totalBytes: number) => void;
+let quotaListener: QuotaExceededListener | null = null;
+
+export function onAttachmentsCacheQuotaExceeded(listener: QuotaExceededListener): () => void {
+  quotaListener = listener;
+  return () => {
+    if (quotaListener === listener) quotaListener = null;
+  };
+}
 
 /**
  * Verifica se l'ambiente supporta Cache API (browser o test con mock).
  */
-function isCacheSupported(): boolean {
+export function isCacheSupported(): boolean {
   return typeof window !== 'undefined' && 'caches' in window;
 }
 
 /**
- * Memorizza un singolo allegato nella cache dedicata.
+ * Rimuove un allegato specifico dalla Cache API (chiamato alla ricezione di un tombstone o delete).
+ */
+export async function removeAttachmentFromCache(urlOrStoragePath: string): Promise<boolean> {
+  if (!isCacheSupported() || !urlOrStoragePath) return false;
+
+  try {
+    const cache = await caches.open(ATTACHMENTS_CACHE_NAME);
+    const targetUrl = urlOrStoragePath.startsWith('http')
+      ? urlOrStoragePath
+      : getAttachmentPublicUrl(urlOrStoragePath);
+
+    return await cache.delete(targetUrl);
+  } catch (err) {
+    console.warn('[StorageCache] Errore rimozione allegato da cache:', err);
+    return false;
+  }
+}
+
+/**
+ * Svuota completamente la cache degli allegati (ad es. al cambio di epoca o full resync atomico).
+ */
+export async function clearAttachmentsCache(): Promise<void> {
+  if (!isCacheSupported()) return;
+  try {
+    await caches.delete(ATTACHMENTS_CACHE_NAME);
+  } catch (_e) {
+    // Ignora errori di svuotamento
+  }
+}
+
+/**
+ * Rimuove dalla cache tutti i file che non corrispondono più ad alcun allegato attivo.
+ */
+export async function pruneDeletedFromCache(activePaths: Set<string>): Promise<number> {
+  if (!isCacheSupported()) return 0;
+
+  try {
+    const cache = await caches.open(ATTACHMENTS_CACHE_NAME);
+    const requests = await cache.keys();
+    let removedCount = 0;
+
+    for (const req of requests) {
+      // Estrae il path dello storage dall'URL Supabase
+      const match = req.url.match(/\/storage\/v1\/object\/public\/allegati\/(.+)$/);
+      if (match && match[1]) {
+        const decodedPath = decodeURIComponent(match[1]);
+        if (!activePaths.has(decodedPath)) {
+          await cache.delete(req);
+          removedCount++;
+        }
+      }
+    }
+    return removedCount;
+  } catch (err) {
+    console.warn('[StorageCache] Errore pruning cache allegati:', err);
+    return 0;
+  }
+}
+
+/**
+ * Applica il tetto di spazio (150 MB) con rimozione automatica dei file meno recenti.
+ */
+export async function enforceAttachmentsCacheCap(): Promise<{
+  evictedCount: number;
+  freedBytes: number;
+  totalBytes: number;
+}> {
+  if (!isCacheSupported()) return { evictedCount: 0, freedBytes: 0, totalBytes: 0 };
+
+  try {
+    const cache = await caches.open(ATTACHMENTS_CACHE_NAME);
+    const requests = await cache.keys();
+    let totalBytes = 0;
+    const entries: { req: Request; size: number; date: number }[] = [];
+
+    for (const req of requests) {
+      const res = await cache.match(req);
+      if (res) {
+        const blob = await res.blob();
+        const size = blob.size;
+        totalBytes += size;
+        const dateHeader = res.headers.get('date');
+        const date = dateHeader ? new Date(dateHeader).getTime() : 0;
+        entries.push({ req, size, date });
+      }
+    }
+
+    if (totalBytes <= MAX_ATTACHMENTS_CACHE_BYTES) {
+      return { evictedCount: 0, freedBytes: 0, totalBytes };
+    }
+
+    // Ordina dai meno recenti ai più recenti
+    entries.sort((a, b) => a.date - b.date);
+
+    let freedBytes = 0;
+    let evictedCount = 0;
+
+    for (const entry of entries) {
+      if (totalBytes - freedBytes <= EVICTION_TARGET_BYTES) {
+        break;
+      }
+      await cache.delete(entry.req);
+      freedBytes += entry.size;
+      evictedCount++;
+    }
+
+    if (evictedCount > 0 && quotaListener) {
+      quotaListener(freedBytes, totalBytes - freedBytes);
+    }
+
+    return { evictedCount, freedBytes, totalBytes: totalBytes - freedBytes };
+  } catch (err) {
+    console.warn('[StorageCache] Errore verifica quota cache:', err);
+    return { evictedCount: 0, freedBytes: 0, totalBytes: 0 };
+  }
+}
+
+/**
+ * Memorizza un singolo allegato nella cache dedicata e verifica il tetto quota.
  */
 export async function cacheAttachment(url: string): Promise<boolean> {
   if (!isCacheSupported() || !url) return false;
@@ -28,6 +158,8 @@ export async function cacheAttachment(url: string): Promise<boolean> {
     const response = await fetch(url, { mode: 'cors' });
     if (response.ok && response.status === 200) {
       await cache.put(url, response.clone());
+      // Controlla quota 150 MB dopo ogni nuovo inserimento
+      await enforceAttachmentsCacheCap();
       return true;
     }
   } catch (err) {

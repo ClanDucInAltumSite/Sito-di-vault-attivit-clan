@@ -547,6 +547,50 @@ export function DesignSystemView() {
         </div>
       </GroupedList>
 
+      {/* 18. CENTRO STAMPA A4 E SCHEDE A4 (FASE 6) */}
+      <GroupedList
+        header="18. CENTRO STAMPA A4 (FASE 6)"
+        footer="Regole CSS @media print senza pop-up, nero su bianco inchiostro-safe, overflow canti con font step-down, copertina e indice."
+      >
+        <GroupedRow
+          leading={<SectionIcon section="stampa" size="sm" />}
+          title="Vai alla Schermata Stampa A4 (#/stampa)"
+          subtitle="Selezione elementi, riordino su/giù e stampa A4"
+          chevron
+          onClick={() => navigate('stampa')}
+        />
+        <div style={{ padding: 'var(--space-4)' }}>
+          {/* Demo alert overflow */}
+          <div className="stampa-overflow-alert" style={{ margin: '0 0 var(--space-3)' }}>
+            <Icon name="info" size={16} />
+            <span>Questa pagina non entra: aggiungi un'interruzione di pagina</span>
+          </div>
+
+          {/* Demo intestazione ridotta pagina >= 2 */}
+          <div
+            style={{
+              padding: 'var(--space-2) var(--space-3)',
+              background: 'var(--color-surface)',
+              border: '1px solid var(--color-border)',
+              borderRadius: 'var(--radius-md)',
+              fontSize: 'var(--font-size-xs)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              marginBottom: 'var(--space-3)',
+            }}
+          >
+            <span style={{ fontWeight: 600 }}>Strade e Pensieri per Domani</span>
+            <span style={{ color: 'var(--color-text-secondary)' }}>2/2</span>
+          </div>
+
+          {/* Demo checkbox ODG stampabile */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--font-size-xs)' }}>
+            <span className="print-checkbox" style={{ display: 'inline-block', width: '14px', height: '14px', border: '1.5px solid var(--color-text)', borderRadius: '2px' }} />
+            <span>Punto Ordine del Giorno con casella quadrata stampabile</span>
+          </div>
+        </div>
+      </GroupedList>
+
       {/* BOTTOM SHEET DIMOSTRATIVO */}
       <BottomSheet
         isOpen={isSheetOpen}

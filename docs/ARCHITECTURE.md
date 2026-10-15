@@ -467,11 +467,37 @@ Meta-tag restrittivo in `index.html`:
 - **Evidenziazione sicura:** TextNode alternati a tag `<mark>` (nessun `innerHTML`).
 - **Ordinamento (esattamente 4 opzioni):** A→Z (default con `Intl.Collator`), Z→A, Più recenti, Più vecchi. Parametri conservati in `sessionStorage`.
 
-### 8.5 Architettura di Stampa A4
-- Esecuzione in-page con `window.print()` e `@media print` A4.
-- **Giochi e Bans:** Flusso continuo senza interruzioni forzate. `break-inside: avoid` applicato **solo agli elementi brevi** (< 600 caratteri); gli elementi lunghi possono spezzarsi normalmente tra le pagine per evitare grandi spazi vuoti a fondo pagina. `break-after: avoid` sui titoli.
-- **Canti:** Ogni canto inizia su una pagina nuova (`break-before: page`), rispetto dei tag `{nuova_pagina}`, intestazione ridotta nelle pagine successive ("Titolo — pag. 2/2") e rilevamento visivo preventivo di overflow in anteprima con avviso.
-- **ODG:** Scheda singola compatta con caselle quadrate stampabili `[ ]` per la spunta a penna.
+### 8.5 Architettura di Stampa A4 e Generazione Fascicoli (Fase 6)
+- **Esecuzione In-Page Senza Popup:** L'invocazione di `window.print()` avviene direttamente dalla schermata `#/stampa`. Nessuna nuova scheda o finestra ausiliaria viene aperta (`window.open` è vietato per evitare il blocco dei popup su browser mobili).
+- **Foglio di Stile Dedicato (`src/styles/print.css`):**
+  - `@page { size: A4 portrait; margin: 15mm 12mm; }`.
+  - Corpo del testo in nero su bianco puro (`oklch(0 0 0)` su `oklch(1 0 0)`), corpo $\ge 12\text{ pt}$.
+  - Soppressione dell'intera UI applicativa (TopBar, BottomNav, banner, modali, HUD altimetrico, wrapper curve di livello SVG e motivi scout).
+  - Reset forzato dei contenitori antenati (`html, body, #app, main, .container`) a `display: block !important; overflow: visible !important; height: auto !important;` per sbloccare la paginazione su motori Chromium e Safari/WebKit.
+- **Flusso Continuo per Giochi e Bans:**
+  - Nessuna interruzione di pagina forzata tra elementi consecutivi.
+  - Separatore sottile orizzontale tra schede.
+  - Intestazioni con `break-after: avoid`, `orphans: 3`, `widows: 3`.
+  - `break-inside: avoid` applicato esclusivamente agli elementi brevi ($< 600$ caratteri); gli elementi lunghi scorrono liberamente tra le pagine per prevenire vuoti tipografici.
+- **Impaginazione Canti e Pagine Multiple:**
+  - Ogni canto inizia su una nuova pagina (`break-before: page !important`).
+  - Supporto nativo della direttiva ChordPro `{nuova_pagina}` per suddividere brani lunghi su 2 o più pagine.
+  - Nelle pagine successive alla prima ($N \ge 2$), la testata è ridotta al solo titolo con indicatore di pagina ("Titolo del Canto — 2/2"), omettendo metadati ripetuti (autore, tonalità, ritmo, capotasto).
+  - Gli accordi sono posizionati sopra il testo in nero grassetto (`oklch(0 0 0)`, `font-weight: 700`).
+  - La linea del ritornello è renderizzata con bordo nero solido a sinistra (`border-left: 3pt solid oklch(0 0 0)`).
+- **Algoritmo di Rilevamento Overflow e Riduzione Font (`src/lib/stampa.ts`):**
+  - Funzione `estimatePageOverflow(page, isFirstPage)`: stima l'altezza occupata confrontandola con la capienza utile di un foglio A4 ($756\text{ pt}$).
+  - Scala tipografica a 4 livelli decrescenti: $12.0\text{ pt} \rightarrow 11.0\text{ pt} \rightarrow 10.2\text{ pt} \rightarrow 9.5\text{ pt}$.
+  - Se il contenuto supera la capienza anche a $9.5\text{ pt}$, la pagina viene marcata con `fits: false` e la UI mostra l'avviso di overflow: *"Questa pagina non entra: aggiungi un'interruzione di pagina"*.
+- **Opzioni Avanzate del Fascicolo:**
+  - Copertina: prima pagina dedicata con `logo-completo` su targa chiara, titolo del fascicolo, data e contatore elementi.
+  - Indice Generale: seconda pagina con tabella dei contenuti ripartita per sezioni e calcolo dinamico dei numeri di pagina.
+  - Allegati Immagini: interruttore per includere le immagini allegate al termine di ciascun elemento. I documenti PDF non sono mai inseriti nella stampa.
+- **Preparazione ODG per Riunioni:**
+  - Scheda A4 compatta con data, luogo, responsabile, testo dell'evento e caselle quadrate stampabili `[ ]` per la spunta a penna dei punti all'ordine del giorno.
+- **Test Automatizzato Reale su Binario PDF (`test/stampa_pdf.spec.ts`):**
+  - Generazione di un file PDF reale tramite Playwright `page.pdf({ format: 'A4' })`.
+  - Parsing del binario con libreria `pdf-parse`: verifica automatizzata di 7 pagine complessive, testata ridotta "2/2", accordi e sillabe posizionati, caratteri speciali HTML (`<`, `&`, `"`, `'`) renderizzati senza entità grezze e totale assenza di pagine bianche non intenzionali.
 
 ---
 

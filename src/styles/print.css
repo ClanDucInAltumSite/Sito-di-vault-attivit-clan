@@ -6,7 +6,7 @@
 @media print {
   @page {
     size: A4 portrait;
-    margin: 12mm 10mm;
+    margin: 15mm 12mm;
   }
 
   /* Reset generale per risparmio inchiostro e leggibilità */
@@ -19,12 +19,44 @@
 
   html, body {
     background: oklch(1 0 0) !important;
-    font-size: 11pt !important;
-    line-height: 1.35 !important;
+    font-size: 12pt !important;
+    line-height: 1.4 !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: block !important;
+    overflow: visible !important;
+    overflow-x: visible !important;
+    overflow-y: visible !important;
   }
 
   #app {
+    display: block !important;
     padding-bottom: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  main {
+    display: block !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: auto !important;
+  }
+
+  .container {
+    display: block !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
   }
 
   /* Elementi dell'interfaccia da nascondere tassativamente */
@@ -41,114 +73,398 @@
   .pwa-update-banner,
   .ios-search-container,
   .search-container,
+  .stampa-screen-controls,
+  .stampa-screen-panel,
+  .stampa-overflow-banner,
+  .ios-segmented-control,
+  .topo-contour-wrapper,
+  .topo-ambient-glow,
+  .topo-svg-container,
+  .topo-altimeter-hud,
+  .scout-trail-svg,
+  .scout-compass-widget,
   button:not(.print-keep),
   input,
   select {
     display: none !important;
   }
 
-  /* 1. SEZIONE GIOCHI E BANS: Flusso continuo */
+  .stampa-preview-paper {
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Il contenitore di stampa occupa la larghezza completa */
+  .stampa-print-container {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* --- 1. COPERTINA E INDICE (Opzionali) --- */
+  .print-cover-page {
+    break-after: page;
+    page-break-after: always;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 240mm;
+    text-align: center;
+    padding: 20mm 10mm;
+  }
+
+  .print-cover-logo {
+    max-width: 180px;
+    max-height: 180px;
+    margin-bottom: 24pt;
+    object-fit: contain;
+  }
+
+  .print-cover-title {
+    font-size: 26pt;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin: 0 0 10pt;
+  }
+
+  .print-cover-subtitle {
+    font-size: 14pt;
+    font-style: italic;
+    color: oklch(0.2 0 0) !important;
+    margin: 0 0 20pt;
+  }
+
+  .print-cover-meta {
+    margin-top: 40pt;
+    font-size: 10.5pt;
+    color: oklch(0.3 0 0) !important;
+  }
+
+  .print-index-page {
+    break-after: page;
+    page-break-after: always;
+    padding-top: 10mm;
+  }
+
+  .print-index-title {
+    font-size: 18pt;
+    font-weight: 700;
+    border-bottom: 1.5pt solid oklch(0 0 0);
+    padding-bottom: 6pt;
+    margin-bottom: 16pt;
+  }
+
+  .print-index-section {
+    margin-bottom: 16pt;
+  }
+
+  .print-index-section-header {
+    font-size: 12pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 6pt;
+    border-bottom: 0.75pt solid oklch(0.3 0 0);
+    padding-bottom: 2pt;
+  }
+
+  .print-index-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 4pt 0;
+    border-bottom: 0.5pt dotted oklch(0.6 0 0);
+    font-size: 11pt;
+  }
+
+  .print-index-row-num {
+    font-weight: 700;
+    min-width: 20pt;
+    text-align: right;
+  }
+
+  /* --- 2. SEZIONE GIOCHI E BANS: Flusso continuo --- */
   .print-continuous {
     display: block;
     width: 100%;
   }
 
+  .print-section-header {
+    font-size: 16pt;
+    font-weight: 800;
+    border-bottom: 1.5pt solid oklch(0 0 0);
+    padding-bottom: 4pt;
+    margin: 18pt 0 12pt;
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
   .print-item-short {
-    /* Gli elementi brevi non si spezzano tra due pagine */
+    /* Elementi brevi (<600 char) non si spezzano tra pagine */
     break-inside: avoid;
     page-break-inside: avoid;
-    margin-bottom: 12pt;
-    padding-bottom: 8pt;
+    margin-bottom: 14pt;
+    padding-bottom: 10pt;
     border-bottom: 0.5pt solid oklch(0.5 0 0);
   }
 
   .print-item-long {
-    /* Gli elementi lunghi possono spezzarsi per non lasciare vuoti a fondo pagina */
+    /* Elementi lunghi (>=600 char) possono spezzarsi per non lasciare vuoti a fondo pagina */
     break-inside: auto;
     page-break-inside: auto;
-    margin-bottom: 14pt;
-    padding-bottom: 8pt;
+    margin-bottom: 16pt;
+    padding-bottom: 10pt;
     border-bottom: 0.5pt solid oklch(0.5 0 0);
   }
 
-  .print-title {
+  .print-title, .print-heading {
     break-after: avoid;
     page-break-after: avoid;
-    font-size: 13pt;
+    orphans: 3;
+    widows: 3;
+    font-size: 13.5pt;
     font-weight: 700;
-    margin-bottom: 4pt;
+    margin: 0 0 4pt;
   }
 
-  /* 2. SEZIONE CANTI: Ogni canto inizia su una pagina nuova */
-  .print-song {
-    break-before: page;
-    page-break-before: always;
+  .print-meta-line {
+    font-size: 9.5pt;
+    font-style: italic;
+    color: oklch(0.25 0 0) !important;
+    margin-bottom: 6pt;
   }
 
-  .print-song:first-of-type {
-    break-before: avoid;
-    page-break-before: avoid;
+  .print-body-text {
+    font-size: 11pt;
+    line-height: 1.4;
+    white-space: pre-wrap;
   }
 
-  /* Interruzione forzata manuale tramite tag {nuova_pagina} */
+  .print-subtitle-label {
+    font-size: 10pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin: 8pt 0 2pt;
+  }
+
+  /* --- 3. SEZIONE CANTI: Ogni canto inizia su una nuova pagina --- */
+  .print-song-wrapper {
+    display: block !important;
+    width: 100% !important;
+  }
+
+  .print-song-page {
+    break-before: page !important;
+    page-break-before: always !important;
+    display: block !important;
+    width: 100% !important;
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
+  /* Interruzione forzata manuale da {nuova_pagina} o {np} */
   .print-page-break {
     break-before: page !important;
     page-break-before: always !important;
-    height: 0;
+    height: 0 !important;
+    margin: 0 !important;
+    border: none !important;
   }
 
   .print-song-header {
     border-bottom: 1pt solid oklch(0 0 0);
-    margin-bottom: 8pt;
+    margin-bottom: 10pt;
     padding-bottom: 4pt;
+    break-after: avoid;
+    page-break-after: avoid;
   }
 
   .print-song-title {
-    font-size: 15pt;
+    font-size: 16pt;
     font-weight: 700;
+    margin: 0 0 2pt;
   }
 
   .print-song-meta {
-    font-size: 9pt;
+    font-size: 9.5pt;
     font-style: italic;
+    color: oklch(0.2 0 0) !important;
   }
 
-  /* Accordo sopra il testo in stampa */
-  .chord-syllable-pair {
-    display: inline-flex;
-    flex-direction: column;
-    vertical-align: bottom;
-    margin-right: 1px;
+  /* Intestazione ridotta per pagine successive (>= 2) */
+  .print-song-reduced-header {
+    border-bottom: 0.75pt solid oklch(0.3 0 0);
+    margin-bottom: 8pt;
+    padding-bottom: 3pt;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 10pt;
+    font-weight: 600;
+    break-after: avoid;
+    page-break-after: avoid;
   }
 
-  .chord-syllable-pair .chord {
-    font-size: 8pt;
-    font-weight: 700;
-    line-height: 1;
+  /* Accordo sopra il testo in stampa (nero pieno, font-weight 700) */
+  .song-chord,
+  .print-chord {
+    color: oklch(0 0 0) !important;
+    font-weight: 700 !important;
+    font-size: 0.82em !important;
+    line-height: 1.1 !important;
+  }
+
+  .song-unit {
+    display: inline-flex !important;
+    flex-direction: column !important;
+    vertical-align: bottom !important;
+  }
+
+  .song-chorus-block {
+    border-left: 2pt solid oklch(0 0 0) !important;
+    padding-left: 8pt !important;
+    margin: 8pt 0 !important;
+    background: transparent !important;
+  }
+
+  .song-chorus-label {
+    font-weight: 700 !important;
     color: oklch(0 0 0) !important;
   }
 
-  .chord-syllable-pair .syllable {
-    font-size: 10.5pt;
-    line-height: 1.2;
+  /* Step-down per overflow canti */
+  .print-font-12 { font-size: 12pt !important; }
+  .print-font-11-5 { font-size: 11.5pt !important; }
+  .print-font-11 { font-size: 11pt !important; }
+  .print-font-10-5 { font-size: 10.5pt !important; }
+  .print-font-10 { font-size: 10pt !important; }
+  .print-font-9-5 { font-size: 9.5pt !important; }
+
+  /* --- 4. IMMAGINI IN STAMPA (Solo immagini, mai PDF) --- */
+  .print-attachment-container {
+    margin-top: 10pt;
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 
-  /* 3. SEZIONE ODG: Scheda con caselle quadrate stampabili */
+  .print-attachment-image {
+    max-width: 100%;
+    max-height: 110mm;
+    object-fit: contain;
+    display: block;
+    margin: 4pt 0;
+    border: 0.5pt solid oklch(0.7 0 0);
+  }
+
+  .print-attachment-caption {
+    font-size: 8.5pt;
+    font-style: italic;
+    color: oklch(0.3 0 0) !important;
+  }
+
+  /* --- 5. SEZIONE ODG: Scheda con caselle quadrate stampabili (Preparatoria Fase 7) --- */
+  .print-odg-sheet {
+    break-before: page;
+    page-break-before: always;
+  }
+
+  .print-odg-header {
+    border-bottom: 1.5pt solid oklch(0 0 0);
+    padding-bottom: 6pt;
+    margin-bottom: 14pt;
+  }
+
   .print-odg-item {
     break-inside: avoid;
+    page-break-inside: avoid;
     display: flex;
     align-items: flex-start;
     gap: 8pt;
-    margin-bottom: 6pt;
+    margin-bottom: 8pt;
+    font-size: 11.5pt;
   }
 
-  .print-checkbox {
+  .print-odg-checkbox {
     display: inline-block;
-    width: 11pt;
-    height: 11pt;
-    border: 1.2pt solid oklch(0 0 0);
+    width: 12pt;
+    height: 12pt;
+    border: 1.5pt solid oklch(0 0 0);
     border-radius: 2pt;
     flex-shrink: 0;
     margin-top: 2pt;
+  }
+}
+
+/* ==============================================================================
+   Stili a Schermo per la Schermata Stampa (#/stampa)
+   ============================================================================== */
+@media screen {
+  .stampa-preview-paper {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+    padding: var(--space-6);
+    margin: var(--space-4) 0;
+    transition: all var(--duration-normal) var(--ease-ios);
+  }
+
+  .stampa-page-indicator {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-xs);
+    font-weight: 700;
+    background: var(--color-fill-tertiary);
+    color: var(--color-text-secondary);
+    margin-bottom: var(--space-2);
+  }
+
+  .stampa-overflow-alert {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-bans-bg);
+    border: 1px solid var(--color-bans-border);
+    border-radius: var(--radius-md);
+    color: var(--color-bans-text);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    margin: var(--space-3) 0;
+  }
+
+  .stampa-reorder-btn {
+    background: transparent;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: 4px 8px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-text);
+    min-width: 32px;
+    min-height: 32px;
+  }
+
+  .stampa-reorder-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+
+  .stampa-switch-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--color-border);
   }
 }

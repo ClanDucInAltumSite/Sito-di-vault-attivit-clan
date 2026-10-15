@@ -1,6 +1,5 @@
 -- ==============================================================================
 -- Migrazione 0005: Restrizione Permessi RPC (bump_sync_epoch e purge_old_tombstones)
--- e Policy di Sicurezza Storage
 -- Sito Vault Scout Clan — Duc In Altum
 -- ==============================================================================
 

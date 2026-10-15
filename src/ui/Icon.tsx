@@ -13,6 +13,7 @@ export type IconName =
   | 'chevron-right'
   | 'chevron-left'
   | 'chevron-down'
+  | 'chevron-up'
   | 'check'
   | 'compass'
   | 'wifi-off'
@@ -166,6 +167,12 @@ export function Icon({
       return (
         <svg {...commonProps}>
           <polyline points="6 9 12 15 18 9" />
+        </svg>
+      );
+    case 'chevron-up':
+      return (
+        <svg {...commonProps}>
+          <polyline points="18 15 12 9 6 15" />
         </svg>
       );
     case 'check':

@@ -8,7 +8,7 @@ import { Icon } from '../../ui/Icon';
 import { Badge } from '../../ui/Badge';
 import { useAdmin, logoutAdmin } from '../../lib/auth';
 import { getTrashItems, exportBackupJson } from '../../lib/admin_actions';
-import { getStorageUsageInfo, findOrphanStorageFiles, purgeOrphanStorageFiles } from '../../lib/attachments';
+import { getStorageUsageInfo, findOrphanStorageFiles, purgeOrphanStorageFiles, OrphanFileInfo } from '../../lib/attachments';
 import { downloadAllAttachmentsForOffline, getOfflineAttachmentStats } from '../../lib/storage-cache';
 import { AdminLoginModal } from './AdminLoginModal';
 import { TrashSheet } from './TrashSheet';
@@ -28,7 +28,7 @@ export function AdminView() {
     attachmentCount: number;
   }>({ usedFormatted: '0 B', totalFormatted: '1 GB', percent: 0, attachmentCount: 0 });
 
-  const [orphanPaths, setOrphanPaths] = useState<string[]>([]);
+  const [orphanFiles, setOrphanFiles] = useState<OrphanFileInfo[]>([]);
   const [isScanningOrphans, setIsScanningOrphans] = useState(false);
   const [isPurgingOrphans, setIsPurgingOrphans] = useState(false);
 
@@ -62,9 +62,9 @@ export function AdminView() {
     setIsScanningOrphans(true);
     try {
       const orphans = await findOrphanStorageFiles();
-      setOrphanPaths(orphans);
+      setOrphanFiles(orphans);
       if (orphans.length === 0) {
-        alert('Nessun file orfano rilevato nel bucket Storage!');
+        alert('Nessun file orfano rilevato nel bucket Storage!\n(Nota: i file appena caricati da meno di 24 ore o con riga nel cestino sono protetti).');
       }
     } catch (err: any) {
       alert(err.message || 'Errore scansione file orfani');
@@ -74,13 +74,21 @@ export function AdminView() {
   };
 
   const handlePurgeOrphans = async () => {
-    if (orphanPaths.length === 0) return;
-    if (!confirm(`Vuoi rimuovere definitivamente i ${orphanPaths.length} file orfani dallo Storage?`)) return;
+    if (orphanFiles.length === 0) return;
+    const fileListText = orphanFiles.map((f) => `- ${f.name} (${f.sizeFormatted}, caricato ${f.ageHours} ore fa)`).join('\n');
+    if (
+      !confirm(
+        `ATTENZIONE: Stai per eliminare DEFINITIVAMENTE i seguenti ${orphanFiles.length} file orfani (> 24 ore senza record):\n\n${fileListText}\n\nConfermi l'eliminazione definitiva dallo Storage?`
+      )
+    ) {
+      return;
+    }
 
     setIsPurgingOrphans(true);
     try {
-      await purgeOrphanStorageFiles(orphanPaths);
-      setOrphanPaths([]);
+      const paths = orphanFiles.map((f) => f.path);
+      await purgeOrphanStorageFiles(paths);
+      setOrphanFiles([]);
       await loadData();
       alert('File orfani rimossi con successo dallo Storage!');
     } catch (err: any) {
@@ -273,9 +281,9 @@ export function AdminView() {
               leading={<Icon name="file" size={20} />}
               title="File Orfani in Storage"
               subtitle={
-                orphanPaths.length > 0
-                  ? `${orphanPaths.length} file orfani individuati nel bucket`
-                  : 'Nessun file orfano rilevato'
+                orphanFiles.length > 0
+                  ? `${orphanFiles.length} file orfani individuati nel bucket (> 24h senza record)`
+                  : 'Nessun file orfano rilevato (protetti file < 24h o nel cestino)'
               }
               trailing={
                 <div style={{ display: 'flex', gap: '6px' }}>
@@ -287,7 +295,7 @@ export function AdminView() {
                   >
                     <span>Scansiona</span>
                   </Button>
-                  {orphanPaths.length > 0 && (
+                  {orphanFiles.length > 0 && (
                     <Button
                       variant="primary"
                       size="sm"
@@ -301,6 +309,57 @@ export function AdminView() {
                 </div>
               }
             />
+
+            {/* Elenco Dettagliato File Orfani (mostrato solo dopo scansione) */}
+            {orphanFiles.length > 0 && (
+              <div
+                style={{
+                  padding: 'var(--space-3) var(--space-4)',
+                  backgroundColor: 'var(--color-surface)',
+                  borderTop: '0.5px solid var(--color-border-subtle)',
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 'var(--font-size-xs)',
+                    fontWeight: 600,
+                    color: 'var(--color-ink)',
+                    marginBottom: 'var(--space-2)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.04em',
+                  }}
+                >
+                  Dettaglio File Orfani Rilevati ({orphanFiles.length}):
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {orphanFiles.map((f) => (
+                    <div
+                      key={f.path}
+                      style={{
+                        fontSize: 'var(--font-size-xs)',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '4px 0',
+                        borderBottom: '0.5px solid var(--color-border-subtle)',
+                      }}
+                    >
+                      <div style={{ display: 'flex', flexDirection: 'column', maxWidth: '70%' }}>
+                        <span style={{ fontWeight: 600, color: 'var(--color-text)', wordBreak: 'break-all' }}>
+                          {f.name}
+                        </span>
+                        <span style={{ color: 'var(--color-text-tertiary)', fontSize: '11px' }}>
+                          {f.path}
+                        </span>
+                      </div>
+                      <span style={{ color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', textAlign: 'right' }}>
+                        {f.sizeFormatted} • {f.ageHours}h fa
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Download Offline Allegati */}
             <GroupedRow
