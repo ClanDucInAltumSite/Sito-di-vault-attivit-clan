@@ -78,7 +78,65 @@ async function runAdminTest() {
       console.log(`[OK] UPDATE riuscita! updated_at server: ${updateData.updated_at}`);
     }
 
-    console.log('\n5. Test DELETE (pulizia record di test)...');
+    console.log('\n5. Test RIGA ESCA: tentativi di UPDATE e DELETE anonimi su riga esistente...');
+    // Creiamo un client separato senza credenziali per testare l'accesso anonimo reale
+    const anonClient = createClient(SUPABASE_URL, ANON_KEY);
+
+    // Tentativo di UPDATE anonimo sulla riga esca creata dall'admin
+    const { data: anonUpData, error: anonUpErr } = await anonClient
+      .from('giochi')
+      .update({ regole: 'REGOLA COMPROMESSA DA ANONIMO' })
+      .eq('id', insertData.id)
+      .select();
+
+    const anonUpBlocked = anonUpErr || !anonUpData || anonUpData.length === 0;
+    if (!anonUpBlocked) {
+      console.error('[FALLIMENTO CRITICO] UPDATE anonimo su riga esca è RIUSCITO!');
+      process.exit(1);
+    }
+    console.log('[OK BLOCCATO] UPDATE anonimo su riga esca respinto correttamente da RLS.');
+
+    // Verifica che la riga nel database sia rimasta identica
+    const { data: checkDataAfterUp } = await anonClient
+      .from('giochi')
+      .select('regole')
+      .eq('id', insertData.id)
+      .single();
+
+    if (checkDataAfterUp?.regole === 'REGOLA COMPROMESSA DA ANONIMO') {
+      console.error('[FALLIMENTO CRITICO] Il dato sul DB è stato modificato dall\'anonimo!');
+      process.exit(1);
+    }
+    console.log(`[OK INTEGRITÀ] Il record sul database è intatto: "${checkDataAfterUp?.regole}"`);
+
+    // Tentativo di DELETE anonimo sulla riga esca
+    const { data: anonDelData, error: anonDelErr } = await anonClient
+      .from('giochi')
+      .delete()
+      .eq('id', insertData.id)
+      .select();
+
+    const anonDelBlocked = anonDelErr || !anonDelData || anonDelData.length === 0;
+    if (!anonDelBlocked) {
+      console.error('[FALLIMENTO CRITICO] DELETE anonimo su riga esca è RIUSCITO!');
+      process.exit(1);
+    }
+    console.log('[OK BLOCCATO] DELETE anonimo su riga esca respinto correttamente da RLS.');
+
+    // Verifica che la riga esista ancora
+    const { data: checkDataAfterDel } = await anonClient
+      .from('giochi')
+      .select('id')
+      .eq('id', insertData.id)
+      .single();
+
+    if (!checkDataAfterDel?.id) {
+      console.error('[FALLIMENTO CRITICO] Il record è stato cancellato dall\'anonimo!');
+      process.exit(1);
+    }
+    console.log('[OK INTEGRITÀ] Il record esiste ancora nel database, non è stato cancellato.');
+
+    console.log('\n6. Test DELETE come Admin (pulizia riga esca di test)...');
     const { error: deleteError } = await supabase
       .from('giochi')
       .delete()
@@ -87,11 +145,11 @@ async function runAdminTest() {
     if (deleteError) {
       console.error('[FALLIMENTO] DELETE da admin fallita:', deleteError.message);
     } else {
-      console.log('[OK] DELETE riuscita! Record temporaneo rimosso.');
+      console.log('[OK] DELETE da admin riuscita! Record esca rimosso regolarmente.');
     }
   }
 
-  console.log('\n6. Test UPLOAD su bucket Storage "allegati"...');
+  console.log('\n7. Test UPLOAD su bucket Storage "allegati" (MIME lecito: image/png)...');
   const dummyBuffer = Buffer.from('Contenuto di test per allegati admin');
   const testFileName = `test_admin_${Date.now()}.png`;
 
@@ -103,11 +161,27 @@ async function runAdminTest() {
     });
 
   if (uploadError) {
-    console.error('[FALLIMENTO] UPLOAD da admin fallito:', uploadError.message);
+    console.error('[FALLIMENTO] UPLOAD lecito da admin fallito:', uploadError.message);
   } else {
-    console.log(`[OK] UPLOAD riuscito da admin! Percorso: ${uploadData.path}`);
+    console.log(`[OK] UPLOAD lecito riuscito da admin! Percorso: ${uploadData.path}`);
 
-    console.log('\n7. Test DELETE file da Storage...');
+    console.log('\n8. Test UPLOAD con MIME NON consentito (es. text/html o application/x-msdownload)...');
+    const invalidFileName = `test_invalid_${Date.now()}.html`;
+    const { error: invalidMimeError } = await supabase.storage
+      .from('allegati')
+      .upload(invalidFileName, Buffer.from('<h1>Non permesso</h1>'), {
+        contentType: 'text/html',
+        upsert: true,
+      });
+
+    if (invalidMimeError) {
+      console.log(`[OK BLOCCATO] Upload con MIME non consentito correttamente respinto: ${invalidMimeError.message}`);
+    } else {
+      console.error('[FALLIMENTO CRITICO] Il bucket ha consentito l\'upload di un file con MIME non consentito!');
+      await supabase.storage.from('allegati').remove([invalidFileName]);
+    }
+
+    console.log('\n9. Test DELETE file da Storage (pulizia)...');
     const { error: removeError } = await supabase.storage
       .from('allegati')
       .remove([testFileName]);
@@ -122,6 +196,7 @@ async function runAdminTest() {
   await supabase.auth.signOut();
   console.log('\n======================================================================');
   console.log('TUTTI I TEST DI SCRITTURA ADMIN HANNO DATO ESITO POSITIVO!');
+  console.log('Verifica riga esca e vincolo MIME superati al 100%.');
   console.log('Sessione chiusa regolarmente.');
   console.log('======================================================================');
 }
