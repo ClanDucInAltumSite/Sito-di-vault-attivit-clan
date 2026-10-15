@@ -64,6 +64,23 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,webp}'],
         cleanupOutdatedCaches: true,
         navigateFallback: `${basePath}index.html`,
+        navigateFallbackAllowlist: [/^(?!\/__).*/],
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/.*\.supabase\.co\/storage\/v1\/object\/public\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'supabase-storage-cache',
+              expiration: {
+                maxEntries: 150,
+                maxAgeSeconds: 60 * 24 * 60 * 60, // 60 giorni
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
+          },
+        ],
       },
     }),
   ],

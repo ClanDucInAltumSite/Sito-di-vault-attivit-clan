@@ -227,3 +227,41 @@ Regole vincolanti applicate a tutte le fasi a partire dalla Fase 2:
 - **Copertura UI:** Ogni nuova schermata va aggiunta a `verify:ui` (Playwright) e alla vista di collaudo `#/design`.
 - **Gestione Ambiguità:** Se un requisito è ambiguo, scegliere l'opzione più semplice, annotarla in `docs/DECISIONS.md` e procedere. Chiedere solo in caso di blocco.
 
+---
+
+## ADR-0008: Architettura Motore di Sincronizzazione Offline, IndexedDB e Gestione Concorrenza (Fase 2)
+
+### Stato
+Accettata e implementata (Fase 2).
+
+### Contesto
+L'applicazione deve funzionare in modo rapido e affidabile all'aperto senza connettività internet (campi scout, uscite in montagna). I dati devono essere disponibili all'istante all'avvio, la UI non deve mai mostrare schermate bianche in caso di caduta di rete o timeout, e i dati sul dispositivo devono convergere in modo deterministico con il backend Supabase senza rischio di corruzione o perdita della cronologia locale.
+
+### Decisioni Architetturali Adottate
+1. **Lettura Esclusiva da IndexedDB:** La UI non interroga mai Supabase direttamente per visualizzare schermate o elenchi. Tutte le query dei componenti (`HomeView`, sezioni tematiche, card) leggono esclusivamente dallo storage locale IndexedDB (`scout_vault_db`).
+2. **Sostituzione Atomica Transazionale (`atomicFullReplace`):**
+   - Durante il primo download e il Full Resync, i record di tutte le tabelle vengono scaricati per intero in una struttura dati temporanea in memoria (`tempData`).
+   - Solo a completamento avvenuto con successo dell'intero download, IndexedDB viene aggiornato all'interno di una singola transazione `readwrite` di `idb` che cancella i vecchi record e inserisce i nuovi per tutti gli object stores.
+   - È vietato svuotare IndexedDB prima del download. In caso di interruzione o errore di rete a metà operazione, la transazione non viene aperta e i dati locali preesistenti rimangono intatti e consultabili.
+3. **Sincronizzazione Incrementale e Server Time:**
+   - Ciascuna tabella traccia il proprio cursore `updated_at`.
+   - Il cursore è guidato unicamente dal tempo restituito dal server PostgreSQL (`server_time`), evitando qualsiasi dipendenza o deriva dall'orologio interno del client (che potrebbe essere errato o alterato).
+   - È applicata una sovrapposizione di sicurezza di 10 secondi (`SAFETY_OVERLAP_MS = 10_000`) per assorbire disallineamenti di clock e transazioni contemporanee su Supabase.
+   - Le scritture locali sono idempotenti tramite `upsertRecords`.
+4. **Timeout Differenziati e Conservazione Tombstone:**
+   - **Pull incrementale rapida:** Timeout breve di 4 secondi (`TIMEOUT_INCREMENTAL_MS = 4_000`). Se la rete è lenta, l'operazione abortisce senza bloccare l'utente e il sistema ritenta in background al trigger successivo.
+   - **Full Resync / Primo Avvio:** Timeout esteso a 25 secondi (`TIMEOUT_FULL_SYNC_MS = 25_000`) con gestione automatica della ripresa.
+   - **Soglia Tombstone a 180 giorni:** Se il tempo trascorso dall'ultima sincronizzazione riuscita supera i 180 giorni (`TOMBSTONE_RETENTION_DAYS = 180`), la sincronizzazione incrementale viene scartata e viene forzato un Full Resync atomico.
+5. **Soft Delete Gerarchica:**
+   - I metodi di lettura locale (`getOdgPunti`, `getAllegati`) verificano la validità del genitore corrispondente (`evento_id`, `gioco_id`, `ban_id`, `canto_id`).
+   - Se il record genitore è cancellato (`deleted_at != null`), i record figli vengono automaticamente filtrati ed esclusi dalla UI.
+   - In caso di annullamento dell'eliminazione del genitore, i figli ritornano visibili contestualmente.
+6. **Realtime come Segnale Puro (Payload Ignorato):**
+   - L'applicazione ascolta gli eventi WebSocket di Supabase (`postgres_changes` su schema `public`), ma ignora deliberatamente il payload inviato nel messaggio per non rischiare inconsistenze o vulnerabilità.
+   - L'evento funge unicamente da segnale di invalidazione per innescare una pull incrementale debounced (300 ms).
+7. **PWA, Persistenza Storage e Codice Diviso:**
+   - Attivazione di `navigator.storage.persist()` all'avvio per prevenire l'eviction di IndexedDB da parte di iOS WebKit (policy 7 giorni) e Android.
+   - Guida contestuale non invasiva per l'installazione su Schermata Home (iOS Safari e Android).
+   - Code splitting delle viste secondarie tramite `lazy` e `Suspense` nativi di `preact/compat` per ridurre il peso del bundle iniziale di primo avvio.
+
+

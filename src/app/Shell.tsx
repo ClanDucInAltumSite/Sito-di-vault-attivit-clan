@@ -6,20 +6,25 @@ import { AdminLoginModal } from '../features/admin/AdminLoginModal';
 import { Icon, IconName } from '../ui/Icon';
 import { BrandLogo } from '../ui/BrandLogo';
 import { TopographicBackground } from '../ui/TopographicBackground';
+import { CompassSync } from '../ui/ScoutMotifs';
 
 export interface ShellProps {
   isOnline: boolean;
+  isSyncing?: boolean;
   lastSyncTime: string | null;
   pwaNeedRefresh: boolean;
   onPwaUpdate: () => void;
+  onManualSync?: () => void;
   children: any;
 }
 
 export function Shell({
   isOnline,
+  isSyncing = false,
   lastSyncTime,
   pwaNeedRefresh,
   onPwaUpdate,
+  onManualSync,
   children,
 }: ShellProps) {
   const { route } = useRoute();
@@ -35,6 +40,7 @@ export function Shell({
     stampa: I18N.stampa.title,
     admin: I18N.nav.admin,
     design: 'Sistema di Design',
+    'stato-dati': 'Stato Dati e Sync',
   };
 
   const navItems: { id: RouteName; label: string; icon: IconName }[] = [
@@ -44,6 +50,10 @@ export function Shell({
     { id: 'canti', label: I18N.nav.canti, icon: 'canti' },
     { id: 'calendario', label: I18N.nav.calendario, icon: 'calendario' },
   ];
+
+  const formattedSyncTime = lastSyncTime
+    ? new Date(lastSyncTime).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' })
+    : I18N.status.neverSynced;
 
   return (
     <>
@@ -64,11 +74,11 @@ export function Shell({
         </div>
       ) : null}
 
-      {/* Banner Offline con indicazione data e ora */}
+      {/* Banner Offline con indicazione data e ora dell'ultimo aggiornamento */}
       {!isOnline ? (
         <div className="ios-banner-offline" role="status">
           <Icon name="wifi-off" size={16} />
-          <span>{I18N.status.offlineBanner(lastSyncTime || I18N.status.neverSynced)}</span>
+          <span>{I18N.status.offlineBanner(formattedSyncTime)}</span>
         </div>
       ) : null}
 
@@ -104,6 +114,25 @@ export function Shell({
         </div>
 
         <div className="ios-top-bar-trailing">
+          {/* Indicatore e Pulsante Sincronizzazione con Bussola Scout Animata */}
+          <button
+            type="button"
+            className="ios-btn ios-btn-ghost ios-btn-sm"
+            onClick={onManualSync || (() => navigate('stato-dati'))}
+            aria-label={isSyncing ? 'Sincronizzazione in corso' : 'Sincronizza archivio'}
+            title={
+              isSyncing
+                ? 'Sincronizzazione in corso…'
+                : lastSyncTime
+                ? `Ultimo aggiornamento: ${formattedSyncTime}. Tocca per sincronizzare`
+                : 'Aggiorna ora'
+            }
+            disabled={!isOnline && !isSyncing}
+            style={{ padding: '0 6px', minWidth: '36px' }}
+          >
+            <CompassSync isSyncing={isSyncing} size={20} />
+          </button>
+
           {/* Scorciatoia Centro Stampa */}
           <button
             type="button"
@@ -111,7 +140,7 @@ export function Shell({
             onClick={() => navigate('stampa')}
             aria-label={I18N.nav.stampa}
             title={I18N.nav.stampa}
-            style={{ padding: '0 8px', minWidth: '40px' }}
+            style={{ padding: '0 8px', minWidth: '38px' }}
           >
             <Icon name="stampa" size={20} />
           </button>

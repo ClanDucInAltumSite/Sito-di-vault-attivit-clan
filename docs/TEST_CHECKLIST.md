@@ -59,15 +59,68 @@ Questo documento definisce la matrice dei test per ciascuna fase di sviluppo del
 
 ---
 
+## FASE 2 — Dati e Offline (Sync Engine, IndexedDB, PWA)
+
+- [x] **201. Architettura IndexedDB (`src/lib/db.ts`):**
+  - Database locale `scout_vault_db` versione 1 gestito tramite libreria leggera `idb`.
+  - Object Stores per tutte le 6 tabelle di contenuto (`giochi`, `bans`, `canti`, `eventi`, `odg_punti`, `allegati`) e metadati di sincronizzazione (`sync_meta`).
+  - Indici di supporto per cursori temporali (`by_updated_at`), soft-delete (`by_deleted_at`) e foreign keys relazionali (`by_evento`, `by_gioco`, `by_ban`, `by_canto`).
+  - La UI legge SEMPRE dallo storage IndexedDB locale; nessuna dipendenza diretta da chiamate di rete nei componenti di vista.
+- [x] **202. Sostituzione Atomica Transazionale (`atomicFullReplace`):**
+  - Download di tutti i dati in un buffer in memoria (`tempData`).
+  - Sostituzione di tutti gli object stores in un'unica transazione atomica `readwrite`.
+  - Nessuno svuotamento preliminare del database: se la rete cade o si verifica un timeout a metà scaricamento, i record locali preesistenti rimangono integri al 100%.
+- [x] **203. Sincronizzazione Incrementale e Server Time:**
+  - Tracciamento dei cursori `updated_at` specifici per ciascuna tabella.
+  - Cursore guidato esclusivamente dal timestamp del server Supabase, indipendente dall'orologio del dispositivo.
+  - Sovrapposizione di sicurezza di 10 secondi (`SAFETY_OVERLAP_MS = 10_000`) per assorbire skew di clock e transazioni simultanee.
+  - Scritture locali idempotenti (`upsertRecords`).
+- [x] **204. Timeout e Conservazione Tombstone:**
+  - Timeout pull incrementale a 4 secondi (`TIMEOUT_INCREMENTAL_MS = 4_000`).
+  - Timeout full resync a 25 secondi (`TIMEOUT_FULL_SYNC_MS = 25_000`) con ripresa.
+  - Se l'ultima sync riuscita è più vecchia di 180 giorni (`TOMBSTONE_RETENTION_DAYS = 180`), viene scartata la pull incrementale e avviato un Full Resync atomico.
+- [x] **205. Soft-Delete Gerarchica:**
+  - `getOdgPunti` e `getAllegati` nascondono automaticamente i record correlati se il record genitore (`evento`, `gioco`, `ban`, `canto`) ha `deleted_at != null`.
+  - Il ripristino del genitore (un-delete) rende nuovamente visibili i figli correlati.
+- [x] **206. Realtime come Segnale Puro:**
+  - Sottoscrizione al canale PostgreSQL `public` via WebSocket.
+  - Payload ignorato: il messaggio serve unicamente come trigger per una sincronizzazione incrementale debounced (300 ms).
+  - Triggers di sync gestiti: avvio app, ritorno online (`online`), riattivazione visibilità (`visibilitychange`), Realtime.
+- [x] **207. Stato Visibile, PWA e Storage Persistente:**
+  - Banner di stato offline con data e ora dell'ultimo aggiornamento sincronizzato.
+  - Indicatore bussola animato (`CompassSync`) con rotazione continua dell'ago durante la sincronizzazione attiva e allineamento fisso a Nord (0°) a sincronizzazione conclusa.
+  - Pulsante "Aggiorna ora" per sincronizzazione manuale on-demand nella barra superiore e nella vista di stato.
+  - Richiesta `navigator.storage.persist()` al mount per prevenire l'eliminazione da parte del browser.
+  - Guida contestuale all'installazione PWA (iOS Safari e Android) con dismiss salvato in localStorage.
+- [x] **208. Schermata di Verifica Stato Dati (`#/stato-dati`):**
+  - Nuova vista dedicata con conteggi totali, attivi e tombstone per ciascuna delle 6 tabelle.
+  - Visualizzazione cursori server, stato connettività (Online/Offline), log errori e pulsanti per test manuale e Full Resync forzato.
+- [x] **209. Suite Test Unitari Automatizzati (`test/sync_engine.test.ts`):**
+  - 7 scenari su 7 superati con successo:
+    1. Propagazione corretta dei tombstone (soft-delete).
+    2. Ritorno online dopo giorni con cursore e sovrapposizione temporale di 10s.
+    3. Fallimento full resync durante il download: IndexedDB non viene corrotto e mantiene i dati preesistenti.
+    4. Idempotenza delle scritture (doppia scrittura produce stesso stato).
+    5. Soft-delete gerarchica di punti ODG e allegati con genitore eliminato.
+    6. Realtime come puro segnale di invalidazione (payload WebSocket ignorato).
+    7. Timeout pull incrementale (4s): gestione errore senza blocco né schermate vuote.
+- [x] **210. Suite Test Playwright e Accessibilità (`test/verify_ui.spec.ts`):**
+  - 14 test su 14 superati (inclusa la verifica e l'audit WCAG AA axe-core su `#/stato-dati`).
+
+---
+
 ## Comandi di Verifica
 
 ```bash
-# 1. Esecuzione test unitari e controlli statici (11 test)
+# 1. Esecuzione test unitari e suite di sincronizzazione offline (18 test)
 npm test
 
-# 2. Esecuzione verifica reattiva e accessibilità Playwright (13 test)
+# 2. Esecuzione verifica reattiva e accessibilità Playwright (14 test)
 npm run verify:ui
 
 # 3. Compilazione TypeScript e build bundle Vite
 npm run build
+
+# 4. Audit di sicurezza live Supabase (con Anon Key)
+node supabase/tests/run_security_check.mjs
 ```

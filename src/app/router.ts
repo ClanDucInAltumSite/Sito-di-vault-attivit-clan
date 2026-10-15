@@ -8,7 +8,8 @@ export type RouteName =
   | 'calendario'
   | 'stampa'
   | 'admin'
-  | 'design';
+  | 'design'
+  | 'stato-dati';
 
 export interface RouteState {
   route: RouteName;
@@ -37,6 +38,7 @@ function parseHash(hashString: string): RouteState {
   else if (path === 'stampa') route = 'stampa';
   else if (path === 'admin') route = 'admin';
   else if (path === 'design') route = 'design';
+  else if (path === 'stato-dati') route = 'stato-dati';
 
   return { route, params, hash: hashString };
 }

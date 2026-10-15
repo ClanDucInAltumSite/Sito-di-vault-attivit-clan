@@ -49,34 +49,42 @@ L'applicazione è progettata secondo il paradigma **Local-First PWA (Progressive
 │   ├── app/
 │   │   ├── App.tsx               # Root component con gestione shell e banner
 │   │   ├── router.ts             # Router reattivo basato su Hash (#/)
-│   │   └── Shell.tsx             # Layout principale con TopBar, BottomNav e indicatori di stato
+│   │   └── Shell.tsx             # Layout principale con TopBar, BottomNav e indicatori di stato (CompassSync)
 │   ├── features/
-│   │   ├── home/                 # Schermata Home (scorciatoie rapide, prossimo evento)
+│   │   ├── home/                 # Schermata Home viva (conteggi IndexedDB, prossimo evento, aggiunti di recente)
 │   │   ├── giochi/               # Lista card, dettaglio, filtri ricerca e modale CRUD admin
 │   │   ├── bans/                 # Lista, dettaglio con vista lettura ad alto contrasto, Wake Lock
 │   │   ├── canti/                # Lista canti, vista esecuzione (accordi, trasposizione), editor live ChordPro
 │   │   ├── calendario/           # Vista mensile, lista prossimi eventi, gestione ODG con riporto
 │   │   ├── stampa/               # Schermata selezione elementi, preview impaginata e CSS print
-│   │   └── admin/                # Schermata gestione: cestino, backup/restore JSON, stato storage
+│   │   ├── admin/                # Schermata gestione: cestino, backup/restore JSON, stato storage
+│   │   ├── design/               # Vetrina del design system Apple-Grade (#/design)
+│   │   └── statodati/            # Schermata di verifica stato sincronizzazione e IndexedDB (#/stato-dati)
 │   ├── lib/
 │   │   ├── i18n.ts               # FILE UNICO per tutte le stringhe, etichette e messaggi UI
 │   │   ├── supabase.ts           # Inizializzazione client Supabase con Anon Key
-│   │   ├── db.ts                 # Schema e wrapper IndexedDB con libreria idb (transazioni atomiche)
-│   │   ├── sync.ts               # Macchina di sincronizzazione (full atomico, incrementale, tombstone)
+│   │   ├── db.ts                 # Schema e wrapper IndexedDB con idb (transazione atomica, query, soft-delete)
+│   │   ├── sync.ts               # Macchina di sincronizzazione (full atomico, incrementale, tombstone, timeout)
+│   │   ├── photos.ts             # Configurazione e placeholder WebP per le 5 fotografie d'intestazione
 │   │   ├── search.ts             # Motore di ricerca normalizzato con Levenshtein calibrato e token match
 │   │   ├── chordpro.ts           # Parser ChordPro, trasposizione tonale, validatore e AST
 │   │   ├── print.ts              # Logica e stili di stampa A4 continua e canti pagina-singola
 │   │   ├── storage-cache.ts      # Cache API per download allegati e gestione offline
 │   │   └── wakelock.ts           # Wrapper Screen Wake Lock API con fallback e re-lock
 │   ├── ui/
-│   │   ├── Button.tsx            # Pulsante accessibile con stile distintivo scout (cucitura/bordo)
+│   │   ├── BrandLogo.tsx         # Logo ufficiale completo o emblema su targa bianca con fallback
+│   │   ├── HeaderBanner.tsx      # Testata responsive con foto WebP, scrim viola e metadati
+│   │   ├── ScoutMotifs.tsx       # Motivi vettoriali scout: LogoReveal, TheTrail, CompassSync
+│   │   ├── PwaInstallGuide.tsx   # Guida contestuale all'installazione su Schermata Home iOS/Android
+│   │   ├── SectionIcon.tsx       # Quadratini arrotondati pieni per ogni sezione
+│   │   ├── Button.tsx            # Pulsante accessibile
 │   │   ├── Card.tsx              # Card contenitore per giochi, bans ed eventi
 │   │   ├── Modal.tsx             # Finestra modale con focus trap e conferma distruttiva a 2 step
 │   │   ├── SearchBar.tsx         # Barra di ricerca con debounce (~200ms) e pulsante reset
 │   │   ├── Toast.tsx             # Notifiche discrete (online/offline, aggiornamento PWA)
 │   │   └── Badge.tsx             # Badge colorati per tipo evento, tonalità, tempo
 │   ├── styles/
-│   │   ├── tokens.css            # Variabili CSS in coordinate OKLCH (palette logo, griglia 8pt, Inter)
+│   │   ├── tokens.css            # Variabili CSS in coordinate OKLCH (palette logo, inchiostro viola, Inter)
 │   │   ├── components.css        # Stili componenti Apple (grouped lists, bottom sheets, translucent bars)
 │   │   ├── global.css            # Reset, stili base accessibili, safe-area iOS, tabular-nums
 │   │   └── print.css             # Regole @media print per la stampa A4 in OKLCH (elementi lunghi e brevi)

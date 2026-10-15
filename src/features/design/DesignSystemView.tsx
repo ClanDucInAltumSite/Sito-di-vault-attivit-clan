@@ -1,4 +1,5 @@
 import { useState } from 'preact/hooks';
+import { navigate } from '../../app/router';
 import { Button } from '../../ui/Button';
 import { GroupedList } from '../../ui/GroupedList';
 import { GroupedRow } from '../../ui/GroupedRow';
@@ -363,6 +364,17 @@ export function DesignSystemView() {
           subtitle="Compare dal basso sopra la barra di navigazione"
           chevron
           onClick={() => setShowToast(true)}
+        />
+      </GroupedList>
+
+      {/* 14. SCHERMATE DI SISTEMA & COLLAUDO */}
+      <GroupedList header="14. SCHERMATE DI SISTEMA & COLLAUDO">
+        <GroupedRow
+          leading={<Icon name="refresh" size={20} />}
+          title="Schermata Stato Dati (FASE 2)"
+          subtitle="Verifica conteggi tabelle, tombstone, cursori e Supabase"
+          chevron
+          onClick={() => navigate('stato-dati')}
         />
       </GroupedList>
 
