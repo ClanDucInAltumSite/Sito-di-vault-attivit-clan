@@ -104,12 +104,15 @@ Tocca il pulsante **"Accedi"** in alto a destra. Inserisci l'email e la password
 ### Cestino e Ripristino:
 Quando cancelli un elemento, questo viene spostato nel **Cestino** per 180 giorni. Un elemento cancellato per sbaglio può sempre essere ripristinato da qualsiasi capo.
 
-### Backup dei Dati:
+### Backup dei Dati e Conservazione Allegati:
 Ogni mese (o prima di grandi uscite):
 1. Entra nel menu **Admin**.
-2. Tocca **"Esporta Backup JSON"**.
-3. Verrà scaricato un file compatto con l'intero database. Conservalo nel Google Drive di Clan o condividilo su WhatsApp/email tra i capi.
-4. Per ripristinare il database da un backup, tocca **"Ripristina da Backup JSON"**: l'anteprima differenziale ti mostrerà esattamente cosa verrà aggiunto o aggiornato prima di applicare le modifiche.
+2. **Backup Dati JSON:** Tocca **"Esporta"** accanto a *"Backup Completo (JSON)"*. Verrà scaricato un file compatto con tutti i testi, accordi, date e punti ODG. Conservalo nel Google Drive di Clan o sulla cartella condivisa dei capi.
+   - **ATTENZIONE:** Il file JSON contiene tutti i dati del database, ma **NON contiene i file fisici (foto e PDF)** caricati nello Storage!
+3. **Conservazione delle Foto e dei PDF:**
+   - **Dal sito:** Nel pannello Admin, tocca **"Esporta Elenco"** accanto a *"Elenco File Allegati in Storage"* per scaricare il file JSON con tutti i collegamenti diretti; poi tocca **"Scarica tutto"** su *"Archivio Offline Allegati"* per salvare tutti i documenti nella cache del tuo dispositivo.
+   - **Da Supabase:** Una volta ogni qualche mese, accedi a Supabase -> *Storage* -> cartella `allegati` e scarica una copia locale dei file sul computer della staff.
+4. Per ripristinare il database da un backup JSON, tocca **"Ripristina da Backup JSON"**: l'anteprima differenziale ti mostrerà esattamente cosa verrà aggiunto o aggiornato prima di applicare le modifiche.
 
 ---
 

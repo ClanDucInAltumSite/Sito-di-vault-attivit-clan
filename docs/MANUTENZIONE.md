@@ -1,0 +1,69 @@
+# Guida alla Manutenzione — Sito Vault Scout Clan
+
+Questo documento descrive in italiano semplice e accessibile (pensato per i capi scout non programmatori) l'elenco di tutte le credenziali e i servizi esterni utilizzati dal sito, e la procedura di manutenzione periodica consigliata.
+
+---
+
+## 1. Elenco dei Servizi e delle Credenziali
+
+L'applicazione del Vault di Clan è un'architettura a **costo zero** basata su tre piattaforme cloud affidabili:
+
+| Servizio | Ruolo nel Sistema | Accesso / URL | Credenziali Necessarie |
+| :--- | :--- | :--- | :--- |
+| **GitHub** | Repository del codice, hosting del sito web (GitHub Pages) e automazioni CI/CD. | [Repository GitHub](https://github.com/ClanDucInAltumSite/Sito-di-vault-attivit-clan) | Account GitHub con permessi di amministratore sul repository (`ClanDucInAltumSite`). |
+| **Supabase** | Database PostgreSQL online, archivio Storage per file allegati (foto e PDF) e autenticazione capi. | [Dashboard Supabase](https://supabase.com/dashboard/project/lpeiyzwccedtqjbficjo) | Email account Supabase del clan. Per il sito: credenziali Admin Capi (`clan.ducinaltum@gmail.com`). |
+| **cron-job.org** | Servizio esterno di sentinella che invia un ping automatico ogni 2 giorni per evitare che Supabase vada in pausa. | [cron-job.org Console](https://cron-job.org) | Account gratuito su cron-job.org (registrato con l'email di branca del Clan). |
+
+### Chiavi e Segreti (Cosa sono e dove risiedono)
+- **`VITE_SUPABASE_URL`:** L'indirizzo web dell'istanza database (`https://lpeiyzwccedtqjbficjo.supabase.co`). È pubblico e configurato nel file `index.html` e nelle variabili di ambiente.
+- **`VITE_SUPABASE_ANON_KEY`:** La chiave pubblica anonima di Supabase. Consente al browser di leggere i dati pubblici (giochi, bans, canti, calendario). Non permette alcuna scrittura se non autenticati con login capo.
+- **Password Capi (Admin):** L'unica password riservata che permette ai capi di accedere all'area Admin, creare e modificare contenuti. Non è salvata in chiaro in nessun file e risiede cifrata nel database di Supabase Auth.
+- **`service_role` (DIVIETO ASSOLUTO):** Questa chiave di super-amministratore **NON deve mai essere inserita né usata** nel repository o nel frontend, per nessun motivo.
+
+---
+
+## 2. Cosa Fare Ogni Mese (Routine di 5 Minuti)
+
+Per garantire che l'archivio rimanga sempre attivo, veloce e protetto da qualsiasi imprevisto, un capo incaricato della pattuglia logistica/comunicazione dovrebbe svolgere questi semplici passaggi una volta al mese:
+
+### 1. Controllo di Vitalità del Database (Anti-Pausa)
+- **Cosa succede:** Supabase (nel piano gratuito) mette automaticamente in pausa i progetti se trascorrono 7 giorni consecutivi senza alcuna richiesta al database.
+- **Cosa fare:**
+  - Aprire semplicemente il sito web dallo smartphone o dal computer una volta alla settimana, oppure verificare che l'email del clan non abbia ricevuto avvisi da Supabase o da `cron-job.org`.
+  - Se il database dovesse andare in pausa, basta accedere alla dashboard di Supabase e cliccare sul pulsante verde **"Restore Project"** (il ripristino richiede circa 2 minuti e nessun dato viene perso).
+
+### 2. Backup di Sicurezza dei Dati (JSON)
+- **Cosa fare:**
+  1. Accedere al sito ed effettuare il login come Admin (tasto *"Admin"* nella barra superiore).
+  2. Nella sezione *"GESTIONE ARCHIVIO E DATI"*, toccare il pulsante **"Esporta"** accanto a *"Backup Completo (JSON)"*.
+  3. Viene scaricato un file con data del tipo `vault-scout-backup-2026-10-16.json`.
+  4. Salvare questo file nella cartella Google Drive del Clan o su una chiavetta USB della staff.
+  - *Nota Importante:* Questo file contiene tutti i testi, le regole, i canti con accordi, le date e gli Ordini del Giorno. Non include i file binari fisici (PDF e foto) caricati nello Storage.
+
+### 3. Esportazione e Conservazione degli Allegati
+- **Cosa fare:**
+  1. Nella stessa schermata Admin, alla riga *"Archivio Offline Allegati"*, toccare **"Scarica tutto"** (o "Aggiorna"). In questo modo tutti i documenti PDF e le foto vengono scaricati nella memoria locale del dispositivo.
+  2. In alternativa, per fare una copia locale sul computer, accedere alla dashboard di Supabase -> sezione **Storage** -> cartella `allegati` -> selezionare e scaricare i file sul PC.
+
+### 4. Verifica dello Spazio Occupato in Storage
+- **Cosa fare:**
+  1. Nel pannello Admin, controllare la riga *"Spazio Storage Utilizzato"*: mostra la percentuale di spazio occupato rispetto a 1 GB gratuito (es. `2.4%`).
+  2. Toccare il pulsante **"Scansiona"** accanto a *"File Orfani in Storage"*.
+  3. Se compaiono file vecchi non più associati ad alcun gioco o canto, toccare *"Ripulisci"* per liberare spazio.
+
+### 5. Verifica Workflow GitHub Actions (Regola dei 60 Giorni)
+- **Cosa succede:** GitHub sospende automaticamente le azioni pianificate se il repository rimane senza commit per 60 giorni. Il sistema include un meccanismo automatico di *heartbeat*, ma se il clan rimane inattivo per tutta l'estate è consigliato fare un controllo.
+- **Cosa fare:**
+  - Aprire la pagina delle [Actions su GitHub](https://github.com/ClanDucInAltumSite/Sito-di-vault-attivit-clan/actions).
+  - Verificare che il workflow `Keepalive Supabase & Repository` mostri l'icona verde di successo. Se compare un avviso giallo di inattività, cliccare su *"Enable workflow"*.
+
+---
+
+## 3. Gestione del Passaggio di Consegne (Cambio Capi / Staff)
+
+A inizio anno scout, in caso di cambio della pattuglia capi o della staff di Clan:
+1. Consegnare alla nuova staff l'email e la password di accesso all'area Admin.
+2. Se necessario cambiare la password:
+   - Accedere alla console di Supabase -> *Authentication* -> *Users*.
+   - Cliccare sui tre puntini accanto all'utente `clan.ducinaltum@gmail.com` -> selezionare *"Send Password Reset"* o *"Change Password"*.
+3. Assicurarsi che almeno due capi abbiano l'accesso all'account GitHub per gestire il repository e i deploy.

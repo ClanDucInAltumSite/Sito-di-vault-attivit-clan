@@ -103,11 +103,22 @@ Per consentire al workflow periodico di mantenere attivo il repository oltre i 6
 
 ---
 
-## 4. Controllo del Keepalive (Anti-Pausa Supabase)
+## 4. Controllo del Keepalive (Anti-Pausa Supabase e Heartbeat 60 Giorni)
 
-Il piano gratuito di Supabase spegne il database se non riceve richieste per 7 giorni. Il nostro sistema include un'azione automatica che ogni 2 giorni invia una richiesta a Supabase per mantenerlo sempre sveglio.
+Il piano gratuito di Supabase spegne il database se non riceve richieste per 7 giorni consecutivi. Inoltre, GitHub Actions disattiva automaticamente i workflow pianificati (*cron*) nei repository in cui non viene effettuato alcun commit o attività per 60 giorni consecutivi.
 
-### 4.1 Come verificare che stia funzionando
+Il nostro sistema include un'azione automatica a doppio effetto che ogni 2 giorni invia una richiesta a Supabase per mantenerlo sempre attivo ed effettua un heartbeat automatico se necessario.
+
+### 4.1 Come Funziona l'Heartbeat dei 60 Giorni e i Suoi Limiti
+Nel file `.github/workflows/keepalive.yml`:
+1. **Calcolo Inattività:** Il workflow calcola i giorni trascorsi dall'ultimo commit: `DIFF_DAYS=$(( (CURRENT_DATE - LAST_COMMIT_DATE) / 86400 ))`.
+2. **Heartbeat Automatico:** Se `DIFF_DAYS > 40` (ovvero mancano meno di 20 giorni alla disattivazione di GitHub), il runner esegue un micro-commit automatico sul file `docs/keepalive_heartbeat.txt` con messaggio `chore(keepalive): heartbeat reset 60gg inattività [skip ci]` e lo spinge su `main`. Questo resetta a zero il timer di inattività di GitHub Actions.
+3. **Limiti Intrinseci dell'Heartbeat:**
+   - **Permessi di Scrittura:** Richiede obbligatoriamente che i permessi di GitHub Actions siano impostati su *"Read and write permissions"* (Sezione 3.3). Se questo permesso non è concesso, il git push fallirà.
+   - **Variabilità dei Cron Gratuiti:** I cron gratuiti di GitHub Actions sono ad alta tolleranza temporale; in orari di picco della piattaforma, l'esecuzione può subire ritardi di 1-2 ore (ampiamente assorbiti dalla frequenza di 2 giorni rispetto ai 7 giorni di Supabase).
+   - **Impossibilità di Risvegliare un Database già Sospeso:** Se l'istanza Supabase dovesse essere sospesa per errore (ad esempio dopo 7 giorni di disservizio prolungato), una richiesta HTTP REST riceverà errore `503 Service Unavailable`, ma *non* riattiverà automaticamente il container Docker di Supabase. In quel caso è indispensabile accedere alla dashboard web di Supabase e cliccare "Restore project". Da qui l'importanza del secondo livello di monitoraggio esterno.
+
+### 4.2 Come Verificare che Stia Funzionando
 1. Sul repository GitHub, clicca sulla scheda **Actions** in alto.
 2. Nella colonna di sinistra, clicca su **"Keepalive Supabase & Repository"**.
 3. Vedrai l'elenco delle esecuzioni passate con una spunta verde.
@@ -116,17 +127,29 @@ Il piano gratuito di Supabase spegne il database se non riceve richieste per 7 g
    - Conferma cliccando sul tasto verde **"Run workflow"**.
    - Entro 30 secondi vedrai comparire il pallino verde di completamento con successo.
 
-### 4.2 Rete di Sicurezza Gratuita Ridondante (Consigliata)
-Per una sicurezza al 100%, puoi impostare un monitor esterno gratuito (es. **Cron-job.org** o **UptimeRobot**) che faccia una richiesta ogni 3 giorni all'indirizzo Supabase:
-1. Registrati gratis su [https://cron-job.org](https://cron-job.org).
-2. Clicca su **"Create cronjob"**.
-3. Nome: `Vault Scout Keepalive`.
-4. URL: `https://lpeiyzwccedtqjbficjo.supabase.co/rest/v1/giochi?select=id&limit=1`
-5. Nella scheda **Headers**, aggiungi:
-   - Header 1: `apikey` con valore la tua anon key di Supabase.
-   - Header 2: `Authorization` con valore `Bearer INCOLLA_QUI_LA_TUA_ANON_KEY`.
-6. Pianificazione: Ogni 3 giorni.
-7. Clicca su **Save**. In questo modo, anche se GitHub dovesse avere disservizi, il database non andrà mai in pausa.
+### 4.3 Rete di Sicurezza Esterna Gratuita (cron-job.org)
+Per garantire che il database non vada mai in pausa anche nell'eventualità di disservizi di GitHub, imposta un ping esterno gratuito su [cron-job.org](https://cron-job.org):
+1. Registrati gratuitamente su [https://cron-job.org](https://cron-job.org).
+2. Clicca sul pulsante **"Create cronjob"** (o "Crea cronjob").
+3. **Titolo:** `Vault Scout Clan Keepalive`.
+4. **URL:** Inserisci l'endpoint REST leggero di verifica metadati:
+   ```text
+   https://lpeiyzwccedtqjbficjo.supabase.co/rest/v1/system_meta?select=sync_epoch
+   ```
+5. **Pianificazione (Execution schedule):**
+   - Seleziona **"Every 2 days"** (Ogni 2 giorni).
+   - Orario consigliato: `07:00 UTC` (o qualsiasi orario desiderato).
+6. **Intestazioni HTTP (Headers):** Clicca su **"Advanced"** -> **"Headers"** e aggiungi le due seguenti intestazioni:
+   - Intestazione 1:
+     - Nome: `apikey`
+     - Valore: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxwZWl5endjY2VkdHFqYmZpY2pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5MTgzNTQsImV4cCI6MjEwNzQ5NDM1NH0.9eIZRUNLPlJn1l4DMs46DNauFdi_32X2y6YBZ1ytZSQ`
+   - Intestazione 2:
+     - Nome: `Authorization`
+     - Valore: `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxwZWl5endjY2VkdHFqYmZpY2pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5MTgzNTQsImV4cCI6MjEwNzQ5NDM1NH0.9eIZRUNLPlJn1l4DMs46DNauFdi_32X2y6YBZ1ytZSQ`
+7. **Notifiche di Errore (Failure notifications):**
+   - Nella sezione **"Notifications"**, attiva **"Notify on failure"** (Avvisa in caso di errore) selezionando la tua email personale.
+   - In questo modo, se Supabase dovesse rispondere con un codice diverso da 200 (es. 503 o database inattivo), riceverai immediatamente un avviso via email per riattivarlo tempestivamente.
+8. Clicca su **"Create"** (Salva).
 
 ---
 
@@ -170,6 +193,19 @@ Nel caso estremo in cui il progetto Supabase venga cancellato, il database diven
 5. Vai su **Actions** -> **Deploy to GitHub Pages** -> clicca **"Run workflow"** per ricompilare il sito con le nuove credenziali.
 
 ### Passo 5: Ripristina i Dati dall'Ultimo Backup JSON
+
+> [!WARNING] **IMPORTANTE — COSA CONTIENE E COSA NON CONTIENE IL BACKUP JSON:**
+> Il file di backup JSON contiene **esclusivamente i dati testuali, le relazioni e i metadati** delle 6 tabelle del database (`giochi`, `bans`, `canti`, `eventi`, `odg_punti`, `allegati`).
+> **NON contiene i file fisici (fotografie, immagini e documenti PDF)** memorizzati nel bucket `allegati` di Supabase Storage!
+> 
+> **Procedura per conservare e mettere al sicuro foto e PDF:**
+> 1. **Dall'applicazione (Amministrazione):**
+>    - Tocca **"Esporta Elenco"** nella riga *"Elenco File Allegati in Storage"* per scaricare il file `vault-scout-allegati-manifest-[data].json` con l'elenco completo di percorsi, dimensioni, tipologie MIME e URL diretti di download pubblico di tutti i file archiviati.
+>    - Tocca **"Scarica tutto"** su *"Archivio Offline Allegati"* per scaricare tutti i documenti e le foto nella Cache API locale del dispositivo.
+> 2. **Dalla Dashboard di Supabase (Conservazione periodica consigliata):**
+>    - Vai su **Storage** -> seleziona il bucket **`allegati`**.
+>    - Seleziona le cartelle e i file e scarica un archivio di backup locale sul computer della staff di Clan o salvalo su Google Drive.
+
 1. Apri il sito del Vault nel browser (o la PWA installata).
 2. Accedi come Admin inserendo email e password impostate al Passo 3.
 3. Nel menu Admin, tocca la riga **"Ripristina da Backup JSON"**.
@@ -182,16 +218,18 @@ Nel caso estremo in cui il progetto Supabase venga cancellato, il database diven
 
 ## 6. Manutenzione Programmata e Prevenzione della Sospensione
 
+Per la guida completa e il calendario operativo mese per mese, consulta il documento dedicato [`docs/MANUTENZIONE.md`](MANUTENZIONE.md).
+
 ### Politiche dei Servizi Gratuiti:
-1. **Supabase Free Tier:** Sospende i database senza traffico dopo 7 giorni di inattività.
+1. **Supabase Free Tier:** Sospende i database senza traffico dopo 7 giorni consecutivi di inattività.
 2. **GitHub Actions:** Disattiva automaticamente i workflow pianificati (*cron*) nei repository in cui non viene effettuato alcun commit o attività per 60 giorni consecutivi.
 
 ### Strategia di Difesa a Triplo Livello Adottata:
 1. **Livello 1 — Workflow GitHub (`.github/workflows/keepalive.yml`):**
-   - Gira ogni 2 giorni.
+   - Gira ogni 2 giorni alle 06:00 UTC.
    - Esegue una query REST a Supabase mantenendo sveglio il database.
    - Ogni 40 giorni effettua un micro-commit automatico su `docs/keepalive_heartbeat.txt` per resettare il timer di inattività di GitHub ed evitare che il workflow stesso si disattivi.
-2. **Livello 2 — Cron Esterno Ridondante (Consigliato):**
-   - Servizio gratuito [Cron-job.org](https://cron-job.org) impostato per interrogare l'endpoint ogni 3 giorni.
+2. **Livello 2 — Cron Esterno Ridondante ([cron-job.org](https://cron-job.org)):**
+   - Servizio gratuito impostato per interrogare l'endpoint `system_meta` ogni 2 giorni con avviso email immediato in caso di errore (configurazione dettagliata nella Sezione 4.3).
 3. **Livello 3 — Promemoria Mensile dei Capi:**
-   - Impostare un evento ricorrente sul calendario di branca/clan con cadenza mensile: *"Controllo Vault Scout & Backup"* per entrare nell'area Admin e premere **"Esporta Backup JSON"**. Conservare il file sul Google Drive di Clan o inviarlo via email alla staffa.
+   - Impostare un promemoria ricorrente nel calendario capi con cadenza mensile (*"Controllo Vault Scout & Backup"*): entrare nell'area Admin, premere **"Esporta Backup JSON"** e **"Esporta Elenco Allegati"**, e conservare i file su Google Drive di Clan o inviarli via email alla staff.

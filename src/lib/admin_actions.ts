@@ -732,6 +732,49 @@ export async function exportBackupJson(): Promise<void> {
   URL.revokeObjectURL(url);
 }
 
+/**
+ * Esportazione facoltativa dell'elenco completo dei file allegati (percorsi, dimensioni, URL diretti).
+ * Permette ai capi di conservare una lista dettagliata di tutti i file presenti in Storage
+ * e di riscaricarli facilmente anche all'esterno dell'applicazione.
+ */
+export async function exportAttachmentsManifestJson(): Promise<void> {
+  const db = await getDb();
+  const allegati = await db.getAll('allegati');
+  const activeAllegati = allegati.filter((a) => !a.deleted_at);
+
+  const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://lpeiyzwccedtqjbficjo.supabase.co';
+
+  const manifest = {
+    export_date: new Date().toISOString(),
+    total_files: activeAllegati.length,
+    total_bytes: activeAllegati.reduce((acc, a) => acc + (a.dimensione || 0), 0),
+    note: "Questo file contiene l'elenco e gli URL di tutti i file salvati nello Storage Supabase. I file possono essere scaricati singolarmente tramite gli URL indicati.",
+    files: activeAllegati.map((a) => ({
+      id: a.id,
+      nome_file: a.nome_file,
+      storage_path: a.storage_path,
+      mime: a.mime,
+      dimensione_bytes: a.dimensione,
+      url_download: `${SUPABASE_URL}/storage/v1/object/public/allegati/${a.storage_path}`,
+      associato_a: a.gioco_id ? `gioco:${a.gioco_id}` : a.ban_id ? `ban:${a.ban_id}` : a.canto_id ? `canto:${a.canto_id}` : a.evento_id ? `evento:${a.evento_id}` : 'non_associato',
+      created_at: a.created_at,
+    })),
+  };
+
+  const jsonString = JSON.stringify(manifest, null, 2);
+  const blob = new Blob([jsonString], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+
+  const dateStr = new Date().toISOString().slice(0, 10);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `vault-scout-allegati-manifest-${dateStr}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 export interface BackupPreviewItem {
   table: ContentTableName;
   id: string;

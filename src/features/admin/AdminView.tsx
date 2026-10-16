@@ -12,6 +12,7 @@ import { useAdmin, logoutAdmin } from '../../lib/auth';
 import {
   getTrashItems,
   exportBackupJson,
+  exportAttachmentsManifestJson,
   validateAndPreviewBackupJson,
   executeBackupImport,
   BackupPreviewDiff,
@@ -28,6 +29,7 @@ export function AdminView() {
   const [isTrashOpen, setIsTrashOpen] = useState(false);
   const [trashCount, setTrashCount] = useState<number>(0);
   const [isExporting, setIsExporting] = useState(false);
+  const [isExportingManifest, setIsExportingManifest] = useState(false);
 
   // Stato Import Backup JSON
   const [backupPreview, setBackupPreview] = useState<BackupPreviewDiff | null>(null);
@@ -143,6 +145,17 @@ export function AdminView() {
       alert(err.message || 'Errore durante l\'esportazione del backup');
     } finally {
       setIsExporting(false);
+    }
+  };
+
+  const handleExportManifest = async () => {
+    setIsExportingManifest(true);
+    try {
+      await exportAttachmentsManifestJson();
+    } catch (err: any) {
+      alert(err.message || 'Errore durante l\'esportazione del manifest allegati');
+    } finally {
+      setIsExportingManifest(false);
     }
   };
 
@@ -304,7 +317,7 @@ export function AdminView() {
             <GroupedRow
               leading={<Icon name="download" size={20} />}
               title={I18N.admin.backupJson}
-              subtitle="Esporta l'intero archivio in un file JSON scaricabile localmente"
+              subtitle="Esporta l'intero archivio in JSON (testi, canti, date, ODG). NOTA: non contiene i file fisici (foto/PDF) in Storage."
               trailing={
                 <Button
                   variant="secondary"
@@ -314,6 +327,22 @@ export function AdminView() {
                 >
                   <Icon name="download" size={14} />
                   <span>Esporta</span>
+                </Button>
+              }
+            />
+            <GroupedRow
+              leading={<Icon name="file" size={20} />}
+              title="Elenco File Allegati in Storage"
+              subtitle="Esporta l'elenco JSON di tutti i file in Storage con percorsi e URL diretti di download"
+              trailing={
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleExportManifest}
+                  isLoading={isExportingManifest}
+                >
+                  <Icon name="download" size={14} />
+                  <span>Esporta Elenco</span>
                 </Button>
               }
             />
