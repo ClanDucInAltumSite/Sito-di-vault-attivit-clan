@@ -1,10 +1,10 @@
 // test/offline_matrix.spec.ts
-// FASE 8E — Matrice di Verifica Comportamento Offline (Playwright)
+// FASE 8E - Matrice di Verifica Comportamento Offline (Playwright)
 // Verifica i 7 scenari fondamentali di resilienza offline secondo le specifiche di progetto.
 
 import { test, expect } from '@playwright/test';
 
-test.describe('FASE 8E — Matrice Offline Vault Scout Clan', () => {
+test.describe('FASE 8E - Matrice Offline Vault Scout Clan', () => {
 
   test('1. Primo avvio: inizializzazione corretta di IndexedDB e asset locali', async ({ page }) => {
     await page.goto('/#/');
@@ -150,28 +150,20 @@ test.describe('FASE 8E — Matrice Offline Vault Scout Clan', () => {
     await page.keyboard.press('Escape');
     await page.waitForTimeout(300);
 
-    // 5. Verifica Bans e Modalità Lettura in offline
+    // 5. Verifica Bans e Scheda Dettaglio in offline
     await page.locator('.ios-tab-item').filter({ hasText: 'Bans' }).click();
     const banItem = page.locator('text=Ban del Falco Volante').first();
     await expect(banItem).toBeVisible();
     await banItem.click();
 
-    // Tocca "Modalità Lettura" dentro il dettaglio del ban
-    const readingBtn = page.locator('button:has-text("Modalità Lettura")').first();
-    await expect(readingBtn).toBeVisible();
-    await readingBtn.click();
+    // In offline: verifica che si apra la Scheda Dettaglio con testo e gesti
+    const banSheet = page.locator('[role="dialog"]').first();
+    await expect(banSheet).toBeVisible();
+    await expect(banSheet).toContainText('Tutti in cerchio muovono le braccia');
 
-    // In offline: verifica che si apra la Modalità Lettura ad alto contrasto con testo grande
-    const readingDialog = page.locator('div[role="dialog"][aria-label*="Modalità Lettura"]');
-    await expect(readingDialog).toBeVisible();
-    await expect(readingDialog).toContainText('Tutti in cerchio muovono le braccia');
-
-    // Chiudi modalità lettura in offline
-    await page.evaluate(() => {
-      const btn = document.querySelector('button[aria-label="Esci da modalità lettura"]') as HTMLButtonElement | null;
-      if (btn) btn.click();
-    });
-    await expect(readingDialog).toBeHidden();
+    // Chiudi dettaglio ban
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
   });
 
   test('4. Allegati scaricati in cache visibili ed apribili in offline', async ({ page, context }) => {

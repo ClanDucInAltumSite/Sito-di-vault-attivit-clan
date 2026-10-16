@@ -1,6 +1,6 @@
 -- ==============================================================================
 -- Migrazione 0005: Restrizione Permessi RPC (bump_sync_epoch e purge_old_tombstones)
--- Sito Vault Scout Clan — Duc In Altum
+-- Sito Vault Scout Clan - Duc In Altum
 -- ==============================================================================
 
 -- 1. Revoca permessi di esecuzione pubblica e anonima sulle funzioni di sistema

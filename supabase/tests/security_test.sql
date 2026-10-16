@@ -1,6 +1,6 @@
 -- ==============================================================================
 -- Test di Sicurezza e RLS (Row Level Security)
--- Sito Vault Scout Clan — Duc In Altum
+-- Sito Vault Scout Clan - Duc In Altum
 -- ==============================================================================
 
 -- 1. Test di verifica pubblicazione Supabase Realtime

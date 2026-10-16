@@ -19,7 +19,7 @@ import {
 import { matchesQuery, findSimilarName } from '../src/lib/search';
 import { getTrashItems } from '../src/lib/admin_actions';
 
-describe('FASE 4 — Canti e ChordPro Engine', () => {
+describe('FASE 4 - Canti e ChordPro Engine', () => {
   // TEST 1: Trasposizione accordi italiani e americani
   describe('1. Trasposizione Accordi', () => {
     it('traspone accordi italiani maggiori, minori, alterati e con slash', () => {

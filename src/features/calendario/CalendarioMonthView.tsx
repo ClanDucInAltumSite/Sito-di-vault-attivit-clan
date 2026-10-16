@@ -192,7 +192,7 @@ export function CalendarioMonthView({
 
       {/* Dettaglio Attività della Data Selezionata */}
       <GroupedList
-        header={`${I18N.calendario.eventiGiorno.toUpperCase()} — ${selectedDateFormatted.toUpperCase()}`}
+        header={`${I18N.calendario.eventiGiorno.toUpperCase()} - ${selectedDateFormatted.toUpperCase()}`}
         footer="Seleziona un'attività per consultare dettagli logistici, allegati e l'Ordine del Giorno."
       >
         {selectedEvents.length === 0 ? (

@@ -3,7 +3,7 @@ import { PDFParse } from 'pdf-parse';
 import * as fs from 'fs';
 import * as path from 'path';
 
-test.describe('FASE 6 — Verifica Reale della Generazione PDF, Indice Verificato e Overflow Misurato (@media print)', () => {
+test.describe('FASE 6 - Verifica Reale della Generazione PDF, Indice Verificato e Overflow Misurato (@media print)', () => {
   test('Genera PDF A4 reale, valida indice con numeri veri, overflow misurato, 5 canti, bans, gioco lungo 3500+ caratteri e rasterizza PNG', async ({
     page,
   }) => {
@@ -54,18 +54,18 @@ test.describe('FASE 6 — Verifica Reale della Generazione PDF, Indice Verificat
             'OBIETTIVO DEL GIOCO:\n' +
             'Le quattro pattuglie del Clan devono conquistare i presidi strategici della valle dei Sibillini (Presidio Nord, Presidio Sud, Passo del Vento, Bosco dei Faggi). ' +
             'Ciascun presidio è difeso da custodi che pongono enigmi cartografici su carta IGM 1:25.000, nodi strutturali di pionieristica e segnalazioni ottiche Morse.\n\n' +
-            'FASE 1 — AVVICINAMENTO E PATTUGLIAMENTO SILENZIOSO:\n' +
+            'FASE 1 - AVVICINAMENTO E PATTUGLIAMENTO SILENZIOSO:\n' +
             'Ogni pattuglia parte da una quota nota con azimuth assegnato e deve muoversi evitando le pattuglie di interdizione. ' +
             'Se una pattuglia viene illuminata dalla torcia di un custode a distanza inferiore a dieci metri, deve dichiarare il proprio nome scout e arretrare di cento metri verso il punto di sosta precedente. ' +
             'Il silenzio assoluto durante il cammino nel sottobosco è vincolante per non allertare le sentinelle avversarie posizionate lungo la cresta rocciosa.\n\n' +
-            'FASE 2 — COSTRUZIONI DI PIONIERISTICA E NODI:\n' +
+            'FASE 2 - COSTRUZIONI DI PIONIERISTICA E NODI:\n' +
             'Raggiunto il primo presidio, i componenti devono realizzare un tripode per il teodolite da campo utilizzando tre pali di castagno da due metri e una legatura quadra con cordino di canapa da sei millimetri. ' +
             'Inoltre, ciascun rover e scolta deve eseguire individualmente un nodo parlato con chiave di bloccaggio e un nodo a otto ripassato per l\'assicurazione in cordata. ' +
             'I custodi verificano la tenuta statica prima di consegnare la mappa con le coordinate azimutali del secondo presidio.\n\n' +
-            'FASE 3 — DECIFRAZIONE E TRASMISSIONE MORSE:\n' +
+            'FASE 3 - DECIFRAZIONE E TRASMISSIONE MORSE:\n' +
             'La pergamena ottenuta contiene un messaggio cifrato mediante cifrario di Cesare con scostamento da ricavare dall\'altitudine della vetta. ' +
             'Una volta decifrato il testo segreto ("LA FIAMMA VIGILA SUL CAMMINO DEL CLAN"), la pattuglia accende una lanterna schermata e trasmette il messaggio mediante segnali luminosi a punti e linee verso la stazione radio centrale situata a fondovalle.\n\n' +
-            'FASE 4 — IL PONTE SUL TORRENTE E IL RECUPERO DELLA CARTA DI CLAN:\n' +
+            'FASE 4 - IL PONTE SUL TORRENTE E IL RECUPERO DELLA CARTA DI CLAN:\n' +
             'L\'ultima prova richiede il guado controllato del torrente montano mediante un ponte di corda alla marinara con fune portante tesa tra due faggi monumentali. ' +
             'Ciascun membro della pattuglia attraversa il passaggio in sicurezza agganciato con longe e moschettone con ghiera a vite.\n\n';
 
@@ -294,27 +294,27 @@ test.describe('FASE 6 — Verifica Reale della Generazione PDF, Indice Verificat
     await page.goto('#/stampa');
     await page.waitForLoadState('networkidle');
 
+    // =========================================================================
+    // CORREZIONE 2 - VERIFICA OVERFLOW MISURATO E AVVISO
+    // =========================================================================
+    // Il Canto 5 è troppo lungo per 1 pagina: deve comparire l'avviso di overflow globale a schermo!
+    const overflowBanner = page.locator('.stampa-overflow-alert').first();
+    await expect(overflowBanner).toBeVisible();
+    const bannerText = await overflowBanner.textContent();
+    expect(bannerText).toContain("Questa pagina non entra");
+    expect(bannerText).toContain("superano l'altezza A4");
+
+    // =========================================================================
+    // CORREZIONE 3 - RASTERIZZAZIONE PNG DELLE PAGINE PER ISPEZIONE VISIVA
+    // La preview a schede è visibile in modalità stampa (@media print)
+    // =========================================================================
+    await page.emulateMedia({ media: 'print' });
+
     await page.waitForSelector('.print-cover-page');
     await page.waitForSelector('.print-index-page');
     await page.waitForSelector('.print-continuous');
     await page.waitForSelector('.print-song-page');
 
-    // =========================================================================
-    // CORREZIONE 2 — VERIFICA OVERFLOW MISURATO E AVVISO
-    // =========================================================================
-    // Il Canto 5 è troppo lungo per 1 pagina: deve comparire l'avviso di overflow sia globale che sulla pagina!
-    const overflowBanner = page.locator('.stampa-overflow-alert').first();
-    await expect(overflowBanner).toBeVisible();
-    const bannerText = await overflowBanner.textContent();
-    expect(bannerText).toContain("superano l'altezza A4");
-
-    const pageWarning = page.locator('.stampa-overflow-alert').nth(1);
-    await expect(pageWarning).toBeVisible();
-    expect(await pageWarning.textContent()).toContain("Questa pagina non entra");
-
-    // =========================================================================
-    // CORREZIONE 3 — RASTERIZZAZIONE PNG DELLE PAGINE PER ISPEZIONE VISIVA
-    // =========================================================================
     const printDir = path.resolve(process.cwd(), 'docs/design-review/print');
     if (!fs.existsSync(printDir)) {
       fs.mkdirSync(printDir, { recursive: true });
@@ -368,7 +368,7 @@ test.describe('FASE 6 — Verifica Reale della Generazione PDF, Indice Verificat
     });
 
     // =========================================================================
-    // CORREZIONE 1 — VERIFICA INDICE CON NUMERI VERI RISPETTO ALLE PAGINE DEL PDF
+    // CORREZIONE 1 - VERIFICA INDICE CON NUMERI VERI RISPETTO ALLE PAGINE DEL PDF
     // =========================================================================
     // Estraiamo la pagina 2 (Indice dei Contenuti)
     const indexPageText = textResult.pages[1].text;
@@ -409,11 +409,11 @@ test.describe('FASE 6 — Verifica Reale della Generazione PDF, Indice Verificat
     }
 
     // =========================================================================
-    // CORREZIONE 3 — VERIFICHE DI INTEGRITÀ DEL PDF
+    // CORREZIONE 3 - VERIFICHE DI INTEGRITÀ DEL PDF
     // =========================================================================
     // A) Gioco lungo di 3500+ caratteri scorre su più pagine senza troncare
     expect(fullPdfText).toContain('Grande Gioco dei Pionieri della Valle');
-    expect(fullPdfText).toContain('FASE 4 — IL PONTE SUL TORRENTE');
+    expect(fullPdfText).toContain('FASE 4 - IL PONTE SUL TORRENTE');
     expect(fullPdfText).toContain('PUNTEGGI E REGOLAMENTO DI VITTORIA');
     expect(fullPdfText).toContain('SICUREZZA E PROTOCOLLI DI EMERGENZA');
 

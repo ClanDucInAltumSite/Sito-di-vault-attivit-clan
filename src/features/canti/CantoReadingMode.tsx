@@ -1,18 +1,34 @@
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useRef } from 'preact/hooks';
 import { Canto } from '../../lib/db';
 import { I18N } from '../../lib/i18n';
 import { Icon } from '../../ui/Icon';
 import { Badge } from '../../ui/Badge';
+import { useAdmin } from '../../lib/auth';
 import { requestWakeLock, releaseWakeLock, isWakeLockSupported } from '../../lib/wakelock';
 import { ChordProRenderer, transposeChord } from '../../lib/chordpro';
+import { AttachmentGallery } from '../allegati/AttachmentGallery';
+import { AttachmentUploadManager } from '../allegati/AttachmentUploadManager';
 
 export interface CantoReadingModeProps {
   canto: Canto | null;
   isOpen: boolean;
   onClose: () => void;
+  onEdit?: (canto: Canto) => void;
+  onDelete?: (canto: Canto) => void;
+  onUpdated?: () => void;
 }
 
-export function CantoReadingMode({ canto, isOpen, onClose }: CantoReadingModeProps) {
+export function CantoReadingMode({
+  canto,
+  isOpen,
+  onClose,
+  onEdit,
+  onDelete,
+  onUpdated,
+}: CantoReadingModeProps) {
+  const { isAdmin } = useAdmin();
+  const [attachmentKey, setAttachmentKey] = useState(0);
+
   const [fontSize, setFontSize] = useState<number>(() => {
     if (typeof window !== 'undefined' && window.localStorage) {
       const saved = localStorage.getItem('canto_reading_font_size');
@@ -25,10 +41,29 @@ export function CantoReadingMode({ canto, isOpen, onClose }: CantoReadingModePro
   const [transposeDelta, setTransposeDelta] = useState<number>(0);
   const [wakeLockActive, setWakeLockActive] = useState(false);
 
+  // --- STATO METRONOMO ---
+  const [bpm, setBpm] = useState<number>(100);
+  const [isMetronomePlaying, setIsMetronomePlaying] = useState<boolean>(false);
+  const [pulse, setPulse] = useState<boolean>(false);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const metronomeTimerRef = useRef<any>(null);
+  const beatCountRef = useRef<number>(0);
+
+  // Inizializza o aggiorna BPM quando cambia il canto
+  useEffect(() => {
+    if (canto?.tempo_bpm) {
+      setBpm(canto.tempo_bpm);
+    } else {
+      setBpm(100);
+    }
+    // Arresta metronomo al cambio del canto
+    setIsMetronomePlaying(false);
+  }, [canto?.id, canto?.tempo_bpm]);
+
+  // Gestione WakeLock, overflow del body ed Escape
   useEffect(() => {
     if (!isOpen || !canto) return;
 
-    // Reset trasposizione all'apertura del canto
     setTransposeDelta(0);
 
     let active = true;
@@ -56,6 +91,90 @@ export function CantoReadingMode({ canto, isOpen, onClose }: CantoReadingModePro
     };
   }, [isOpen, canto, onClose]);
 
+  // Gestione esecuzione metronomo
+  useEffect(() => {
+    if (!isMetronomePlaying || !isOpen) {
+      if (metronomeTimerRef.current) {
+        clearInterval(metronomeTimerRef.current);
+        metronomeTimerRef.current = null;
+      }
+      setPulse(false);
+      return;
+    }
+
+    // Inizializza AudioContext al click dell'utente
+    if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioContextClass) {
+        audioCtxRef.current = new AudioContextClass();
+      }
+    }
+    if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
+      audioCtxRef.current.resume();
+    }
+
+    const beatsPerBar = canto?.misura?.startsWith('3') ? 3 : canto?.misura?.startsWith('6') ? 6 : 4;
+    const intervalMs = Math.round((60 / Math.max(30, Math.min(260, bpm))) * 1000);
+    beatCountRef.current = 0;
+
+    const tick = () => {
+      const isDownbeat = beatCountRef.current % beatsPerBar === 0;
+      beatCountRef.current++;
+
+      // Emetti suono acustico con AudioContext
+      if (audioCtxRef.current && audioCtxRef.current.state === 'running') {
+        try {
+          const now = audioCtxRef.current.currentTime;
+          const osc = audioCtxRef.current.createOscillator();
+          const gain = audioCtxRef.current.createGain();
+          osc.connect(gain);
+          gain.connect(audioCtxRef.current.destination);
+
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(isDownbeat ? 1000 : 750, now);
+
+          gain.gain.setValueAtTime(0.7, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+
+          osc.start(now);
+          osc.stop(now + 0.045);
+        } catch {
+          // Ignora errori audio contestuali
+        }
+      }
+
+      // Impulso visivo a tempo
+      setPulse(true);
+      setTimeout(() => setPulse(false), Math.min(130, Math.floor(intervalMs / 2)));
+    };
+
+    tick();
+    metronomeTimerRef.current = setInterval(tick, intervalMs);
+
+    return () => {
+      if (metronomeTimerRef.current) {
+        clearInterval(metronomeTimerRef.current);
+        metronomeTimerRef.current = null;
+      }
+    };
+  }, [isMetronomePlaying, bpm, isOpen, canto?.misura]);
+
+  // Pulizia generale alla distruzione
+  useEffect(() => {
+    return () => {
+      if (metronomeTimerRef.current) {
+        clearInterval(metronomeTimerRef.current);
+        metronomeTimerRef.current = null;
+      }
+      if (audioCtxRef.current) {
+        try {
+          audioCtxRef.current.close();
+        } catch {}
+        audioCtxRef.current = null;
+      }
+    };
+  }, []);
+
   if (!isOpen || !canto) return null;
 
   const changeFontSize = (delta: number) => {
@@ -71,9 +190,12 @@ export function CantoReadingMode({ canto, isOpen, onClose }: CantoReadingModePro
   const handleTranspose = (delta: number) => {
     setTransposeDelta((prev) => {
       const next = prev + delta;
-      // Mantieni intervallo ragionevole tra -11 e +11
       return next > 11 ? next - 12 : next < -11 ? next + 12 : next;
     });
+  };
+
+  const toggleMetronome = () => {
+    setIsMetronomePlaying((prev) => !prev);
   };
 
   const currentKeyDisplay = canto.tonalita
@@ -86,16 +208,17 @@ export function CantoReadingMode({ canto, isOpen, onClose }: CantoReadingModePro
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={`${I18N.bans.modalitaLettura} — ${canto.titolo}`}
+      aria-label={`${I18N.bans.modalitaLettura} - ${canto.titolo}`}
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: 'var(--z-modal)',
+        zIndex: 'var(--z-modal, 2000)',
         backgroundColor: 'var(--color-bg)',
         color: 'var(--color-text)',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
+        isolation: 'isolate',
       }}
     >
       {/* Top Bar ad alto contrasto con strumenti per la musica */}
@@ -106,9 +229,10 @@ export function CantoReadingMode({ canto, isOpen, onClose }: CantoReadingModePro
           borderBottom: '1px solid var(--color-border)',
           backgroundColor: 'var(--color-surface)',
           flexShrink: 0,
+          zIndex: 10,
         }}
       >
-        {/* Prima riga: pulsante chiudi, titolo, wake lock */}
+        {/* Prima riga: pulsante indietro, titolo, controlli admin e wake lock */}
         <div
           style={{
             display: 'flex',
@@ -116,27 +240,33 @@ export function CantoReadingMode({ canto, isOpen, onClose }: CantoReadingModePro
             justifyContent: 'space-between',
             padding: 'var(--space-2) var(--space-4)',
             gap: 'var(--space-2)',
+            minHeight: '52px',
           }}
         >
+          {/* Tasto INDIETRO con indicazione chiara e freccia */}
           <button
             type="button"
             onClick={onClose}
-            className="ios-btn ios-btn-ghost"
+            className="ios-btn ios-btn-secondary ios-sheet-close-btn"
             style={{
-              display: 'flex',
+              display: 'inline-flex',
               alignItems: 'center',
-              gap: 'var(--space-1)',
-              minHeight: 'var(--touch-target)',
-              padding: '0 var(--space-2)',
+              gap: '6px',
+              minHeight: '38px',
+              padding: '0 var(--space-3)',
               color: 'var(--color-interactive)',
-              fontWeight: 600,
+              fontWeight: 700,
+              fontSize: 'var(--font-size-sm)',
+              borderRadius: 'var(--radius-full)',
+              flexShrink: 0,
             }}
-            aria-label={I18N.bans.esciModalitaLettura}
+            aria-label="Torna all'elenco dei canti"
           >
-            <Icon name="chevron-left" size={20} />
-            <span>{I18N.dialogs.chiudi}</span>
+            <Icon name="chevron-left" size={18} />
+            <span>Indietro</span>
           </button>
 
+          {/* Titolo del Canto */}
           <div
             style={{
               fontWeight: 700,
@@ -153,19 +283,63 @@ export function CantoReadingMode({ canto, isOpen, onClose }: CantoReadingModePro
             {canto.titolo}
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+          {/* Azioni destra: Badge Schermo sempre attivo + Tasti Admin */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexShrink: 0 }}>
             {isWakeLockSupported() && wakeLockActive ? (
               <Badge variant="azzurro" size="sm">
                 <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <Icon name="sun" size={14} />
-                  <span>Attivo</span>
+                  <span>Schermo attivo</span>
                 </span>
               </Badge>
             ) : null}
+
+            {isAdmin && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                <button
+                  type="button"
+                  onClick={() => onEdit?.(canto)}
+                  className="ios-btn ios-btn-secondary"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    minHeight: '34px',
+                    padding: '0 var(--space-3)',
+                    fontSize: 'var(--font-size-xs)',
+                    fontWeight: 600,
+                    borderRadius: 'var(--radius-full)',
+                  }}
+                  aria-label="Modifica canto"
+                >
+                  <Icon name="edit" size={14} />
+                  <span>Modifica</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDelete?.(canto)}
+                  className="ios-btn ios-btn-danger"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    minHeight: '34px',
+                    padding: '0 var(--space-3)',
+                    fontSize: 'var(--font-size-xs)',
+                    fontWeight: 600,
+                    borderRadius: 'var(--radius-full)',
+                  }}
+                  aria-label="Elimina canto"
+                >
+                  <Icon name="trash" size={14} />
+                  <span>Elimina</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Seconda riga: Toolbar controlli per accordi, trasposizione e zoom */}
+        {/* Seconda riga: Toolbar controlli per accordi, trasposizione, zoom e metronomo */}
         <div
           style={{
             display: 'flex',
@@ -185,7 +359,7 @@ export function CantoReadingMode({ canto, isOpen, onClose }: CantoReadingModePro
             onClick={() => setShowChords(!showChords)}
             className={`ios-btn ${showChords ? 'ios-btn-secondary' : 'ios-btn-ghost'}`}
             style={{
-              minHeight: '36px',
+              minHeight: '34px',
               padding: '0 var(--space-3)',
               fontSize: 'var(--font-size-xs)',
               fontWeight: 600,
@@ -217,7 +391,7 @@ export function CantoReadingMode({ canto, isOpen, onClose }: CantoReadingModePro
               className="ios-btn ios-btn-ghost"
               style={{
                 minWidth: '32px',
-                minHeight: '32px',
+                minHeight: '30px',
                 padding: '0 6px',
                 fontSize: 'var(--font-size-xs)',
                 fontWeight: 700,
@@ -233,7 +407,7 @@ export function CantoReadingMode({ canto, isOpen, onClose }: CantoReadingModePro
               onClick={() => setTransposeDelta(0)}
               className="ios-btn ios-btn-ghost"
               style={{
-                minHeight: '32px',
+                minHeight: '30px',
                 padding: '0 8px',
                 fontSize: 'var(--font-size-xs)',
                 fontWeight: 600,
@@ -249,7 +423,7 @@ export function CantoReadingMode({ canto, isOpen, onClose }: CantoReadingModePro
               className="ios-btn ios-btn-ghost"
               style={{
                 minWidth: '32px',
-                minHeight: '32px',
+                minHeight: '30px',
                 padding: '0 6px',
                 fontSize: 'var(--font-size-xs)',
                 fontWeight: 700,
@@ -259,6 +433,95 @@ export function CantoReadingMode({ canto, isOpen, onClose }: CantoReadingModePro
               title="Alza di un semitono"
             >
               +1
+            </button>
+          </div>
+
+          {/* METRONOMO AUDIO-VISIVO ("quel coso che si usa per prendere il tempo") */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '2px',
+              backgroundColor: 'var(--color-surface)',
+              borderRadius: 'var(--radius-full)',
+              border: isMetronomePlaying ? '1.5px solid var(--color-interactive)' : '1px solid var(--color-border)',
+              padding: '2px 4px',
+            }}
+          >
+            <button
+              type="button"
+              onClick={toggleMetronome}
+              className={`ios-btn ${isMetronomePlaying ? 'ios-btn-primary' : 'ios-btn-ghost'}`}
+              style={{
+                minHeight: '30px',
+                padding: '0 8px',
+                fontSize: 'var(--font-size-xs)',
+                fontWeight: 700,
+                borderRadius: 'var(--radius-full)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+              aria-label={isMetronomePlaying ? 'Ferma ritmo metronomo' : 'Avvia ritmo metronomo'}
+              title={isMetronomePlaying ? 'Ferma metronomo' : 'Avvia metronomo a tempo'}
+            >
+              <span
+                style={{
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '50%',
+                  backgroundColor: pulse ? 'var(--color-bans)' : isMetronomePlaying ? 'var(--color-canti)' : 'var(--color-text-secondary)',
+                  display: 'inline-block',
+                  transition: 'transform 80ms ease',
+                  transform: pulse ? 'scale(1.6)' : 'scale(1)',
+                }}
+                className={pulse ? 'metronome-pulse' : ''}
+              />
+              <span>{isMetronomePlaying ? 'Stop' : 'Ritmo'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setBpm((b) => Math.max(40, b - 5))}
+              className="ios-btn ios-btn-ghost"
+              style={{
+                minWidth: '24px',
+                minHeight: '30px',
+                padding: '0 4px',
+                fontSize: 'var(--font-size-xs)',
+                fontWeight: 700,
+              }}
+              title="-5 BPM"
+              aria-label="Rallenta ritmo di 5 BPM"
+            >
+              -
+            </button>
+            <span
+              style={{
+                fontSize: 'var(--font-size-xs)',
+                fontWeight: 700,
+                minWidth: '56px',
+                textAlign: 'center',
+                color: isMetronomePlaying ? 'var(--color-interactive)' : 'var(--color-text)',
+              }}
+            >
+              {bpm} BPM
+            </span>
+            <button
+              type="button"
+              onClick={() => setBpm((b) => Math.min(240, b + 5))}
+              className="ios-btn ios-btn-ghost"
+              style={{
+                minWidth: '24px',
+                minHeight: '30px',
+                padding: '0 4px',
+                fontSize: 'var(--font-size-xs)',
+                fontWeight: 700,
+              }}
+              title="+5 BPM"
+              aria-label="Accelera ritmo di 5 BPM"
+            >
+              +
             </button>
           </div>
 
@@ -280,7 +543,7 @@ export function CantoReadingMode({ canto, isOpen, onClose }: CantoReadingModePro
               className="ios-btn ios-btn-ghost"
               style={{
                 minWidth: '32px',
-                minHeight: '32px',
+                minHeight: '30px',
                 padding: '0 6px',
                 fontSize: 'var(--font-size-xs)',
                 fontWeight: 700,
@@ -307,7 +570,7 @@ export function CantoReadingMode({ canto, isOpen, onClose }: CantoReadingModePro
               className="ios-btn ios-btn-ghost"
               style={{
                 minWidth: '32px',
-                minHeight: '32px',
+                minHeight: '30px',
                 padding: '0 6px',
                 fontSize: 'var(--font-size-sm)',
                 fontWeight: 700,
@@ -401,6 +664,49 @@ export function CantoReadingMode({ canto, isOpen, onClose }: CantoReadingModePro
           showChords={showChords}
           fontSizeRem={fontSize / 16}
         />
+
+        {/* Sezione Allegati e Spartiti (Fase 5) */}
+        <div
+          style={{
+            marginTop: 'var(--space-8)',
+            borderTop: '1px solid var(--color-border)',
+            paddingTop: 'var(--space-6)',
+          }}
+        >
+          <h3
+            style={{
+              fontSize: 'var(--font-size-base)',
+              fontWeight: 700,
+              color: 'var(--color-ink)',
+              margin: '0 0 var(--space-3)',
+            }}
+          >
+            Allegati e spartiti
+          </h3>
+
+          <AttachmentGallery
+            key={attachmentKey}
+            parentType="canto"
+            parentId={canto.id}
+            isAdmin={isAdmin}
+            onChanged={() => {
+              setAttachmentKey((k) => k + 1);
+              onUpdated?.();
+            }}
+          />
+
+          {isAdmin && (
+            <div style={{ marginTop: 'var(--space-4)' }}>
+              <AttachmentUploadManager
+                parent={{ type: 'canto', id: canto.id }}
+                onUploaded={() => {
+                  setAttachmentKey((k) => k + 1);
+                  onUpdated?.();
+                }}
+              />
+            </div>
+          )}
+        </div>
       </main>
     </div>
   );

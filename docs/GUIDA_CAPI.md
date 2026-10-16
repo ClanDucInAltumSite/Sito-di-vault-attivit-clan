@@ -1,4 +1,4 @@
-# Guida all'Uso per i Capi — Vault Scout Clan
+# Guida all'Uso per i Capi - Vault Scout Clan
 
 Benvenuto nel **Vault Scout**, l'archivio digitale tascabile progettato per accompagnare la comunità capi e i ragazzi durante le uscite, le riunioni e i campi estivi, sia online che in completo isolamento sui sentieri di montagna.
 

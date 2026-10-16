@@ -1,6 +1,6 @@
 -- ==============================================================================
 -- Migrazione 0002: Row Level Security (RLS) e Pubblicazione Supabase Realtime
--- Sito Vault Scout Clan — Duc In Altum
+-- Sito Vault Scout Clan - Duc In Altum
 -- ==============================================================================
 
 -- 1. Funzione is_admin() (SECURITY DEFINER con search_path protetto a public)

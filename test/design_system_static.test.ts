@@ -20,7 +20,7 @@ function getAllFiles(dirPath: string, extensions: string[]): string[] {
   return files;
 }
 
-describe('FASE 1B — Verifica Statica del Design System Apple-Grade', () => {
+describe('FASE 1B - Verifica Statica del Design System Apple-Grade', () => {
   const srcDir = path.resolve(__dirname, '../src');
 
   it('Verifica che i font Inter woff2 self-hosted siano presenti in public/fonts', () => {

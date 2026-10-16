@@ -29,7 +29,7 @@ function photoUrl(filename: string): string {
 export const HEADER_PHOTOS: Record<HeaderPhotoConfig['id'], HeaderPhotoConfig> = {
   home: {
     id: 'home',
-    title: 'Vault Clan — Duc In Altum',
+    title: 'Vault Clan - Duc In Altum',
     alt: 'Paesaggio montano con vette illuminate dal sole al tramonto',
     src: photoUrl('home-400.webp'),
     srcMobile: photoUrl('home-400.webp'),

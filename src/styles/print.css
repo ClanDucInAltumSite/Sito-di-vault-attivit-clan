@@ -1,5 +1,5 @@
 /* ==============================================================================
-   Stili di Stampa (@media print) — Formato A4, Nero su Bianco, Alto Contrasto
+   Stili di Stampa (@media print) - Formato A4, Nero su Bianco, Alto Contrasto
    Espresso in OKLCH con massimo contrasto e risparmio inchiostro
    ============================================================================== */
 
@@ -405,6 +405,10 @@
    Stili a Schermo per la Schermata Stampa (#/stampa)
    ============================================================================== */
 @media screen {
+  .stampa-print-container {
+    display: none !important;
+  }
+
   .stampa-preview-paper {
     background: var(--color-surface);
     border: 1px solid var(--color-border);

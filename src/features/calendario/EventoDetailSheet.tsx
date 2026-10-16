@@ -150,29 +150,6 @@ export function EventoDetailSheet({
           </div>
         )}
 
-        {/* Responsabile */}
-        {evento.responsabile && (
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: 'var(--space-2)',
-              fontSize: 'var(--font-size-sm)',
-              color: 'var(--color-text)',
-            }}
-          >
-            <span style={{ color: 'var(--color-text-secondary)', marginTop: '2px' }}>
-              <Icon name="search" size={16} />
-            </span>
-            <div>
-              <strong style={{ display: 'block', fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>
-                {I18N.calendario.responsabile}
-              </strong>
-              {evento.responsabile}
-            </div>
-          </div>
-        )}
-
         {/* Cosa Portare */}
         {evento.cosa_portare && (
           <div
@@ -229,13 +206,15 @@ export function EventoDetailSheet({
           </div>
         )}
 
-        {/* Ordine del Giorno (ODG) */}
-        <OdgManager
-          evento={evento}
-          isAdmin={isAdmin}
-          onCreateMeeting={onCreateMeeting}
-          onChanged={onChanged}
-        />
+        {/* Ordine del Giorno (ODG) - ESCLUSIVO PER RIUNIONI */}
+        {evento.tipo === 'riunione' && (
+          <OdgManager
+            evento={evento}
+            isAdmin={isAdmin}
+            onCreateMeeting={onCreateMeeting}
+            onChanged={onChanged}
+          />
+        )}
 
         {/* Galleria Allegati (Fase 5) */}
         <div style={{ marginTop: 'var(--space-2)' }}>

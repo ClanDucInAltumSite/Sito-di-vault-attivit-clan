@@ -38,7 +38,7 @@ import {
 } from '../src/lib/db';
 import 'fake-indexeddb/auto';
 
-describe('FASE 5 — Allegati: Validazione, Storage, Cache e Resilienza', () => {
+describe('FASE 5 - Allegati: Validazione, Storage, Cache e Resilienza', () => {
   beforeEach(async () => {
     resetDbInstanceForTesting();
     const db = await getDb();

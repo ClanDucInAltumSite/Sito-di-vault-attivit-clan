@@ -1,6 +1,6 @@
 -- ==============================================================================
 -- Migrazione 0001: Schema Iniziale, Tabelle, Indici e Trigger
--- Sito Vault Scout Clan — Duc In Altum
+-- Sito Vault Scout Clan - Duc In Altum
 -- ==============================================================================
 
 -- 1. Funzione trigger per l'aggiornamento automatico di updated_at

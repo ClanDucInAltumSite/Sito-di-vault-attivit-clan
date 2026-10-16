@@ -16,7 +16,6 @@ import { softDeleteRecord } from '../../lib/admin_actions';
 import { subscribeSyncState } from '../../lib/sync';
 import { BanDetailSheet } from './BanDetailSheet';
 import { BanFormSheet } from './BanFormSheet';
-import { BanReadingMode } from './BanReadingMode';
 import { DeleteConfirmModal } from '../../ui/DeleteConfirmModal';
 
 type SortOption = 'az' | 'za' | 'recenti' | 'vecchi';
@@ -48,8 +47,6 @@ export function BansView() {
   // Modali e Sheet
   const [selectedBan, setSelectedBan] = useState<Ban | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
-  const [isReadingModeOpen, setIsReadingModeOpen] = useState(false);
-  const [readingBan, setReadingBan] = useState<Ban | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingBan, setEditingBan] = useState<Ban | null>(null);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -321,10 +318,6 @@ export function BansView() {
         ban={selectedBan}
         isOpen={isDetailOpen}
         onClose={() => setIsDetailOpen(false)}
-        onOpenReadingMode={(b) => {
-          setReadingBan(b);
-          setIsReadingModeOpen(true);
-        }}
         onEdit={(b) => {
           setIsDetailOpen(false);
           setEditingBan(b);
@@ -333,16 +326,6 @@ export function BansView() {
         onDelete={(b) => {
           setDeletingBan(b);
           setIsDeleteOpen(true);
-        }}
-      />
-
-      {/* Modalità Lettura Fullscreen (Fuochi di bivacco) */}
-      <BanReadingMode
-        ban={readingBan}
-        isOpen={isReadingModeOpen}
-        onClose={() => {
-          setIsReadingModeOpen(false);
-          setReadingBan(null);
         }}
       />
 

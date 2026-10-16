@@ -1,4 +1,4 @@
-# Guida alla Manutenzione — Sito Vault Scout Clan
+# Guida alla Manutenzione - Sito Vault Scout Clan
 
 Questo documento descrive in italiano semplice e accessibile (pensato per i capi scout non programmatori) l'elenco di tutte le credenziali e i servizi esterni utilizzati dal sito, e la procedura di manutenzione periodica consigliata.
 

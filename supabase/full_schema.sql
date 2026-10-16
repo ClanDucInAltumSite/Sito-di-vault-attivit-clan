@@ -1,5 +1,5 @@
 -- ==============================================================================
--- SCHEMA COMPLETO CONSOLIDATO — Sito Vault Scout Clan (Duc In Altum)
+-- SCHEMA COMPLETO CONSOLIDATO - Sito Vault Scout Clan (Duc In Altum)
 -- Da eseguire nel SQL Editor della dashboard Supabase
 -- ==============================================================================
 

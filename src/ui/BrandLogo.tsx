@@ -14,7 +14,7 @@ export interface BrandLogoProps {
 }
 
 /**
- * Componente Logo Ufficiale — Conforme a FASE 1B (FINALE) Sezione 1
+ * Componente Logo Ufficiale - Conforme a FASE 1B (FINALE) Sezione 1
  * - Sempre su fondo chiaro / targa bianca opaca
  * - Area di rispetto >= 12%
  * - Nessun ritocco, deformazione o ricolorazione
@@ -34,7 +34,7 @@ export function BrandLogo({
     ? `${logoCompletoMdWebp} 320w, ${logoCompletoWebp} 540w`
     : `${logoEmblemaSmWebp} 96w, ${logoEmblemaWebp} 540w`;
   const alt = isCompleto
-    ? 'Logo Ufficiale Clan Duc In Altum — Gruppo AGESCI Ponte San Giovanni 1'
+    ? 'Logo Ufficiale Clan Duc In Altum - Gruppo AGESCI Ponte San Giovanni 1'
     : 'Emblema Scout Duc In Altum';
 
   // Dimensioni native: completo 540x543 (ratio ~1), emblema 540x468 (ratio 1.15)

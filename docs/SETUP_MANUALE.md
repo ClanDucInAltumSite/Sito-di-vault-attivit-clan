@@ -1,4 +1,4 @@
-# Guida di Configurazione Manuale — Sito Vault Scout Clan
+# Guida di Configurazione Manuale - Sito Vault Scout Clan
 
 Questa guida spiega passo passo, in italiano semplice e per chi non è un programmatore, come configurare Supabase, GitHub e l'utenza di amministrazione per far funzionare il Vault di Clan.
 
@@ -194,7 +194,7 @@ Nel caso estremo in cui il progetto Supabase venga cancellato, il database diven
 
 ### Passo 5: Ripristina i Dati dall'Ultimo Backup JSON
 
-> [!WARNING] **IMPORTANTE — COSA CONTIENE E COSA NON CONTIENE IL BACKUP JSON:**
+> [!WARNING] **IMPORTANTE - COSA CONTIENE E COSA NON CONTIENE IL BACKUP JSON:**
 > Il file di backup JSON contiene **esclusivamente i dati testuali, le relazioni e i metadati** delle 6 tabelle del database (`giochi`, `bans`, `canti`, `eventi`, `odg_punti`, `allegati`).
 > **NON contiene i file fisici (fotografie, immagini e documenti PDF)** memorizzati nel bucket `allegati` di Supabase Storage!
 > 
@@ -223,11 +223,11 @@ Per la guida completa e il calendario operativo mese per mese, consulta il docum
 2. **GitHub Actions:** Disattiva automaticamente i workflow pianificati (*cron*) nei repository in cui non viene effettuato alcun commit o attività per 60 giorni consecutivi.
 
 ### Strategia di Difesa a Triplo Livello Adottata:
-1. **Livello 1 — Workflow GitHub (`.github/workflows/keepalive.yml`):**
+1. **Livello 1 - Workflow GitHub (`.github/workflows/keepalive.yml`):**
    - Gira ogni 2 giorni alle 06:00 UTC.
    - Esegue una query REST a Supabase mantenendo sveglio il database.
    - Ogni 40 giorni effettua un micro-commit automatico su `docs/keepalive_heartbeat.txt`. Tale commit **dovrebbe evitare la disattivazione; GitHub non lo garantisce ufficialmente: per questo esistono il promemoria mensile e il ping esterno**.
-2. **Livello 2 — Cron Esterno Ridondante ([cron-job.org](https://cron-job.org)):**
+2. **Livello 2 - Cron Esterno Ridondante ([cron-job.org](https://cron-job.org)):**
    - Servizio gratuito impostato per interrogare l'endpoint `giochi?select=id&limit=1` ogni 2 giorni con avviso email immediato in caso di errore (configurazione dettagliata nella Sezione 4.3).
-3. **Livello 3 — Promemoria Mensile dei Capi:**
+3. **Livello 3 - Promemoria Mensile dei Capi:**
    - Impostare un promemoria ricorrente nel calendario capi con cadenza mensile (*"Controllo Vault Scout & Backup"*): entrare nell'area Admin, premere **"Esporta Backup JSON"** e verificare la conservazione dei file originali su Google Drive di Clan.

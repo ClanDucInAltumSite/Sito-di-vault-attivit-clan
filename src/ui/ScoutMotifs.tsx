@@ -1,5 +1,5 @@
 /**
- * I Tre Motivi Scout Vettoriali — FASE 1B (FINALE) Sezione 7
+ * I Tre Motivi Scout Vettoriali - FASE 1B (FINALE) Sezione 7
  * Tratto sottile come le icone (1.75px), al massimo uno per schermata:
  * 1. La Rivelazione del Logo (su Targa Bianca)
  * 2. Il Sentiero (linea tratteggiata che si disegna con punto giallo finale)

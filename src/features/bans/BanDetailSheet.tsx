@@ -13,7 +13,6 @@ export interface BanDetailSheetProps {
   ban: Ban | null;
   isOpen: boolean;
   onClose: () => void;
-  onOpenReadingMode: (ban: Ban) => void;
   onEdit?: (ban: Ban) => void;
   onDelete?: (ban: Ban) => void;
   onUpdated?: () => void;
@@ -23,7 +22,6 @@ export function BanDetailSheet({
   ban,
   isOpen,
   onClose,
-  onOpenReadingMode,
   onEdit,
   onDelete,
   onUpdated,
@@ -76,37 +74,18 @@ export function BanDetailSheet({
             <div />
           )}
 
-          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => {
-                onClose();
-                onOpenReadingMode(ban);
-              }}
-            >
-              <Icon name="eye" size={16} />
-              <span>{I18N.bans.modalitaLettura}</span>
-            </Button>
-          </div>
+          <Button variant="primary" size="sm" onClick={onClose}>
+            {I18N.dialogs.chiudi}
+          </Button>
         </div>
       }
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          {isNew ? <Badge variant="giallo" size="sm">Nuovo</Badge> : <div />}
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => {
-              onClose();
-              onOpenReadingMode(ban);
-            }}
-          >
-            <Icon name="eye" size={16} />
-            <span>{I18N.bans.modalitaLettura}</span>
-          </Button>
-        </div>
+        {isNew && (
+          <div>
+            <Badge variant="giallo" size="sm">Nuovo</Badge>
+          </div>
+        )}
 
         {ban.note_gesti ? (
           <div

@@ -46,7 +46,7 @@ function getAllSourceFiles(dir: string, fileList: string[] = []): string[] {
   return fileList;
 }
 
-describe('CORREZIONE 4 — Verifica Statica Conformità Content Security Policy (CSP)', () => {
+describe('CORREZIONE 4 - Verifica Statica Conformità Content Security Policy (CSP)', () => {
   const csp = getIndexCspDirectives();
 
   it('1. Direttiva img-src: ammette tutti gli schemi e domini usati (blob:, data:, self, supabase)', () => {

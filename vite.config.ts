@@ -31,7 +31,7 @@ export default defineConfig({
         'photos/*.webp',
       ],
       manifest: {
-        name: 'Vault Clan — Duc In Altum',
+        name: 'Vault Clan - Duc In Altum',
         short_name: 'Vault Clan',
         description: 'Archivio condiviso di Giochi, Bans, Canti e Calendario per Clan Scout',
         theme_color: '#462679',

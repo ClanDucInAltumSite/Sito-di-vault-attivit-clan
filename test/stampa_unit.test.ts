@@ -13,7 +13,7 @@ import {
 } from '../src/lib/stampa';
 import { Gioco, Ban } from '../src/lib/db';
 
-describe('FASE 6 — Stampa A4: Logica di Paginazione, Overflow e Configurazione', () => {
+describe('FASE 6 - Stampa A4: Logica di Paginazione, Overflow e Configurazione', () => {
   beforeEach(() => {
     sessionStorage.clear();
   });

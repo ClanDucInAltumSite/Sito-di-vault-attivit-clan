@@ -66,7 +66,7 @@ export function BanReadingMode({ ban, isOpen, onClose }: BanReadingModeProps) {
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={`${I18N.bans.modalitaLettura} — ${ban.nome}`}
+      aria-label={`${I18N.bans.modalitaLettura} - ${ban.nome}`}
       style={{
         position: 'fixed',
         inset: 0,

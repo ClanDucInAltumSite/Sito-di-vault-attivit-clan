@@ -21,7 +21,7 @@ import { Evento, OdgPunto, getDb, resetDbInstanceForTesting, getOdgPunti, upsert
 import { saveEvento, forwardUnfinishedOdgPunti, findNextFutureMeeting } from '../src/lib/admin_actions';
 import { supabase } from '../src/lib/supabase';
 
-describe('Calendario & ODG — Test Logica di Dominio', () => {
+describe('Calendario & ODG - Test Logica di Dominio', () => {
   beforeEach(async () => {
     resetDbInstanceForTesting();
     const db = await getDb();

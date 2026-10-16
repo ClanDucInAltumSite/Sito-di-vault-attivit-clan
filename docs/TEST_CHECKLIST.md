@@ -1,4 +1,4 @@
-# Matrice e Procedura di Collaudo e Accettazione — Sito Vault Scout Clan
+# Matrice e Procedura di Collaudo e Accettazione - Sito Vault Scout Clan
 
 Questo documento definisce la matrice dei test per ciascuna fase di sviluppo del Vault di Clan, i comandi di esecuzione automatica, le prove documentate e i criteri di superamento (GATE).
 
@@ -10,7 +10,7 @@ La seguente tabella riporta i 14 criteri di accettazione definiti nella Sezione 
 
 ---
 
-### Voce 1 — Permessi Anonimi vs Admin (Tabelle e Storage)
+### Voce 1 - Permessi Anonimi vs Admin (Tabelle e Storage)
 > **Requisito:** Con la sola chiave anon, nessuna scrittura (tabelle e Storage) riesce; con l'admin sì. Script di test eseguito.
 
 - **Stato:** **DA VERIFICARE A MANO: `npm run test:admin` richiede la password dell'admin, eseguito dal proprietario**
@@ -29,7 +29,7 @@ La seguente tabella riporta i 14 criteri di accettazione definiti nella Sezione 
 
 ---
 
-### Voce 2 — Registrazioni Pubbliche e Amministratore Unico
+### Voce 2 - Registrazioni Pubbliche e Amministratore Unico
 > **Requisito:** Nessuna registrazione pubblica possibile; esiste un solo admin.
 
 - **Stato:** **DA VERIFICARE A MANO nel pannello Supabase**
@@ -40,7 +40,7 @@ La seguente tabella riporta i 14 criteri di accettazione definiti nella Sezione 
 
 ---
 
-### Voce 3 — Assenza di `innerHTML` e Resilienza XSS
+### Voce 3 - Assenza di `innerHTML` e Resilienza XSS
 > **Requisito:** Nessun `innerHTML` su dati dinamici (ricerca nel codice); input con `<`, `&`, virgolette renderizzato correttamente ovunque.
 
 - **Stato:** **SUPERATO (VERIFICATO CON TEST STATICO E PLAYWRIGHT)**
@@ -58,10 +58,10 @@ La seguente tabella riporta i 14 criteri di accettazione definiti nella Sezione 
 
 ---
 
-### Voce 4 — Assenza di Segreti e `service_role`
+### Voce 4 - Assenza di Segreti e `service_role`
 > **Requisito:** Nessun segreto o `service_role` nel repo né nella cronologia git.
 
-- **Stato:** **SUPERATO SUI FILE ATTUALI — CRONOLOGIA GIT DA VERIFICARE A MANO**
+- **Stato:** **SUPERATO SUI FILE ATTUALI - CRONOLOGIA GIT DA VERIFICARE A MANO**
 - **Comando di verifica:**
   ```bash
   # 1. Test automatico sui file attuali del workspace (esclusi node_modules, dist, .git)
@@ -77,10 +77,10 @@ La seguente tabella riporta i 14 criteri di accettazione definiti nella Sezione 
 
 ---
 
-### Voce 5 — Funzionamento Offline Completo
+### Voce 5 - Funzionamento Offline Completo
 > **Requisito:** Offline: app aperta online, poi modalità aereo, chiusura e riapertura → contenuti, ricerca, lettura canti e allegati scaricati funzionano.
 
-- **Stato:** **SUPERATO SU SIMULATORE AUTOMATIZZATO — DA VERIFICARE A MANO SU SAFARI IOS E APP INSTALLATA**
+- **Stato:** **SUPERATO SU SIMULATORE AUTOMATIZZATO - DA VERIFICARE A MANO SU SAFARI IOS E APP INSTALLATA**
 - **Comando di verifica:**
   ```bash
   npx playwright test test/offline_matrix.spec.ts
@@ -98,7 +98,7 @@ La seguente tabella riporta i 14 criteri di accettazione definiti nella Sezione 
 
 ---
 
-### Voce 6 — Sincronizzazione Multi-Dispositivo (Realtime e Offline->Online)
+### Voce 6 - Sincronizzazione Multi-Dispositivo (Realtime e Offline->Online)
 > **Requisito:** Modifica dal dispositivo A → compare sul B online (realtime) e sul C dopo il riavvio offline→online.
 
 - **Stato:** **SUPERATO (VERIFICATO CON TEST UNITARI SUL MOTORE DI SYNC)**
@@ -114,7 +114,7 @@ La seguente tabella riporta i 14 criteri di accettazione definiti nella Sezione 
 
 ---
 
-### Voce 7 — Eliminazione Sincronizzata e Bonifica Tombstone
+### Voce 7 - Eliminazione Sincronizzata e Bonifica Tombstone
 > **Requisito:** Eliminazione sincronizzata: un elemento cancellato sparisce anche da chi era offline.
 
 - **Stato:** **SUPERATO (VERIFICATO CON TEST DI SYNC ENGINE E FULL_SCHEMA)**
@@ -130,25 +130,25 @@ La seguente tabella riporta i 14 criteri di accettazione definiti nella Sezione 
 
 ---
 
-### Voce 8 — Notifica di Nuova Versione dell'Applicazione
+### Voce 8 - Notifica di Nuova Versione dell'Applicazione
 > **Requisito:** Nuova versione dell'app: l'avviso di aggiornamento compare e nessuno resta bloccato su una versione vecchia.
 
-- **Stato:** **SUPERATO (VERIFICATO NEL CODICE SERVICE WORKER) — DA VERIFICARE A MANO AL PRIMO DEPLOY DI PRODUZIONE**
+- **Stato:** **SUPERATO (VERIFICATO NEL CODICE SERVICE WORKER) - DA VERIFICARE A MANO AL PRIMO DEPLOY DI PRODUZIONE**
 - **Prova ed Evidenza:**
   - `src/sw.ts` registra l'ascoltatore di messaggi per l'evento `SKIP_WAITING`.
   - In `src/app/App.tsx`, il registration hook di `vite-plugin-pwa` intercetta l'evento `needRefresh`.
   - Quando viene pubblicata una nuova release su GitHub Pages:
     1. Il browser scarica in background il nuovo Service Worker.
-    2. Nella barra superiore dell'applicazione compare un banner `Toast` in evidenza: *"Nuova versione disponibile — [Aggiorna]"*.
+    2. Nella barra superiore dell'applicazione compare un banner `Toast` in evidenza: *"Nuova versione disponibile - [Aggiorna]"*.
     3. Al tap sul pulsante "Aggiorna", viene inviato il comando `skipWaiting()`, il nuovo SW prende il controllo e la pagina si ricarica in modo trasparente senza cache residue.
   - **Verifica su PWA Installata:** **DA VERIFICARE A MANO** dopo il push su GitHub Pages mediante rilascio di un nuovo commit.
 
 ---
 
-### Voce 9 — Stampa Professionale A4 e Generazione PDF
+### Voce 9 - Stampa Professionale A4 e Generazione PDF
 > **Requisito:** Stampa: giochi e bans in sequenza continua; ogni canto su pagina nuova; canto da 2 pagine = 2 pagine esatte; accordi allineati; verificato via PDF.
 
-- **Stato:** **SUPERATO (VERIFICATO CON PARSING BINARIO PDF) — DA VERIFICARE A MANO SU AIRPRINT**
+- **Stato:** **SUPERATO (VERIFICATO CON PARSING BINARIO PDF) - DA VERIFICARE A MANO SU AIRPRINT**
 - **Comando di verifica:**
   ```bash
   npx playwright test test/stampa_pdf.spec.ts
@@ -158,14 +158,14 @@ La seguente tabella riporta i 14 criteri di accettazione definiti nella Sezione 
     - **Copertina e Indice:** Pagina 1 (Copertina con marchio `logo-completo` su targa) e Pagina 2 (Indice analitico con numeri di pagina reali coincidenti con la collocazione effettiva dei brani).
     - **Giochi e Bans:** Flusso continuo senza interruzioni di pagina arbitrarie (`break-inside: avoid` per elementi brevi, separatore orizzontale).
     - **Canti su Nuova Pagina:** Ogni canto comincia rigorosamente su pagina nuova (`break-before: page !important`).
-    - **Canto Lungo su 2 Pagine:** Il canto di prova su 2 pagine genera esattamente 2 pagine; la pagina 2 riporta la testata ridotta con numerazione *"Titolo — 2/2"*.
+    - **Canto Lungo su 2 Pagine:** Il canto di prova su 2 pagine genera esattamente 2 pagine; la pagina 2 riporta la testata ridotta con numerazione *"Titolo - 2/2"*.
     - **Allineamento Accordi:** Testata una riga con 40 accordi consecutivi disposti esattamente sopra le sillabe corrispondenti, senza troncamenti o sovrapposizioni.
     - **Assenza di Pagine Bianche:** Nessuna pagina bianca o semivuota presente nel documento.
   - **Verifica AirPrint su Stampante Fisica:** **DA VERIFICARE A MANO** (richiede apertura menu Condividi -> Stampa su iOS verso stampante Wi-Fi).
 
 ---
 
-### Voce 10 — Ordine del Giorno (ODG) Riunioni
+### Voce 10 - Ordine del Giorno (ODG) Riunioni
 > **Requisito:** ODG: punti spuntabili, riporto alla riunione successiva, stampa.
 
 - **Stato:** **SUPERATO (VERIFICATO CON TEST UNITARI, RLS E STAMPA)**
@@ -182,7 +182,7 @@ La seguente tabella riporta i 14 criteri di accettazione definiti nella Sezione 
 
 ---
 
-### Voce 11 — Design System OKLCH, Accessibilità AA e Icone PWA
+### Voce 11 - Design System OKLCH, Accessibilità AA e Icone PWA
 > **Requisito:** Palette gialla/azzurra/rossa applicata, contrasto AA verificato, logo corretto, icone PWA (192, 512, maskable con zona sicura) generate dal logo e di dimensioni reali.
 
 - **Stato:** **SUPERATO (VERIFICATO CON AXE-CORE, DESIGN SYSTEM TEST E SCREENSHOT)**
@@ -202,7 +202,7 @@ La seguente tabella riporta i 14 criteri di accettazione definiti nella Sezione 
 
 ---
 
-### Voce 12 — Audit Lighthouse Mobile e Prestazioni
+### Voce 12 - Audit Lighthouse Mobile e Prestazioni
 > **Requisito:** Lighthouse mobile: PWA installabile, Performance e Accessibilità alti; nessun errore in console.
 
 - **Stato:** **SUPERATO (CON LIMITE NOTO LCP LANTERN DOCUMENTATO)**
@@ -240,7 +240,7 @@ La seguente tabella riporta i 14 criteri di accettazione definiti nella Sezione 
 
 ---
 
-### Voce 13 — Keepalive Automatico, Esecuzione Manuale e Fallimento Visibile
+### Voce 13 - Keepalive Automatico, Esecuzione Manuale e Fallimento Visibile
 > **Requisito:** Keepalive eseguito manualmente con successo e fallimento simulato visibile.
 
 - **Stato:** **SUPERATO (VERIFICATO CON API GITHUB ACTIONS E LOGICA DI CONTROLLO NEL WORKFLOW)**
@@ -265,7 +265,7 @@ La seguente tabella riporta i 14 criteri di accettazione definiti nella Sezione 
 
 ---
 
-### Voce 14 — Verifica da Zero di `SETUP_MANUALE.md` (Disaster Recovery)
+### Voce 14 - Verifica da Zero di `SETUP_MANUALE.md` (Disaster Recovery)
 > **Requisito:** `SETUP_MANUALE.md` testato: seguendolo da zero si ottiene l'app funzionante.
 
 - **Stato:** **NON VERIFICATA da zero su un nuovo progetto**

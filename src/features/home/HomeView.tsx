@@ -204,7 +204,7 @@ export function HomeView() {
             aria-label="Nessun evento in programma. Tocca per aprire il calendario."
           >
             <div className="calendar-date-block" aria-hidden="true">
-              <div className="calendar-date-month">—</div>
+              <div className="calendar-date-month">-</div>
               <div className="calendar-date-day">--</div>
               <div className="calendar-date-weekday">CAL</div>
             </div>

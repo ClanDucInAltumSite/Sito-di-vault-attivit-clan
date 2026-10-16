@@ -709,7 +709,7 @@ export async function exportBackupJson(): Promise<void> {
   const db = await getDb();
   const backupData: Record<string, any> = {
     export_date: new Date().toISOString(),
-    app: 'Vault Scout — Duc In Altum',
+    app: 'Vault Scout - Duc In Altum',
     schema_version: 1,
     tables: {},
   };

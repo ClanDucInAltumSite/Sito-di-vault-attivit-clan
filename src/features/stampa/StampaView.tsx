@@ -30,7 +30,9 @@ import {
   PrintableODG,
   computePrintIndex,
 } from '../../lib/stampa';
-import { ChordProRenderer } from '../../lib/chordpro';
+import { ChordProRenderer, stripChords } from '../../lib/chordpro';
+import { SearchField } from '../../ui/SearchField';
+import { matchesQuery } from '../../lib/search';
 
 type SectionTab = 'tutti' | 'giochi' | 'bans' | 'canti' | 'odg';
 
@@ -42,6 +44,18 @@ export function StampaView() {
   const [eventi, setEventi] = useState<Evento[]>([]);
   const [odgPuntiMap, setOdgPuntiMap] = useState<Record<string, OdgPunto[]>>({});
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [expandedSections, setExpandedSections] = useState<{ [key: string]: boolean }>({
+    giochi: true,
+    bans: true,
+    canti: true,
+    odg: true,
+  });
+
+  const toggleSection = (sec: string) => {
+    setExpandedSections((prev) => ({ ...prev, [sec]: !prev[sec] }));
+  };
 
   const [activeTab, setActiveTab] = useState<SectionTab>('tutti');
   const [printableData, setPrintableData] = useState<PrintableData>({
@@ -217,6 +231,43 @@ export function StampaView() {
     });
   }, []);
 
+  // Filtraggio elementi tramite la barra di ricerca
+  const filteredGiochi = useMemo(() => {
+    if (!searchQuery.trim()) return giochi;
+    return giochi.filter((g) =>
+      matchesQuery(searchQuery, g.nome, g.materiali || '', g.regole || '')
+    );
+  }, [giochi, searchQuery]);
+
+  const filteredBans = useMemo(() => {
+    if (!searchQuery.trim()) return bans;
+    return bans.filter((b) =>
+      matchesQuery(searchQuery, b.nome, b.testo || '', b.note_gesti || '')
+    );
+  }, [bans, searchQuery]);
+
+  const filteredCanti = useMemo(() => {
+    if (!searchQuery.trim()) return canti;
+    return canti.filter((c) => {
+      const clean = stripChords(c.testo_chordpro);
+      return matchesQuery(searchQuery, c.titolo, c.autore || '', clean);
+    });
+  }, [canti, searchQuery]);
+
+  const filteredEventi = useMemo(() => {
+    if (!searchQuery.trim()) return eventi;
+    return eventi.filter((ev) => {
+      const pts = odgPuntiMap[ev.id] || [];
+      const ptsText = pts.map((p) => p.testo).join(' ');
+      return matchesQuery(searchQuery, ev.titolo, ev.luogo || '', ptsText);
+    });
+  }, [eventi, odgPuntiMap, searchQuery]);
+
+  const isGiochiOpen = searchQuery.trim() ? filteredGiochi.length > 0 : !!expandedSections.giochi;
+  const isBansOpen = searchQuery.trim() ? filteredBans.length > 0 : !!expandedSections.bans;
+  const isCantiOpen = searchQuery.trim() ? filteredCanti.length > 0 : !!expandedSections.canti;
+  const isOdgOpen = searchQuery.trim() ? filteredEventi.length > 0 : !!expandedSections.odg;
+
   return (
     <div className="container" style={{ paddingTop: 'var(--space-4)', paddingBottom: 'var(--space-8)' }}>
       {/* =========================================================================
@@ -357,6 +408,16 @@ export function StampaView() {
           </div>
         </div>
 
+        {/* Barra di Ricerca Elementi Stampa */}
+        <div style={{ marginBottom: 'var(--space-4)' }}>
+          <SearchField
+            value={searchQuery}
+            onInput={setSearchQuery}
+            placeholder="Cerca per titolo o contenuto tra giochi, bans, canti e ODG..."
+            aria-label="Cerca elementi da stampare"
+          />
+        </div>
+
         {/* Filtro per Sezioni */}
         <div style={{ marginBottom: 'var(--space-4)' }}>
           <SegmentedControl
@@ -372,7 +433,7 @@ export function StampaView() {
           />
         </div>
 
-        {/* LISTA GIOCHI */}
+        {/* LISTA GIOCHI (Menu a tendina / Accordion) */}
         {(activeTab === 'tutti' || activeTab === 'giochi') && (
           <div className="ios-card" style={{ marginBottom: 'var(--space-4)', padding: 'var(--space-4)' }}>
             <div
@@ -380,22 +441,46 @@ export function StampaView() {
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                marginBottom: 'var(--space-3)',
-                paddingBottom: 'var(--space-2)',
-                borderBottom: '1px solid var(--color-border)',
+                paddingBottom: isGiochiOpen ? 'var(--space-2)' : 0,
+                borderBottom: isGiochiOpen ? '1px solid var(--color-border)' : 'none',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+              <button
+                type="button"
+                onClick={() => toggleSection('giochi')}
+                aria-expanded={isGiochiOpen}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 'var(--space-2)',
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  font: 'inherit',
+                  color: 'inherit',
+                }}
+              >
                 <SectionIcon section="giochi" size="sm" />
                 <h2 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 700, margin: 0 }}>
                   {I18N.stampa.giochi} ({config.selectedGiochiIds.length}/{giochi.length})
                 </h2>
-              </div>
-              <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                {searchQuery.trim() && (
+                  <Badge variant="neutral" size="sm">
+                    {filteredGiochi.length} trovati
+                  </Badge>
+                )}
+                <div style={{ marginLeft: 'var(--space-1)', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center' }}>
+                  <Icon name={isGiochiOpen ? 'chevron-up' : 'chevron-down'} size={18} />
+                </div>
+              </button>
+
+              <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
                 <button
                   type="button"
                   className="ios-btn ios-btn-secondary"
-                  style={{ minHeight: '32px', padding: '0 8px', fontSize: 'var(--font-size-xs)' }}
+                  style={{ minHeight: '30px', padding: '0 8px', fontSize: 'var(--font-size-xs)' }}
                   onClick={() => selectAllSection('giochi')}
                 >
                   {I18N.stampa.selezionaTutto}
@@ -403,7 +488,7 @@ export function StampaView() {
                 <button
                   type="button"
                   className="ios-btn ios-btn-secondary"
-                  style={{ minHeight: '32px', padding: '0 8px', fontSize: 'var(--font-size-xs)' }}
+                  style={{ minHeight: '30px', padding: '0 8px', fontSize: 'var(--font-size-xs)' }}
                   onClick={() => deselectAllSection('giochi')}
                 >
                   {I18N.stampa.deselezionaTutto}
@@ -411,88 +496,92 @@ export function StampaView() {
               </div>
             </div>
 
-            {giochi.length === 0 ? (
-              <div style={{ color: 'var(--color-text-secondary)', padding: 'var(--space-3) 0' }}>
-                Nessun gioco presente nel vault.
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                {giochi.map((g) => {
-                  const isSelected = config.selectedGiochiIds.includes(g.id);
-                  const orderIndex = config.selectedGiochiIds.indexOf(g.id);
-                  return (
-                    <div
-                      key={g.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: 'var(--space-2) var(--space-3)',
-                        borderRadius: 'var(--radius-md)',
-                        background: isSelected ? 'var(--color-fill-quaternary)' : 'transparent',
-                        border: '1px solid',
-                        borderColor: isSelected ? 'var(--color-giochi-border)' : 'var(--color-border)',
-                      }}
-                    >
-                      <label
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 'var(--space-3)',
-                          cursor: 'pointer',
-                          flex: 1,
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleSelection('giochi', g.id)}
-                          style={{ width: '18px', height: '18px' }}
-                          aria-label={`Seleziona ${g.nome}`}
-                        />
-                        <div>
-                          <div style={{ fontWeight: 600, fontSize: 'var(--font-size-sm)' }}>
-                            {g.nome}
-                          </div>
-                          {g.materiali && (
-                            <div style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-secondary)' }}>
-                              Materiali: {g.materiali}
+            {isGiochiOpen && (
+              <div style={{ marginTop: 'var(--space-3)' }}>
+                {filteredGiochi.length === 0 ? (
+                  <div style={{ color: 'var(--color-text-secondary)', padding: 'var(--space-3) 0', fontSize: 'var(--font-size-sm)' }}>
+                    {searchQuery.trim() ? 'Nessun gioco corrispondente alla ricerca.' : 'Nessun gioco presente nel vault.'}
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                    {filteredGiochi.map((g) => {
+                      const isSelected = config.selectedGiochiIds.includes(g.id);
+                      const orderIndex = config.selectedGiochiIds.indexOf(g.id);
+                      return (
+                        <div
+                          key={g.id}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: 'var(--space-2) var(--space-3)',
+                            borderRadius: 'var(--radius-md)',
+                            background: isSelected ? 'var(--color-fill-quaternary)' : 'transparent',
+                            border: '1px solid',
+                            borderColor: isSelected ? 'var(--color-giochi-border)' : 'var(--color-border)',
+                          }}
+                        >
+                          <label
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 'var(--space-3)',
+                              cursor: 'pointer',
+                              flex: 1,
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleSelection('giochi', g.id)}
+                              style={{ width: '18px', height: '18px' }}
+                              aria-label={`Seleziona ${g.nome}`}
+                            />
+                            <div>
+                              <div style={{ fontWeight: 600, fontSize: 'var(--font-size-sm)' }}>
+                                {g.nome}
+                              </div>
+                              {g.materiali && (
+                                <div style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-secondary)' }}>
+                                  Materiali: {g.materiali}
+                                </div>
+                              )}
+                            </div>
+                          </label>
+
+                          {isSelected && (
+                            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                              <button
+                                type="button"
+                                className="stampa-reorder-btn"
+                                disabled={orderIndex <= 0}
+                                onClick={() => handleReorder('giochi', g.id, 'up')}
+                                aria-label={`${I18N.stampa.spostaSu} ${g.nome}`}
+                              >
+                                <Icon name="chevron-up" size={14} />
+                              </button>
+                              <button
+                                type="button"
+                                className="stampa-reorder-btn"
+                                disabled={orderIndex === -1 || orderIndex >= config.selectedGiochiIds.length - 1}
+                                onClick={() => handleReorder('giochi', g.id, 'down')}
+                                aria-label={`${I18N.stampa.spostaGiu} ${g.nome}`}
+                              >
+                                <Icon name="chevron-down" size={14} />
+                              </button>
                             </div>
                           )}
                         </div>
-                      </label>
-
-                      {isSelected && (
-                        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                          <button
-                            type="button"
-                            className="stampa-reorder-btn"
-                            disabled={orderIndex <= 0}
-                            onClick={() => handleReorder('giochi', g.id, 'up')}
-                            aria-label={`${I18N.stampa.spostaSu} ${g.nome}`}
-                          >
-                            <Icon name="chevron-up" size={14} />
-                          </button>
-                          <button
-                            type="button"
-                            className="stampa-reorder-btn"
-                            disabled={orderIndex === -1 || orderIndex >= config.selectedGiochiIds.length - 1}
-                            onClick={() => handleReorder('giochi', g.id, 'down')}
-                            aria-label={`${I18N.stampa.spostaGiu} ${g.nome}`}
-                          >
-                            <Icon name="chevron-down" size={14} />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
           </div>
         )}
 
-        {/* LISTA BANS */}
+        {/* LISTA BANS (Menu a tendina / Accordion) */}
         {(activeTab === 'tutti' || activeTab === 'bans') && (
           <div className="ios-card" style={{ marginBottom: 'var(--space-4)', padding: 'var(--space-4)' }}>
             <div
@@ -500,22 +589,46 @@ export function StampaView() {
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                marginBottom: 'var(--space-3)',
-                paddingBottom: 'var(--space-2)',
-                borderBottom: '1px solid var(--color-border)',
+                paddingBottom: isBansOpen ? 'var(--space-2)' : 0,
+                borderBottom: isBansOpen ? '1px solid var(--color-border)' : 'none',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+              <button
+                type="button"
+                onClick={() => toggleSection('bans')}
+                aria-expanded={isBansOpen}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 'var(--space-2)',
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  font: 'inherit',
+                  color: 'inherit',
+                }}
+              >
                 <SectionIcon section="bans" size="sm" />
                 <h2 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 700, margin: 0 }}>
                   {I18N.stampa.bans} ({config.selectedBansIds.length}/{bans.length})
                 </h2>
-              </div>
-              <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                {searchQuery.trim() && (
+                  <Badge variant="neutral" size="sm">
+                    {filteredBans.length} trovati
+                  </Badge>
+                )}
+                <div style={{ marginLeft: 'var(--space-1)', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center' }}>
+                  <Icon name={isBansOpen ? 'chevron-up' : 'chevron-down'} size={18} />
+                </div>
+              </button>
+
+              <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
                 <button
                   type="button"
                   className="ios-btn ios-btn-secondary"
-                  style={{ minHeight: '32px', padding: '0 8px', fontSize: 'var(--font-size-xs)' }}
+                  style={{ minHeight: '30px', padding: '0 8px', fontSize: 'var(--font-size-xs)' }}
                   onClick={() => selectAllSection('bans')}
                 >
                   {I18N.stampa.selezionaTutto}
@@ -523,7 +636,7 @@ export function StampaView() {
                 <button
                   type="button"
                   className="ios-btn ios-btn-secondary"
-                  style={{ minHeight: '32px', padding: '0 8px', fontSize: 'var(--font-size-xs)' }}
+                  style={{ minHeight: '30px', padding: '0 8px', fontSize: 'var(--font-size-xs)' }}
                   onClick={() => deselectAllSection('bans')}
                 >
                   {I18N.stampa.deselezionaTutto}
@@ -531,88 +644,92 @@ export function StampaView() {
               </div>
             </div>
 
-            {bans.length === 0 ? (
-              <div style={{ color: 'var(--color-text-secondary)', padding: 'var(--space-3) 0' }}>
-                Nessun ban presente nel vault.
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                {bans.map((b) => {
-                  const isSelected = config.selectedBansIds.includes(b.id);
-                  const orderIndex = config.selectedBansIds.indexOf(b.id);
-                  return (
-                    <div
-                      key={b.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: 'var(--space-2) var(--space-3)',
-                        borderRadius: 'var(--radius-md)',
-                        background: isSelected ? 'var(--color-fill-quaternary)' : 'transparent',
-                        border: '1px solid',
-                        borderColor: isSelected ? 'var(--color-bans-border)' : 'var(--color-border)',
-                      }}
-                    >
-                      <label
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 'var(--space-3)',
-                          cursor: 'pointer',
-                          flex: 1,
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleSelection('bans', b.id)}
-                          style={{ width: '18px', height: '18px' }}
-                          aria-label={`Seleziona ${b.nome}`}
-                        />
-                        <div>
-                          <div style={{ fontWeight: 600, fontSize: 'var(--font-size-sm)' }}>
-                            {b.nome}
-                          </div>
-                          {b.note_gesti && (
-                            <div style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-secondary)' }}>
-                              Gesti: {b.note_gesti}
+            {isBansOpen && (
+              <div style={{ marginTop: 'var(--space-3)' }}>
+                {filteredBans.length === 0 ? (
+                  <div style={{ color: 'var(--color-text-secondary)', padding: 'var(--space-3) 0', fontSize: 'var(--font-size-sm)' }}>
+                    {searchQuery.trim() ? 'Nessun ban corrispondente alla ricerca.' : 'Nessun ban presente nel vault.'}
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                    {filteredBans.map((b) => {
+                      const isSelected = config.selectedBansIds.includes(b.id);
+                      const orderIndex = config.selectedBansIds.indexOf(b.id);
+                      return (
+                        <div
+                          key={b.id}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: 'var(--space-2) var(--space-3)',
+                            borderRadius: 'var(--radius-md)',
+                            background: isSelected ? 'var(--color-fill-quaternary)' : 'transparent',
+                            border: '1px solid',
+                            borderColor: isSelected ? 'var(--color-bans-border)' : 'var(--color-border)',
+                          }}
+                        >
+                          <label
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 'var(--space-3)',
+                              cursor: 'pointer',
+                              flex: 1,
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleSelection('bans', b.id)}
+                              style={{ width: '18px', height: '18px' }}
+                              aria-label={`Seleziona ${b.nome}`}
+                            />
+                            <div>
+                              <div style={{ fontWeight: 600, fontSize: 'var(--font-size-sm)' }}>
+                                {b.nome}
+                              </div>
+                              {b.note_gesti && (
+                                <div style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-secondary)' }}>
+                                  Gesti: {b.note_gesti}
+                                </div>
+                              )}
+                            </div>
+                          </label>
+
+                          {isSelected && (
+                            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                              <button
+                                type="button"
+                                className="stampa-reorder-btn"
+                                disabled={orderIndex <= 0}
+                                onClick={() => handleReorder('bans', b.id, 'up')}
+                                aria-label={`${I18N.stampa.spostaSu} ${b.nome}`}
+                              >
+                                <Icon name="chevron-up" size={14} />
+                              </button>
+                              <button
+                                type="button"
+                                className="stampa-reorder-btn"
+                                disabled={orderIndex === -1 || orderIndex >= config.selectedBansIds.length - 1}
+                                onClick={() => handleReorder('bans', b.id, 'down')}
+                                aria-label={`${I18N.stampa.spostaGiu} ${b.nome}`}
+                              >
+                                <Icon name="chevron-down" size={14} />
+                              </button>
                             </div>
                           )}
                         </div>
-                      </label>
-
-                      {isSelected && (
-                        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                          <button
-                            type="button"
-                            className="stampa-reorder-btn"
-                            disabled={orderIndex <= 0}
-                            onClick={() => handleReorder('bans', b.id, 'up')}
-                            aria-label={`${I18N.stampa.spostaSu} ${b.nome}`}
-                          >
-                            <Icon name="chevron-up" size={14} />
-                          </button>
-                          <button
-                            type="button"
-                            className="stampa-reorder-btn"
-                            disabled={orderIndex === -1 || orderIndex >= config.selectedBansIds.length - 1}
-                            onClick={() => handleReorder('bans', b.id, 'down')}
-                            aria-label={`${I18N.stampa.spostaGiu} ${b.nome}`}
-                          >
-                            <Icon name="chevron-down" size={14} />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
           </div>
         )}
 
-        {/* LISTA CANTI */}
+        {/* LISTA CANTI (Menu a tendina / Accordion) */}
         {(activeTab === 'tutti' || activeTab === 'canti') && (
           <div className="ios-card" style={{ marginBottom: 'var(--space-4)', padding: 'var(--space-4)' }}>
             <div
@@ -620,22 +737,46 @@ export function StampaView() {
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                marginBottom: 'var(--space-3)',
-                paddingBottom: 'var(--space-2)',
-                borderBottom: '1px solid var(--color-border)',
+                paddingBottom: isCantiOpen ? 'var(--space-2)' : 0,
+                borderBottom: isCantiOpen ? '1px solid var(--color-border)' : 'none',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+              <button
+                type="button"
+                onClick={() => toggleSection('canti')}
+                aria-expanded={isCantiOpen}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 'var(--space-2)',
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  font: 'inherit',
+                  color: 'inherit',
+                }}
+              >
                 <SectionIcon section="canti" size="sm" />
                 <h2 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 700, margin: 0 }}>
                   {I18N.stampa.canti} ({config.selectedCantiIds.length}/{canti.length})
                 </h2>
-              </div>
-              <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                {searchQuery.trim() && (
+                  <Badge variant="neutral" size="sm">
+                    {filteredCanti.length} trovati
+                  </Badge>
+                )}
+                <div style={{ marginLeft: 'var(--space-1)', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center' }}>
+                  <Icon name={isCantiOpen ? 'chevron-up' : 'chevron-down'} size={18} />
+                </div>
+              </button>
+
+              <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
                 <button
                   type="button"
                   className="ios-btn ios-btn-secondary"
-                  style={{ minHeight: '32px', padding: '0 8px', fontSize: 'var(--font-size-xs)' }}
+                  style={{ minHeight: '30px', padding: '0 8px', fontSize: 'var(--font-size-xs)' }}
                   onClick={() => selectAllSection('canti')}
                 >
                   {I18N.stampa.selezionaTutto}
@@ -643,7 +784,7 @@ export function StampaView() {
                 <button
                   type="button"
                   className="ios-btn ios-btn-secondary"
-                  style={{ minHeight: '32px', padding: '0 8px', fontSize: 'var(--font-size-xs)' }}
+                  style={{ minHeight: '30px', padding: '0 8px', fontSize: 'var(--font-size-xs)' }}
                   onClick={() => deselectAllSection('canti')}
                 >
                   {I18N.stampa.deselezionaTutto}
@@ -651,179 +792,226 @@ export function StampaView() {
               </div>
             </div>
 
-            {canti.length === 0 ? (
-              <div style={{ color: 'var(--color-text-secondary)', padding: 'var(--space-3) 0' }}>
-                Nessun canto presente nel vault.
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                {canti.map((c) => {
-                  const isSelected = config.selectedCantiIds.includes(c.id);
-                  const orderIndex = config.selectedCantiIds.indexOf(c.id);
-                  const printableSong = printableData.canti.find((sc) => sc.canto.id === c.id);
+            {isCantiOpen && (
+              <div style={{ marginTop: 'var(--space-3)' }}>
+                {filteredCanti.length === 0 ? (
+                  <div style={{ color: 'var(--color-text-secondary)', padding: 'var(--space-3) 0', fontSize: 'var(--font-size-sm)' }}>
+                    {searchQuery.trim() ? 'Nessun canto corrispondente alla ricerca.' : 'Nessun canto presente nel vault.'}
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                    {filteredCanti.map((c) => {
+                      const isSelected = config.selectedCantiIds.includes(c.id);
+                      const orderIndex = config.selectedCantiIds.indexOf(c.id);
+                      const printableSong = printableData.canti.find((sc) => sc.canto.id === c.id);
 
-                  return (
-                    <div
-                      key={c.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: 'var(--space-2) var(--space-3)',
-                        borderRadius: 'var(--radius-md)',
-                        background: isSelected ? 'var(--color-fill-quaternary)' : 'transparent',
-                        border: '1px solid',
-                        borderColor: isSelected ? 'var(--color-canti-border)' : 'var(--color-border)',
-                      }}
-                    >
-                      <label
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 'var(--space-3)',
-                          cursor: 'pointer',
-                          flex: 1,
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleSelection('canti', c.id)}
-                          style={{ width: '18px', height: '18px' }}
-                          aria-label={`Seleziona ${c.titolo}`}
-                        />
-                        <div>
-                          <div style={{ fontWeight: 600, fontSize: 'var(--font-size-sm)' }}>
-                            {c.titolo}
-                          </div>
-                          <div
+                      return (
+                        <div
+                          key={c.id}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: 'var(--space-2) var(--space-3)',
+                            borderRadius: 'var(--radius-md)',
+                            background: isSelected ? 'var(--color-fill-quaternary)' : 'transparent',
+                            border: '1px solid',
+                            borderColor: isSelected ? 'var(--color-canti-border)' : 'var(--color-border)',
+                          }}
+                        >
+                          <label
                             style={{
                               display: 'flex',
                               alignItems: 'center',
-                              gap: 'var(--space-2)',
-                              fontSize: 'var(--font-size-2xs)',
-                              color: 'var(--color-text-secondary)',
+                              gap: 'var(--space-3)',
+                              cursor: 'pointer',
+                              flex: 1,
                             }}
                           >
-                            {c.autore && <span>{c.autore}</span>}
-                            {c.tonalita && <span>• Tonalità: {c.tonalita}</span>}
-                            {printableSong && (
-                              <span style={{ fontWeight: 600 }}>
-                                • {printableSong.pageCount} {printableSong.pageCount === 1 ? 'pagina A4' : 'pagine A4'}
-                              </span>
-                            )}
-                            {printableSong?.hasAnyOverflow && (
-                              <Badge variant="rosso" size="sm">
-                                Overflow
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                      </label>
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleSelection('canti', c.id)}
+                              style={{ width: '18px', height: '18px' }}
+                              aria-label={`Seleziona ${c.titolo}`}
+                            />
+                            <div>
+                              <div style={{ fontWeight: 600, fontSize: 'var(--font-size-sm)' }}>
+                                {c.titolo}
+                              </div>
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 'var(--space-2)',
+                                  fontSize: 'var(--font-size-2xs)',
+                                  color: 'var(--color-text-secondary)',
+                                }}
+                              >
+                                {c.autore && <span>{c.autore}</span>}
+                                {c.tonalita && <span>• Tonalità: {c.tonalita}</span>}
+                                {printableSong && (
+                                  <span style={{ fontWeight: 600 }}>
+                                    • {printableSong.pageCount} {printableSong.pageCount === 1 ? 'pagina A4' : 'pagine A4'}
+                                  </span>
+                                )}
+                                {printableSong?.hasAnyOverflow && (
+                                  <Badge variant="rosso" size="sm">
+                                    Overflow
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                          </label>
 
-                      {isSelected && (
-                        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                          <button
-                            type="button"
-                            className="stampa-reorder-btn"
-                            disabled={orderIndex <= 0}
-                            onClick={() => handleReorder('canti', c.id, 'up')}
-                            aria-label={`${I18N.stampa.spostaSu} ${c.titolo}`}
-                          >
-                            <Icon name="chevron-up" size={14} />
-                          </button>
-                          <button
-                            type="button"
-                            className="stampa-reorder-btn"
-                            disabled={orderIndex === -1 || orderIndex >= config.selectedCantiIds.length - 1}
-                            onClick={() => handleReorder('canti', c.id, 'down')}
-                            aria-label={`${I18N.stampa.spostaGiu} ${c.titolo}`}
-                          >
-                            <Icon name="chevron-down" size={14} />
-                          </button>
+                          {isSelected && (
+                            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                              <button
+                                type="button"
+                                className="stampa-reorder-btn"
+                                disabled={orderIndex <= 0}
+                                onClick={() => handleReorder('canti', c.id, 'up')}
+                                aria-label={`${I18N.stampa.spostaSu} ${c.titolo}`}
+                              >
+                                <Icon name="chevron-up" size={14} />
+                              </button>
+                              <button
+                                type="button"
+                                className="stampa-reorder-btn"
+                                disabled={orderIndex === -1 || orderIndex >= config.selectedCantiIds.length - 1}
+                                onClick={() => handleReorder('canti', c.id, 'down')}
+                                aria-label={`${I18N.stampa.spostaGiu} ${c.titolo}`}
+                              >
+                                <Icon name="chevron-down" size={14} />
+                              </button>
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
           </div>
         )}
 
-        {/* MODELLO ODG (Preparatorio per Fase 7) */}
+        {/* MODELLO ODG (Menu a tendina / Accordion) */}
         {(activeTab === 'tutti' || activeTab === 'odg') && (
           <div className="ios-card" style={{ marginBottom: 'var(--space-4)', padding: 'var(--space-4)' }}>
             <div
               style={{
                 display: 'flex',
+                justifyContent: 'space-between',
                 alignItems: 'center',
-                gap: 'var(--space-2)',
-                marginBottom: 'var(--space-3)',
-                paddingBottom: 'var(--space-2)',
-                borderBottom: '1px solid var(--color-border)',
+                paddingBottom: isOdgOpen ? 'var(--space-2)' : 0,
+                borderBottom: isOdgOpen ? '1px solid var(--color-border)' : 'none',
               }}
             >
-              <SectionIcon section="calendario" size="sm" />
-              <h2 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 700, margin: 0 }}>
-                {I18N.stampa.schedaOdg}
-              </h2>
-            </div>
-            <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-3)' }}>
-              Seleziona un evento del calendario con Ordine del Giorno per stampare una scheda A4 compatta con caselle quadrate stampabili.
-            </p>
+              <button
+                type="button"
+                onClick={() => toggleSection('odg')}
+                aria-expanded={isOdgOpen}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 'var(--space-2)',
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  font: 'inherit',
+                  color: 'inherit',
+                }}
+              >
+                <SectionIcon section="calendario" size="sm" />
+                <h2 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 700, margin: 0 }}>
+                  {I18N.stampa.schedaOdg} {selectedEventId ? '(1 selezionato)' : '(0 selezionati)'}
+                </h2>
+                {searchQuery.trim() && (
+                  <Badge variant="neutral" size="sm">
+                    {filteredEventi.length} trovati
+                  </Badge>
+                )}
+                <div style={{ marginLeft: 'var(--space-1)', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center' }}>
+                  <Icon name={isOdgOpen ? 'chevron-up' : 'chevron-down'} size={18} />
+                </div>
+              </button>
 
-            {eventi.length === 0 ? (
-              <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
-                Nessun evento disponibile.
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                {selectedEventId && (
+                  <button
+                    type="button"
+                    className="ios-btn ios-btn-secondary"
+                    style={{ minHeight: '30px', padding: '0 8px', fontSize: 'var(--font-size-xs)' }}
+                    onClick={() => setSelectedEventId(null)}
+                  >
+                    Deseleziona
+                  </button>
+                )}
               </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                {eventi.map((ev) => {
-                  const pts = odgPuntiMap[ev.id] || [];
-                  const isSelected = selectedEventId === ev.id;
-                  return (
-                    <div
-                      key={ev.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: 'var(--space-2) var(--space-3)',
-                        borderRadius: 'var(--radius-md)',
-                        background: isSelected ? 'var(--color-fill-quaternary)' : 'transparent',
-                        border: '1px solid',
-                        borderColor: isSelected ? 'var(--color-calendario)' : 'var(--color-border)',
-                      }}
-                    >
-                      <label
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 'var(--space-3)',
-                          cursor: 'pointer',
-                          flex: 1,
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => setSelectedEventId(isSelected ? null : ev.id)}
-                          style={{ width: '18px', height: '18px' }}
-                          aria-label={`Seleziona ODG ${ev.titolo}`}
-                        />
-                        <div>
-                          <div style={{ fontWeight: 600, fontSize: 'var(--font-size-sm)' }}>
-                            {ev.titolo}
-                          </div>
-                          <div style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-secondary)' }}>
-                            {new Date(ev.inizio).toLocaleDateString('it-IT')} • {pts.length} punti ODG
-                          </div>
+            </div>
+
+            {isOdgOpen && (
+              <div style={{ marginTop: 'var(--space-3)' }}>
+                <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-3)' }}>
+                  Seleziona un evento del calendario con Ordine del Giorno per stampare una scheda A4 compatta con caselle quadrate stampabili.
+                </p>
+
+                {filteredEventi.length === 0 ? (
+                  <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
+                    {searchQuery.trim() ? 'Nessuna riunione o ODG corrispondente alla ricerca.' : 'Nessun evento disponibile.'}
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                    {filteredEventi.map((ev) => {
+                      const pts = odgPuntiMap[ev.id] || [];
+                      const isSelected = selectedEventId === ev.id;
+                      return (
+                        <div
+                          key={ev.id}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: 'var(--space-2) var(--space-3)',
+                            borderRadius: 'var(--radius-md)',
+                            background: isSelected ? 'var(--color-fill-quaternary)' : 'transparent',
+                            border: '1px solid',
+                            borderColor: isSelected ? 'var(--color-calendario)' : 'var(--color-border)',
+                          }}
+                        >
+                          <label
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 'var(--space-3)',
+                              cursor: 'pointer',
+                              flex: 1,
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => setSelectedEventId(isSelected ? null : ev.id)}
+                              style={{ width: '18px', height: '18px' }}
+                              aria-label={`Seleziona ODG ${ev.titolo}`}
+                            />
+                            <div>
+                              <div style={{ fontWeight: 600, fontSize: 'var(--font-size-sm)' }}>
+                                {ev.titolo}
+                              </div>
+                              <div style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-secondary)' }}>
+                                {new Date(ev.inizio).toLocaleDateString('it-IT')} • {pts.length} punti ODG
+                              </div>
+                            </div>
+                          </label>
                         </div>
-                      </label>
-                    </div>
-                  );
-                })}
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
           </div>

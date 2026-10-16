@@ -5,7 +5,7 @@
 
 export const I18N = {
   app: {
-    title: 'Vault Clan — Duc In Altum',
+    title: 'Vault Clan - Duc In Altum',
     shortTitle: 'Vault Clan',
     subtitle: 'Archivio condiviso di Giochi, Bans, Canti e Calendario',
   },
@@ -24,7 +24,7 @@ export const I18N = {
     syncing: 'Sincronizzazione in corso...',
     lastSync: 'Ultimo aggiornamento:',
     neverSynced: 'Mai sincronizzato',
-    offlineBanner: (dataOra: string) => `Sei offline — dati aggiornati al ${dataOra}`,
+    offlineBanner: (dataOra: string) => `Sei offline - dati aggiornati al ${dataOra}`,
     offlineNotice: 'Sei offline. Le modifiche sono consentite solo quando sei connesso a internet.',
     syncNow: 'Aggiorna ora',
     pwaUpdateAvailable: 'Nuova versione disponibile!',
@@ -158,7 +158,7 @@ export const I18N = {
     scattaFoto: 'Scatta foto con fotocamera',
     scaricaOffline: 'Scarica tutti per uso offline',
     scaricamentoInCorso: 'Download allegati in corso...',
-    nonScaricato: 'Non scaricato — connettiti a internet per visualizzarlo',
+    nonScaricato: 'Non scaricato - connettiti a internet per visualizzarlo',
     limiteSuperato: 'Dimensione massima superata (limite 10 MB).',
     tipoNonSupportato: 'Tipo di file non supportato. Sono ammesse solo immagini JPG, PNG, WebP e PDF.',
   },

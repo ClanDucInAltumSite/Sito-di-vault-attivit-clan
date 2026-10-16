@@ -4,7 +4,7 @@ Questo documento raccoglie tutte le decisioni architetturali, i vincoli e le mot
 
 ---
 
-## ADR-001: Scelta del Framework Frontend — Preact + Vite + TypeScript (strict)
+## ADR-001: Scelta del Framework Frontend - Preact + Vite + TypeScript (strict)
 - **Stato:** Approvato (Fase 0)
 - **Opzioni considerate:** Preact, Svelte 5.
 - **Decisione:** Adozione di **Preact** (con `@preact/preset-vite` e `preact/hooks`).
@@ -84,7 +84,7 @@ Questo documento raccoglie tutte le decisioni architetturali, i vincoli e le mot
 - **Decisione:** La stampa avviene interamente nella stessa pagina tramite `window.print()` e `@media print` A4.
 - **Specifiche per sezione:**
   - *Giochi e Bans:* Flusso continuo senza interruzioni di pagina forzate. La regola `break-inside: avoid` viene applicata **esclusivamente agli elementi brevi** (testo sotto i 600 caratteri); gli elementi lunghi possono spezzarsi liberamente tra le pagine per non lasciare ampi spazi bianchi a fondo pagina. `break-after: avoid` rimane attivo sui titoli per evitare titoli orfani.
-  - *Canti:* Nuova pagina obbligatoria per ogni canto (`break-before: page`), rispetto dei tag `{nuova_pagina}`, intestazione ridotta nelle pagine successive ("Titolo — 2/2") e algoritmo di rilevamento overflow che avvisa nell'anteprima se il canto sfora l'A4.
+  - *Canti:* Nuova pagina obbligatoria per ogni canto (`break-before: page`), rispetto dei tag `{nuova_pagina}`, intestazione ridotta nelle pagine successive ("Titolo - 2/2") e algoritmo di rilevamento overflow che avvisa nell'anteprima se il canto sfora l'A4.
   - *ODG:* Scheda singola compatta con caselle quadrate stampabili per la spunta manuale.
 
 ---
@@ -158,7 +158,7 @@ Questo documento raccoglie tutte le decisioni architetturali, i vincoli e le mot
 ---
 
 ## ADR-016: Redesign Professionale con Anima e Identità (Logo Protagonista, 5 Fotografie, Targa Bianca e Movimento Sobrio)
-- **Stato:** Approvato (Fase 1B Finale — Sostituisce tutte le bozze precedenti 1B/1C/1D)
+- **Stato:** Approvato (Fase 1B Finale - Sostituisce tutte le bozze precedenti 1B/1C/1D)
 - **Decisione:** Rifacimento completo dell'interfaccia basato su qualità di classe Apple (Note, Promemoria, Libri, Impostazioni) mettendo al centro il logo del gruppo AGESCI Ponte San Giovanni 1, arricchito da cinque fotografie suggestate e movimento vettoriale sobrio.
 - **Scelte implementative:**
   1. **Il Logo è il Protagonista Assoluto sulla Targa Bianca:**
@@ -187,22 +187,22 @@ Questo documento raccoglie tutte le decisioni architetturali, i vincoli e le mot
 
 Questa sezione tiene traccia delle implementazioni puntuali richieste e approvate al termine della Fase 0, che verranno integrate nei rispettivi moduli durante le fasi operative corrispondenti:
 
-1. **FASE 2 — Dati e Offline:**
+1. **FASE 2 - Dati e Offline:**
    - **Full Resync Atomico:** Nel primo download e nel full resync (> 90 giorni di assenza), i record vengono scaricati per intero in un buffer in memoria e scritti in IndexedDB in un'unica transazione atomica `readwrite`. È vietato svuotare IndexedDB prima del termine del download.
    - **Timeout Differenziati:** Timeout breve a 4s per le pull incrementali; timeout esteso a 25s per full resync e primo avvio, con suddivisione a blocchi e gestione della ripresa.
    - **Soft Delete Gerarchica:** Quando un elemento genitore (`gioco`, `ban`, `canto`, `evento`) subisce soft-delete (`deleted_at != null`), i relativi figli (`odg_punti`, `allegati`) vengono nascosti automaticamente dalla UI e ripristinati insieme al genitore in caso di un-delete.
 
-2. **FASE 3 — Giochi e Bans & FASE 5 — Allegati:**
+2. **FASE 3 - Giochi e Bans & FASE 5 - Allegati:**
    - **Cestino e Rimozione Storage Definitiva:** Conservazione tombstone sul server a 180 giorni. La pulizia definitiva del Cestino (hard delete attivata dall'admin) cancella sia i record nel database sia i file fisici corrispondenti da Supabase Storage (`storage.objects`).
 
-3. **FASE 3 — Ricerca e Ordinamento:**
+3. **FASE 3 - Ricerca e Ordinamento:**
    - **Regola Deterministica Tolleranza Typo:**
      - Termini con lunghezza < 4 caratteri: Exact match (Levenshtein = 0).
      - Termini con lunghezza 4–7 caratteri: Distanza Levenshtein $\le 1$.
      - Termini con lunghezza $\ge 8$ caratteri: Distanza Levenshtein $\le 2$ (ad es. termine cercato "aveleata", lunghezza 8 caratteri, trova "avvelenata" con distanza 2).
      - Test unitari allineati a questa specifica.
 
-4. **FASE 6 — Stampa:**
+4. **FASE 6 - Stampa:**
    - **Gestione Spezzatura Pagine Giochi e Bans:** La direttiva `break-inside: avoid` viene applicata unicamente agli elementi brevi (testo sotto i 600 caratteri o classe `.print-item-short`); gli elementi lunghi possono spezzarsi normalmente tra le pagine A4 per evitare spazi bianchi a fondo pagina. `break-after: avoid` rimane attivo sui titoli.
 
 ---
@@ -389,7 +389,7 @@ Le sezioni Giochi e Bans rappresentano il nucleo operativo per l'animazione e le
   6. **Cache Offline (Cache API `scout-attachments-v1`):**
      - Gli allegati di piccole dimensioni ($< 500\text{ KB}$) vengono automaticamente scaricati e inseriti in cache al termine di ogni sincronizzazione in background.
      - Pulsante dedicato in Admin per forzare il download manuale di tutti gli allegati con barra di progresso in percentuale.
-     - In assenza di rete, gli allegati non ancora memorizzati in cache mostrano un badge sobrio "Non scaricato — serve connessione" senza provocare errori di rete visibili o interruzioni dell'interfaccia.
+     - In assenza di rete, gli allegati non ancora memorizzati in cache mostrano un badge sobrio "Non scaricato - serve connessione" senza provocare errori di rete visibili o interruzioni dell'interfaccia.
   7. **Interfaccia Utente e Lightbox Zoom:**
      - Componente `AttachmentGallery`: griglia responsiva con miniature ad altezza e larghezza fisse per prevenire Cumulative Layout Shift (CLS), icona identificativa per PDF con dimensione formattata, zoom modale a tutto schermo per immagini (lightbox accessibile) e opzioni di eliminazione per admin.
      - Componente `AttachmentUploadManager`: selettore duale fotocamera/file, anteprima immediata e barra di avanzamento caricamento.
@@ -412,7 +412,7 @@ La Fase 6 richiede la generazione e stampa di fascicoli personalizzati composti 
 1. Nessun popup o nuova scheda (`window.open` è intercettato dai popup blocker mobili): l'anteprima e la stampa avvengono nella stessa finestra tramite `window.print()` e direttive `@media print`.
 2. Impaginazione rigorosa A4 (`@page { size: A4 portrait; margin: 15mm 12mm; }`), testo nero su fondo bianco puro (`oklch(0 0 0)` su `oklch(1 0 0)`), corpo del testo non inferiore a 12 pt.
 3. Flusso continuo per Giochi e Bans: separatore sottile tra elementi, titoli con `break-after: avoid`, `orphans: 3`, `widows: 3`. Gli elementi brevi (< 600 caratteri) hanno `break-inside: avoid`, mentre quelli estesi scorrono liberamente su più pagine.
-4. Canti a pagina singola o doppia: ogni canto inizia su nuova pagina (`break-before: page`). I cambi pagina espliciti `{nuova_pagina}` (ChordPro) spezzano il canto. Nelle pagine successive alla prima, la testata è ridotta al solo titolo con indicatore di pagina ("Titolo — 2/2"). Accordi in nero grassetto posizionati sopra il testo.
+4. Canti a pagina singola o doppia: ogni canto inizia su nuova pagina (`break-before: page`). I cambi pagina espliciti `{nuova_pagina}` (ChordPro) spezzano il canto. Nelle pagine successive alla prima, la testata è ridotta al solo titolo con indicatore di pagina ("Titolo - 2/2"). Accordi in nero grassetto posizionati sopra il testo.
 5. Controllo di capienza (overflow): algoritmo deterministico con 4 gradini di riduzione del carattere (da 12 pt a 9.5 pt); se il testo supera comunque l'altezza utile del foglio A4, compare l'avviso giallo *"Questa pagina non entra: aggiungi un'interruzione di pagina"*.
 6. Opzioni: copertina con `logo-completo` su fondo chiaro e indice con numeri di pagina calcolati; interruttore per includere le sole immagini allegate (i PDF non sono mai inclusi nel flusso di stampa).
 7. Preparazione ODG: impaginazione A4 per riunioni con caselle quadrate di spunta.

@@ -1,6 +1,6 @@
 -- ==============================================================================
 -- Migrazione 0003: Configurazione Bucket Storage Allegati e Policy di Sicurezza
--- Sito Vault Scout Clan — Duc In Altum
+-- Sito Vault Scout Clan - Duc In Altum
 -- ==============================================================================
 
 -- 1. Creazione del bucket 'allegati' (pubblico per download diretto via URL)

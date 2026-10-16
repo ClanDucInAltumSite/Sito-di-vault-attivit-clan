@@ -140,7 +140,7 @@ export function StatoDatiView() {
             subtitle={syncState.lastSyncServerTime ? new Date(syncState.lastSyncServerTime).toLocaleString('it-IT') : 'Nessuna sincronizzazione effettuata'}
             trailing={
               <span className="tabular-nums" style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
-                {syncState.lastSyncServerTime ? syncState.lastSyncServerTime.slice(11, 19) : '—'}
+                {syncState.lastSyncServerTime ? syncState.lastSyncServerTime.slice(11, 19) : '-'}
               </span>
             }
           />
@@ -184,7 +184,7 @@ export function StatoDatiView() {
                 }
                 trailing={
                   <span className="tabular-nums" style={{ fontWeight: 600, fontSize: 'var(--font-size-sm)' }}>
-                    {tableData ? `${tableData.active} / ${tableData.total}` : '—'}
+                    {tableData ? `${tableData.active} / ${tableData.total}` : '-'}
                   </span>
                 }
               />
@@ -202,7 +202,7 @@ export function StatoDatiView() {
               subtitle={cursors[table] ? `Cursore: ${cursors[table]}` : 'Nessun cursore (utilizza ultimo orario globale)'}
               trailing={
                 <span className="tabular-nums" style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-secondary)' }}>
-                  {cursors[table] ? cursors[table].slice(0, 10) : '—'}
+                  {cursors[table] ? cursors[table].slice(0, 10) : '-'}
                 </span>
               }
             />

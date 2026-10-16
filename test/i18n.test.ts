@@ -21,7 +21,7 @@ describe('Dizionario di Internazionalizzazione (I18N)', () => {
 
   it('ha messaggi di stato offline e PWA conformi alle specifiche', () => {
     const formattedOffline = I18N.status.offlineBanner('14/10 alle 12:00');
-    expect(formattedOffline).toContain('Sei offline — dati aggiornati al 14/10 alle 12:00');
+    expect(formattedOffline).toContain('Sei offline - dati aggiornati al 14/10 alle 12:00');
     expect(I18N.status.pwaUpdateAvailable).toBe('Nuova versione disponibile!');
   });
 });

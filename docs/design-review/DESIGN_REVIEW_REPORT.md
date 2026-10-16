@@ -1,8 +1,8 @@
-# Rapporto di Revisione Grafica — FASE 1B (Redesign Apple-Grade)
+# Rapporto di Revisione Grafica - FASE 1B (Redesign Apple-Grade)
 
 **Data:** 14 Ottobre 2026  
 **Autore:** Antigravity (Advanced Agentic Coding)  
-**Applicazione:** Vault Clan — Duc In Altum  
+**Applicazione:** Vault Clan - Duc In Altum  
 **Branch:** `main`
 
 ---

@@ -22,6 +22,6 @@ I capi clan possono sostituire qualsiasi foto posizionando un file JPEG con lo s
 ---
 
 ## Logo e Marchio del Gruppo
-- **Marchio:** Clan "Duc In Altum" — Gruppo AGESCI Ponte San Giovanni 1.
+- **Marchio:** Clan "Duc In Altum" - Gruppo AGESCI Ponte San Giovanni 1.
 - **Colori Campionati:** Viola profondo (`#462679`), Giallo (`#FDC500`), Azzurro (`#00BDFF`), Rosso (`#E8442D`).
 - **File originali:** `assets/favicon.png` (derivazioni: `assets/logo-completo.png` e `assets/logo-emblema.png`).

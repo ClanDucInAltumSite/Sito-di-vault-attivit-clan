@@ -1,4 +1,4 @@
-# Sistema di Design e Specifiche dell'Interfaccia — FASE 1B (FINALE)
+# Sistema di Design e Specifiche dell'Interfaccia - FASE 1B (FINALE)
 
 Documento di riferimento per il design system, l'esperienza utente e l'architettura visiva del **Vault di Clan (Duc In Altum)**, conforme alle direttive di redesign professionale con anima e identità.
 
@@ -92,9 +92,9 @@ Tutti i token cromatici sono formulati nello spazio colore percettivo **OKLCH** 
 ## 5. Profondità Fisica e Materiali
 
 L'interfaccia adotta un modello fisico a tre livelli:
-- **Livello 0 — Sfondo Applicazione:** Sfondo grigio caldo calmo (`oklch(0.975 0.006 80)` in chiaro; grigio-viola molto profondo `oklch(0.14 0.015 305)` in scuro).
-- **Livello 1 — Tessere e Card a Riposo:** Superfici bianche opache con bordo sottile (`1px solid var(--color-border)`) e ombra subliminale (`--shadow-rest`). Tessere 2×2 in Home con quadratino colorato 36×36px e grande numero indicatore.
-- **Livello 2 — Elementi Sospesi e Traslucidi:** Barre di navigazione superiore e inferiore con effetto vetro `backdrop-filter: blur(20px)`, Targa bianca del logo con ombra morbida a sbalzo (`--shadow-targa`), Bottom Sheet che scorre dal basso con maniglia arrotondata e blocco scroll.
+- **Livello 0 - Sfondo Applicazione:** Sfondo grigio caldo calmo (`oklch(0.975 0.006 80)` in chiaro; grigio-viola molto profondo `oklch(0.14 0.015 305)` in scuro).
+- **Livello 1 - Tessere e Card a Riposo:** Superfici bianche opache con bordo sottile (`1px solid var(--color-border)`) e ombra subliminale (`--shadow-rest`). Tessere 2×2 in Home con quadratino colorato 36×36px e grande numero indicatore.
+- **Livello 2 - Elementi Sospesi e Traslucidi:** Barre di navigazione superiore e inferiore con effetto vetro `backdrop-filter: blur(20px)`, Targa bianca del logo con ombra morbida a sbalzo (`--shadow-targa`), Bottom Sheet che scorre dal basso con maniglia arrotondata e blocco scroll.
 
 ---
 
@@ -199,7 +199,7 @@ La suite di test automatizzati con **Playwright** e **Axe-Core** verifica ad ogn
 ### 10.1 Galleria Allegati (`AttachmentGallery`)
 - **Griglia Miniature Immagini:** Miniature a rapporto d'aspetto fisso con `width` e `height` esplicite per eliminare qualsiasi Cumulative Layout Shift (CLS), raggio di curvatura coerente (`--radius-md`) e badge per l'ingrandimento (`zoom-in`).
 - **Card Documenti PDF:** Scheda orizzontale elegante con icona vettoriale documento, titolo file con troncamento ellittico protetto, dimensione formattata (KB/MB) e pulsante di apertura diretta in nuova scheda o viewer di sistema.
-- **Badge Risorsa Non Scaricata:** Se il dispositivo è offline e il file non è presente nella cache locale (`scout-attachments-v1`), compare un badge sobrio "Non scaricato — serve connessione" al posto della miniatura o accanto alla dimensione, senza generare errori di caricamento immagine o blocchi UI.
+- **Badge Risorsa Non Scaricata:** Se il dispositivo è offline e il file non è presente nella cache locale (`scout-attachments-v1`), compare un badge sobrio "Non scaricato - serve connessione" al posto della miniatura o accanto alla dimensione, senza generare errori di caricamento immagine o blocchi UI.
 - **Gating Amministrativo:** I pulsanti di cancellazione rapida (icona cestino rosso con conferma) sono visibili esclusivamente se `isAdmin === true`.
 
 ### 10.2 Modale Ingrandimento Immagini (`Lightbox`)
@@ -240,7 +240,7 @@ La suite di test automatizzati con **Playwright** e **Axe-Core** verifica ad ogn
 - **Paginazione Canti:**
   - Ogni canto inizia tassativamente su una pagina nuova (`break-before: page !important`).
   - Ripartizione automatica su più pagine tramite tag `{nuova_pagina}`.
-  - Pagine successive ($N \ge 2$): testata ridotta al solo titolo con indicatore di pagina ("Titolo del Canto — 2/2"), escludendo metadati secondari.
+  - Pagine successive ($N \ge 2$): testata ridotta al solo titolo con indicatore di pagina ("Titolo del Canto - 2/2"), escludendo metadati secondari.
   - Accordi musicali posizionati sopra il testo in nero solido grassetto (`font-weight: 700`).
   - Barra laterale del ritornello con bordo spesso solido (`border-left: 3pt solid oklch(0 0 0)`).
 - **Controllo di Capienza (Overflow):**
@@ -259,7 +259,7 @@ La suite di test automatizzati con **Playwright** e **Axe-Core** verifica ad ogn
 
 ---
 
-## 12. Specifiche Componenti Calendario e Ordine del Giorno (ODG — Fase 7)
+## 12. Specifiche Componenti Calendario e Ordine del Giorno (ODG - Fase 7)
 
 ### 12.1 Token e Indicatori Cromatici dei Tipi di Evento
 I 5 tipi di attività previsti dal Clan utilizzano token OKLCH armonizzati:

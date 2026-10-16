@@ -52,7 +52,7 @@ function makeMockQuery(data: any[] = [], error: any = null) {
   return p;
 }
 
-describe('FASE 2 — Test di Sicurezza, Sincronizzazione e Offline (Sync Engine)', () => {
+describe('FASE 2 - Test di Sicurezza, Sincronizzazione e Offline (Sync Engine)', () => {
   beforeEach(async () => {
     // Pulisce e ricrea il database per ogni test
     resetDbInstanceForTesting();

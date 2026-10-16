@@ -184,7 +184,7 @@ export function AttachmentGallery({
                       PDF • {formatSize(pdf.dimensione)}
                       {state.isOffline && (
                         <span style={{ marginLeft: '8px' }} className="attachment-offline-badge">
-                          Non scaricato — serve connessione
+                          Non scaricato - serve connessione
                         </span>
                       )}
                     </div>

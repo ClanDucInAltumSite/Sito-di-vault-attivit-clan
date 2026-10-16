@@ -77,7 +77,7 @@ export function DesignSystemView() {
           Sistema di Design con Anima
         </h1>
         <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: '4px' }}>
-          FASE 1B (FINALE) — Qualità Apple, identità del logo AGESCI, 5 fotografie e motivi vettoriali scout
+          FASE 1B (FINALE) - Qualità Apple, identità del logo AGESCI, 5 fotografie e motivi vettoriali scout
         </p>
       </div>
 
@@ -184,31 +184,31 @@ export function DesignSystemView() {
       >
         <GroupedRow
           leading={<SectionIcon section="giochi" size="md" />}
-          title="Giochi — Giallo Scout"
+          title="Giochi - Giallo Scout"
           subtitle="quadratino giallo pieno con glifo scuro (OKLCH L=0.83)"
           trailing={<Badge variant="giallo" size="sm">Giochi</Badge>}
         />
         <GroupedRow
           leading={<SectionIcon section="bans" size="md" />}
-          title="Bans — Rosso Scout"
+          title="Bans - Rosso Scout"
           subtitle="quadratino rosso pieno con glifo bianco (OKLCH L=0.55)"
           trailing={<Badge variant="rosso" size="sm">Bans</Badge>}
         />
         <GroupedRow
           leading={<SectionIcon section="canti" size="md" />}
-          title="Canti — Azzurro Canzoniere"
+          title="Canti - Azzurro Canzoniere"
           subtitle="quadratino azzurro pieno con glifo bianco (OKLCH L=0.53)"
           trailing={<Badge variant="azzurro" size="sm">Canti</Badge>}
         />
         <GroupedRow
           leading={<SectionIcon section="calendario" size="md" />}
-          title="Calendario — Blu Notte"
+          title="Calendario - Blu Notte"
           subtitle="quadratino blu notte pieno con glifo bianco (OKLCH L=0.42)"
           trailing={<span className="event-type-chip event-chip-riunione">Calendario</span>}
         />
         <GroupedRow
           leading={<SectionIcon section="stampa" size="md" />}
-          title="Stampa e Admin — Grigio Neutro"
+          title="Stampa e Admin - Grigio Neutro"
           subtitle="quadratino grigio pieno con glifo bianco (OKLCH L=0.48)"
           trailing={<Badge variant="neutral" size="sm">Strumenti</Badge>}
         />
@@ -318,7 +318,7 @@ export function DesignSystemView() {
         <div style={{ padding: 'var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-6)', alignItems: 'center' }}>
           <div style={{ width: '100%', textAlign: 'center' }}>
             <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 600, color: 'var(--color-text-secondary)', display: 'block', marginBottom: 'var(--space-2)' }}>
-              Il Sentiero (The Trail — linea tratteggiata che si disegna + punto giallo)
+              Il Sentiero (The Trail - linea tratteggiata che si disegna + punto giallo)
             </span>
             <TheTrail />
           </div>
@@ -591,9 +591,9 @@ export function DesignSystemView() {
         </div>
       </GroupedList>
 
-      {/* 19. CALENDARIO E ORDINE DEL GIORNO (ODG) — FASE 7 */}
+      {/* 19. CALENDARIO E ORDINE DEL GIORNO (ODG) - FASE 7 */}
       <GroupedList
-        header="19. CALENDARIO E ORDINE DEL GIORNO (ODG — FASE 7)"
+        header="19. CALENDARIO E ORDINE DEL GIORNO (ODG - FASE 7)"
         footer="Chip cromatici per i 5 tipi di attività, blocchi data da parete, indicatore 'Oggi' in rosso e spunta ODG animata riservata ad Admin."
       >
         <GroupedRow

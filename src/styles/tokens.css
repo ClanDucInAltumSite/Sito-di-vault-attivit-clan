@@ -1,5 +1,5 @@
 /* ==============================================================================
-   Design Tokens — Sistema OKLCH con Anima e Identità (FASE 1B FINALE)
+   Design Tokens - Sistema OKLCH con Anima e Identità (FASE 1B FINALE)
    Tutti i colori sono espressi in coordinate OKLCH.
    Campionamento rigoroso dal logo:
      - Viola profondo (#462679): "Inchiostro" dell'app e accento nobile
@@ -167,6 +167,14 @@
   --duration-normal: 280ms;
   --duration-sheet: 320ms;
   --duration-reveal: 550ms;
+
+  /* --- Z-INDEX STRATIFICAZIONE --- */
+  --z-base: 1;
+  --z-sticky: 100;
+  --z-dropdown: 500;
+  --z-sheet: 1000;
+  --z-modal: 2000;
+  --z-toast: 3000;
 }
 
 /* --- TEMA SCURO (DARK MODE) CON GRIGIO-VIOLA PROFONDO --- */

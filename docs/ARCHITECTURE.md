@@ -1,4 +1,4 @@
-# Architettura Tecnica e Specifiche di Sistema — Sito Vault Scout Clan
+# Architettura Tecnica e Specifiche di Sistema - Sito Vault Scout Clan
 
 Documento architetturale di riferimento per il Vault di Clan (archivio di Giochi, Bans, Canti e Calendario con Ordine del Giorno per clan scout).
 
@@ -417,7 +417,7 @@ Meta-tag restrittivo in `index.html`:
 - Cache storage dedicata: `scout-attachments-v1`.
 - **Auto-download:** Allegati $< 500\text{ KB}$ scaricati in background dopo la sync.
 - **Download su richiesta:** Pulsante *"Scarica tutti gli allegati per l'uso offline"* con barra di progresso.
-- **Fallback visivo:** *"Non scaricato — connettiti a internet per aprirlo"*.
+- **Fallback visivo:** *"Non scaricato - connettiti a internet per aprirlo"*.
 - **Persistenza iOS:** Chiamata `navigator.storage.persist()`. Banner di istruzioni per l'installazione su Schermata Home di iOS per neutralizzare la policy di rimozione dei 7 giorni di Safari.
 
 ---
@@ -452,7 +452,7 @@ Meta-tag restrittivo in `index.html`:
 - **Editor Admin Live e Validatore Morbido:**
   - Componente `CantoFormSheet` con anteprima live in tempo reale, pulsanti di inserimento rapido per accordi `[Accordo]` e direttive alla posizione del cursore, controllo duplicati morbido (Levenshtein $\le 2$) e validatore sintattico morbido (`validateChordPro`).
 
-### 8.3 Calendario e Ordine del Giorno (ODG) — Fase 7
+### 8.3 Calendario e Ordine del Giorno (ODG) - Fase 7
 - **Fuso Orario e Localizzazione:** Fuso orario rigorosamente fissato su `Europe/Rome`, localizzazione `it-IT`, inizio settimana di Lunedì. Gestione matematica deterministica dei mesi (28, 29 bisestile, 30, 31 giorni) e immunità agli sfasamenti da ora legale (transizione estiva di marzo e solare di ottobre).
 - **Architettura a Due Viste:**
   - **Vista Mese (`CalendarioMonthView`):** Griglia reattiva a 7 colonne (LUN-DOM), celle con giorno del mese, evidenziazione del giorno odierno in rosso accento (`.calendar-cell-today`), indicatori a pallini cromatici per ciascun tipo di attività, pulsanti di navigazione mese e salto rapido a "Oggi". Elenco dinamico delle attività della data selezionata sottostante alla griglia.
@@ -490,7 +490,7 @@ Meta-tag restrittivo in `index.html`:
 - **Impaginazione Canti e Pagine Multiple:**
   - Ogni canto inizia su una nuova pagina (`break-before: page !important`).
   - Supporto nativo della direttiva ChordPro `{nuova_pagina}` per suddividere brani lunghi su 2 o più pagine.
-  - Nelle pagine successive alla prima ($N \ge 2$), la testata è ridotta al solo titolo con indicatore di pagina ("Titolo del Canto — 2/2"), omettendo metadati ripetuti (autore, tonalità, ritmo, capotasto).
+  - Nelle pagine successive alla prima ($N \ge 2$), la testata è ridotta al solo titolo con indicatore di pagina ("Titolo del Canto - 2/2"), omettendo metadati ripetuti (autore, tonalità, ritmo, capotasto).
   - Gli accordi sono posizionati sopra il testo in nero grassetto (`oklch(0 0 0)`, `font-weight: 700`).
   - La linea del ritornello è renderizzata con bordo nero solido a sinistra (`border-left: 3pt solid oklch(0 0 0)`).
 - **Algoritmo di Rilevamento Overflow e Riduzione Font (`src/lib/stampa.ts`):**

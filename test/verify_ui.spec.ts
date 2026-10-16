@@ -286,7 +286,7 @@ test.describe('Verifica Motivi Scout Vettoriali e Animazioni', () => {
   });
 });
 
-test.describe('CORREZIONE 2 — Verifica Stress UI con Dati Sporchi, Viewport Ristretto e Tastiera', () => {
+test.describe('CORREZIONE 2 - Verifica Stress UI con Dati Sporchi, Viewport Ristretto e Tastiera', () => {
   async function populateDirtyData(page: any) {
     await page.goto('#/');
     await page.waitForLoadState('networkidle');
@@ -451,7 +451,7 @@ test.describe('CORREZIONE 2 — Verifica Stress UI con Dati Sporchi, Viewport Ri
   });
 });
 
-test.describe('FASE 5 — Verifica Componenti Allegati e Lightbox su #/design', () => {
+test.describe('FASE 5 - Verifica Componenti Allegati e Lightbox su #/design', () => {
   test('Rendering galleria allegati, badge offline, card PDF e modale Lightbox zoom', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/#/design');
@@ -488,7 +488,7 @@ test.describe('FASE 5 — Verifica Componenti Allegati e Lightbox su #/design', 
   });
 });
 
-test.describe('FASE 7 — Verifica Calendario e ODG (#/calendario)', () => {
+test.describe('FASE 7 - Verifica Calendario e ODG (#/calendario)', () => {
   async function seedCalendarData(page: any) {
     await page.goto('#/');
     await page.waitForLoadState('networkidle');
@@ -633,7 +633,8 @@ test.describe('FASE 7 — Verifica Calendario e ODG (#/calendario)', () => {
     await expect(firstRow.locator('.event-type-chip')).toBeVisible();
 
     // 3. Apertura Dettaglio Evento con ODG denso (30 punti)
-    await firstRow.click();
+    const riunioneRow = page.locator('.ios-grouped-row:has-text("Riunione Ordinaria")').first();
+    await riunioneRow.click();
     await page.waitForSelector('[role="dialog"]');
     const dialog = page.locator('[role="dialog"]');
     await expect(dialog).toBeVisible();

@@ -44,7 +44,7 @@ function isStrictRlsBlock(status, error) {
 
 async function runSecurityAudit() {
   console.log('======================================================================');
-  console.log('AUDIT DI SICUREZZA RIGOROSO — CON CHIAVE ANONIMA (ANON KEY)');
+  console.log('AUDIT DI SICUREZZA RIGOROSO - CON CHIAVE ANONIMA (ANON KEY)');
   console.log('URL:', SUPABASE_URL);
   console.log('======================================================================\n');
 

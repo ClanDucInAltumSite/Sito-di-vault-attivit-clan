@@ -49,7 +49,7 @@ import {
   purgeTrash,
 } from '../src/lib/admin_actions';
 
-describe('FASE 3 — GIOCHI E BANS', () => {
+describe('FASE 3 - GIOCHI E BANS', () => {
   describe('1. Tolleranza ai Typo Deterministica e Normalizzazione', () => {
     it('applica la regola deterministica di lunghezza token', () => {
       // < 4 caratteri: distanza = 0

@@ -1,6 +1,6 @@
 -- ==============================================================================
 -- Migrazione 0004: Gestione Cestino Tombstone (180 giorni) e Sync Epoch
--- Sito Vault Scout Clan — Duc In Altum
+-- Sito Vault Scout Clan - Duc In Altum
 -- ==============================================================================
 
 -- 1. Tabella Metadati di Sistema per tracciamento dell'epoca di sincronizzazione

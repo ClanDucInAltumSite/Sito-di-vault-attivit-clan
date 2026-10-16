@@ -15,7 +15,6 @@ import { matchesQuery, HighlightText } from '../../lib/search';
 import { softDeleteRecord } from '../../lib/admin_actions';
 import { subscribeSyncState } from '../../lib/sync';
 import { stripChords, calculatePageCount } from '../../lib/chordpro';
-import { CantoDetailSheet } from './CantoDetailSheet';
 import { CantoReadingMode } from './CantoReadingMode';
 import { CantoFormSheet } from './CantoFormSheet';
 import { DeleteConfirmModal } from '../../ui/DeleteConfirmModal';
@@ -46,9 +45,8 @@ export function CantiView() {
     return 'az';
   });
 
-  // Fogli e Modali
+  // Modali e Sheet
   const [selectedCanto, setSelectedCanto] = useState<Canto | null>(null);
-  const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isReadingModeOpen, setIsReadingModeOpen] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingCanto, setEditingCanto] = useState<Canto | null>(null);
@@ -132,7 +130,6 @@ export function CantiView() {
       setIsDeleteOpen(false);
       setDeletingCanto(null);
       if (selectedCanto?.id === deletingCanto.id) {
-        setIsDetailOpen(false);
         setIsReadingModeOpen(false);
         setSelectedCanto(null);
       }
@@ -271,7 +268,7 @@ export function CantiView() {
         ) : (
           <GroupedList
             header={debouncedSearch ? `RISULTATI DI RICERCA (${filteredList.length})` : 'CANZONIERE'}
-            footer="Tocca un canto per visualizzare gli accordi, trasporre la tonalità o aprire la modalità lettura."
+            footer="Tocca un canto per visualizzare gli accordi, trasporre la tonalità o avviare il metronomo."
           >
             {filteredList.map((canto) => {
               const isNew =
@@ -298,7 +295,7 @@ export function CantiView() {
                   }
                   subtitle={
                     <HighlightText
-                      text={canto.autore ? `${canto.autore} — ${subtitleText}` : subtitleText}
+                      text={canto.autore ? `${canto.autore} - ${subtitleText}` : subtitleText}
                       query={debouncedSearch}
                     />
                   }
@@ -312,7 +309,7 @@ export function CantiView() {
                   chevron
                   onClick={() => {
                     setSelectedCanto(canto);
-                    setIsDetailOpen(true);
+                    setIsReadingModeOpen(true);
                   }}
                 />
               );
@@ -321,18 +318,15 @@ export function CantiView() {
         )}
       </div>
 
-      {/* Sheet Dettaglio Canto */}
-      <CantoDetailSheet
+      {/* Modalità Lettura a Tutto Schermo (Accordi, Metronomo, Wake Lock e Allegati) */}
+      <CantoReadingMode
         canto={selectedCanto}
-        isOpen={isDetailOpen}
-        onClose={() => setIsDetailOpen(false)}
-        onOpenReadingMode={(c) => {
-          setIsDetailOpen(false);
-          setSelectedCanto(c);
-          setIsReadingModeOpen(true);
+        isOpen={isReadingModeOpen}
+        onClose={() => {
+          setIsReadingModeOpen(false);
+          setSelectedCanto(null);
         }}
         onEdit={(c) => {
-          setIsDetailOpen(false);
           setEditingCanto(c);
           setIsFormOpen(true);
         }}
@@ -340,13 +334,7 @@ export function CantiView() {
           setDeletingCanto(c);
           setIsDeleteOpen(true);
         }}
-      />
-
-      {/* Modalità Lettura a Tutto Schermo (Wake Lock & Accordi Trasposti) */}
-      <CantoReadingMode
-        canto={selectedCanto}
-        isOpen={isReadingModeOpen}
-        onClose={() => setIsReadingModeOpen(false)}
+        onUpdated={loadData}
       />
 
       {/* Sheet Form Aggiungi/Modifica Canto (Admin) */}
