@@ -132,6 +132,8 @@ export const I18N = {
     erroreDateFine: 'La data e ora di fine non può essere antecedente alla data di inizio.',
     avvisoPrivacy: 'Attenzione: le informazioni inserite saranno sincronizzate sui dispositivi del Clan. Non inserire dati sanitari, recapiti privati o dati personali sensibili.',
     nessunaRiunioneFutura: 'Nessuna riunione futura programmata. Crea prima una nuova riunione nel calendario per potervi riportare i punti non conclusi.',
+    tuttiPuntiGiaRiportati: 'Tutti i punti aperti risultano già riportati alla riunione successiva.',
+    creaRiunioneOra: 'Vuoi creare una nuova riunione adesso?',
     puntiRiportatiSuccess: (n: number) => `${n} punt${n === 1 ? 'o' : 'i'} non conclus${n === 1 ? 'o' : 'i'} riportat${n === 1 ? 'o' : 'i'} con successo alla prossima riunione.`,
     nessunPuntoDaRiportare: 'Tutti i punti dell\'ordine del giorno sono già stati completati.',
     confermaRiporto: (n: number, titolo: string) => `Vuoi riportare ${n} punt${n === 1 ? 'o' : 'i'} non completat${n === 1 ? 'o' : 'i'} alla riunione "${titolo}"?`,

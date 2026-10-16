@@ -9,6 +9,7 @@ export interface HeaderPhotoConfig {
   title: string;
   alt: string;
   src: string;
+  srcMobile: string;
   srcset: string;
   sizes: string;
   placeholder: string;
@@ -30,7 +31,8 @@ export const HEADER_PHOTOS: Record<HeaderPhotoConfig['id'], HeaderPhotoConfig> =
     id: 'home',
     title: 'Vault Clan — Duc In Altum',
     alt: 'Paesaggio montano con vette illuminate dal sole al tramonto',
-    src: photoUrl('home-800.webp'),
+    src: photoUrl('home-400.webp'),
+    srcMobile: photoUrl('home-400.webp'),
     srcset: `${photoUrl('home-400.webp')} 400w, ${photoUrl('home-800.webp')} 800w, ${photoUrl('home-1200.webp')} 1200w`,
     sizes: '(max-width: 600px) 400px, (max-width: 1024px) 800px, 1200px',
     placeholder: 'data:image/webp;base64,UklGRngAAABXRUJQVlA4IGwAAADQAwCdASoYAA4APxFwsFAsJiSisAgBgCIJYgCdAB4+k5IjwBGubmAA+pi1mXTBOaemGdQExrH1EqRKuBCRY3JwzzOsrJkCfYjC0wPd2NDRCR1kSZYJztUnwvzEedi8pzrn/tjTpjSHt16rgAA=',
@@ -43,7 +45,8 @@ export const HEADER_PHOTOS: Record<HeaderPhotoConfig['id'], HeaderPhotoConfig> =
     id: 'giochi',
     title: 'Archivio Giochi',
     alt: 'Ampio prato verde collinare per attività e grandi giochi scout',
-    src: photoUrl('giochi-800.webp'),
+    src: photoUrl('giochi-400.webp'),
+    srcMobile: photoUrl('giochi-400.webp'),
     srcset: `${photoUrl('giochi-400.webp')} 400w, ${photoUrl('giochi-800.webp')} 800w, ${photoUrl('giochi-1200.webp')} 1200w`,
     sizes: '(max-width: 600px) 400px, (max-width: 1024px) 800px, 1200px',
     placeholder: 'data:image/webp;base64,UklGRlwAAABXRUJQVlA4IFAAAACwAwCdASoYAA4APxF8tFGsKCUisAgBgCIJZQCdG1/AWKDhbHHgAAD+kEfl3Mnx1FWsk6R1HiCJmYKu4B0Jl+/+X10xtdqQBfNWPjzijAAAAA==',
@@ -56,7 +59,8 @@ export const HEADER_PHOTOS: Record<HeaderPhotoConfig['id'], HeaderPhotoConfig> =
     id: 'bans',
     title: 'Archivio Bans',
     alt: 'Fuoco di bivacco scout serale con braci ardenti e fiamme vive',
-    src: photoUrl('bans-800.webp'),
+    src: photoUrl('bans-400.webp'),
+    srcMobile: photoUrl('bans-400.webp'),
     srcset: `${photoUrl('bans-400.webp')} 400w, ${photoUrl('bans-800.webp')} 800w, ${photoUrl('bans-1200.webp')} 1200w`,
     sizes: '(max-width: 600px) 400px, (max-width: 1024px) 800px, 1200px',
     placeholder: 'data:image/webp;base64,UklGRlIAAABXRUJQVlA4IEYAAABQAwCdASoYAA4APxFysVCsJqSisAgBgCIJY2VuRgATjal/AAD+7eRk1EZWmaT3yzdQkbOlRLosYv+jMgHy4ozYO7Tum+AA',
@@ -69,7 +73,8 @@ export const HEADER_PHOTOS: Record<HeaderPhotoConfig['id'], HeaderPhotoConfig> =
     id: 'canti',
     title: 'Canzoniere di Clan',
     alt: 'Chitarra acustica scout con corde e manico a fuoco',
-    src: photoUrl('canti-800.webp'),
+    src: photoUrl('canti-400.webp'),
+    srcMobile: photoUrl('canti-400.webp'),
     srcset: `${photoUrl('canti-400.webp')} 400w, ${photoUrl('canti-800.webp')} 800w, ${photoUrl('canti-1200.webp')} 1200w`,
     sizes: '(max-width: 600px) 400px, (max-width: 1024px) 800px, 1200px',
     placeholder: 'data:image/webp;base64,UklGRqoAAABXRUJQVlA4IJ4AAABQBACdASoYAA4APxFysFAsJqSisAgBgCIJbACdMoACSzCopL/sPyrl1pG8APffjmV8OJxFDieeDjlJ4xBt1whllHn23EntzzaIPwIChXsgWu1foXe0DY0MJ6wr4sJlYj4EdAZ9ZM7CFlMEUTVgMJoYGCJzXumnLw4ju8aOzYj+/ruz1aZ7i3cRuJXp/cShVUPgV57/Js9rm2A7yXAAAA==',
@@ -82,7 +87,8 @@ export const HEADER_PHOTOS: Record<HeaderPhotoConfig['id'], HeaderPhotoConfig> =
     id: 'calendario',
     title: 'Calendario Clan',
     alt: 'Sentiero battuto nel bosco scout immerso nella natura',
-    src: photoUrl('calendario-800.webp'),
+    src: photoUrl('calendario-400.webp'),
+    srcMobile: photoUrl('calendario-400.webp'),
     srcset: `${photoUrl('calendario-400.webp')} 400w, ${photoUrl('calendario-800.webp')} 800w, ${photoUrl('calendario-1200.webp')} 1200w`,
     sizes: '(max-width: 600px) 400px, (max-width: 1024px) 800px, 1200px',
     placeholder: 'data:image/webp;base64,UklGRm4AAABXRUJQVlA4IGIAAACwAwCdASoYAA4APxF0sVCsJqSisAgBgCIJZgC7ABkq7kPFIV0MAAD+3fi2ui7iSnHLfxWjO8mG2vdGjD0bmQbVVPijhL4G6zExe4SsRBHqxcpGCCVd73rIZbv1Fb+1p7AAAA==',

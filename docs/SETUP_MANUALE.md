@@ -127,3 +127,71 @@ Per una sicurezza al 100%, puoi impostare un monitor esterno gratuito (es. **Cro
    - Header 2: `Authorization` con valore `Bearer INCOLLA_QUI_LA_TUA_ANON_KEY`.
 6. Pianificazione: Ogni 3 giorni.
 7. Clicca su **Save**. In questo modo, anche se GitHub dovesse avere disservizi, il database non andrà mai in pausa.
+
+---
+
+## 5. Procedura di Ripristino Totale d'Emergenza (Disaster Recovery da Zero)
+
+Nel caso estremo in cui il progetto Supabase venga cancellato, il database diventi inaccessibile o si decida di migrare su un account Supabase completamente nuovo, segui questi passaggi per ripristinare il Vault al 100% in meno di 10 minuti:
+
+### Passo 1: Crea un nuovo progetto Supabase
+1. Vai su [https://supabase.com](https://supabase.com) e accedi con le tue credenziali.
+2. Clicca su **"New Project"**.
+3. Inserisci nome (`Vault Scout Clan`), password del database sicura e scegli la regione più vicina (es. *Frankfurt* o *Milan*).
+4. Attendi circa 2 minuti che il progetto sia pronto.
+
+### Passo 2: Applica lo Schema Consolidato Unico
+1. Nel nuovo progetto Supabase, clicca su **SQL Editor** (`>_`) e poi su **"New query"**.
+2. Apri il file del repository [`supabase/full_schema.sql`](../supabase/full_schema.sql).
+3. Copia tutto il contenuto, incollalo nell'editor SQL e clicca **Run**.
+   - Questo script è 100% idempotente e crea all'istante:
+     - Tabelle: `giochi`, `bans`, `canti`, `allegati`, `eventi`, `odg_punti`, `admin_users`, `system_meta`.
+     - Politiche di sicurezza RLS (lettura pubblica, scrittura riservata ad admin).
+     - Bucket Supabase Storage `allegati` con MIME limitati (JPEG, PNG, WEBP, PDF, audio).
+     - Funzioni RPC per epoca di sincronizzazione (`bump_sync_epoch()`) e pulizia periodica (`purge_old_tombstones()`).
+
+### Passo 3: Crea l'Utente Admin
+1. Vai su **Authentication** -> **Users** -> **"Add user"** -> **"Create user"**.
+2. Inserisci l'email dei capi e una password sicura. Spunta **"Auto Confirm User"**.
+3. Copia lo **User UID** generato.
+4. Torna in **SQL Editor** ed esegui:
+   ```sql
+   INSERT INTO public.admin_users (user_id) VALUES ('TUO_USER_UID');
+   ```
+5. Disabilita le registrazioni pubbliche in **Authentication** -> **Providers** -> **Email** -> disattiva **"Enable email signups"**.
+
+### Passo 4: Aggiorna le Chiavi su GitHub
+1. In Supabase, vai su **Project Settings** (icona ingranaggio) -> **API**.
+2. Copia:
+   - **Project URL**
+   - **Project API Keys** -> chiave `anon` `public` (MAI la service_role!).
+3. Sul repository GitHub, vai su **Settings** -> **Secrets and variables** -> **Actions**.
+4. Aggiorna le variabili `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`.
+5. Vai su **Actions** -> **Deploy to GitHub Pages** -> clicca **"Run workflow"** per ricompilare il sito con le nuove credenziali.
+
+### Passo 5: Ripristina i Dati dall'Ultimo Backup JSON
+1. Apri il sito del Vault nel browser (o la PWA installata).
+2. Accedi come Admin inserendo email e password impostate al Passo 3.
+3. Nel menu Admin, tocca la riga **"Ripristina da Backup JSON"**.
+4. Seleziona il file `.json` del backup più recente (es. `vault-scout-backup-2026-10-15.json`).
+5. Il sistema esegue una **validazione differenziale**: mostra un'anteprima chiara di quanti record nuovi verranno inseriti e quanti aggiornati.
+6. Clicca **"Conferma e Applica"**. Tutti i giochi, bans, canti, eventi e punti ODG vengono inseriti atomicamente in Supabase e salvati nella memoria locale del dispositivo.
+7. Il Vault è tornato operativo al 100%!
+
+---
+
+## 6. Manutenzione Programmata e Prevenzione della Sospensione
+
+### Politiche dei Servizi Gratuiti:
+1. **Supabase Free Tier:** Sospende i database senza traffico dopo 7 giorni di inattività.
+2. **GitHub Actions:** Disattiva automaticamente i workflow pianificati (*cron*) nei repository in cui non viene effettuato alcun commit o attività per 60 giorni consecutivi.
+
+### Strategia di Difesa a Triplo Livello Adottata:
+1. **Livello 1 — Workflow GitHub (`.github/workflows/keepalive.yml`):**
+   - Gira ogni 2 giorni.
+   - Esegue una query REST a Supabase mantenendo sveglio il database.
+   - Ogni 40 giorni effettua un micro-commit automatico su `docs/keepalive_heartbeat.txt` per resettare il timer di inattività di GitHub ed evitare che il workflow stesso si disattivi.
+2. **Livello 2 — Cron Esterno Ridondante (Consigliato):**
+   - Servizio gratuito [Cron-job.org](https://cron-job.org) impostato per interrogare l'endpoint ogni 3 giorni.
+3. **Livello 3 — Promemoria Mensile dei Capi:**
+   - Impostare un evento ricorrente sul calendario di branca/clan con cadenza mensile: *"Controllo Vault Scout & Backup"* per entrare nell'area Admin e premere **"Esporta Backup JSON"**. Conservare il file sul Google Drive di Clan o inviarlo via email alla staffa.

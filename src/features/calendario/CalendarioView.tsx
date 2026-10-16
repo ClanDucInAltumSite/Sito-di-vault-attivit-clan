@@ -93,6 +93,26 @@ export function CalendarioView() {
     setIsFormOpen(true);
   };
 
+  const handleCreateNewMeeting = () => {
+    setIsDetailOpen(false);
+    setEditingEvento({
+      id: '',
+      titolo: 'Riunione di Clan',
+      tipo: 'riunione',
+      inizio: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString(),
+      fine: null,
+      tutto_il_giorno: false,
+      luogo: 'Sede',
+      descrizione: null,
+      responsabile: null,
+      cosa_portare: null,
+      created_at: '',
+      updated_at: '',
+      deleted_at: null,
+    });
+    setIsFormOpen(true);
+  };
+
   const handleEditEvento = (evento: Evento) => {
     setIsDetailOpen(false);
     setEditingEvento(evento);
@@ -208,6 +228,7 @@ export function CalendarioView() {
         }}
         onEdit={handleEditEvento}
         onDelete={handleDeleteEvento}
+        onCreateMeeting={handleCreateNewMeeting}
         onChanged={loadData}
       />
 

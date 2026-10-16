@@ -174,6 +174,20 @@ describe('Calendario & ODG — Test Logica di Dominio', () => {
       expect(textMulti).toContain('Tutto il giorno');
       expect(textMulti).toContain('–');
     });
+
+    it('CORREZIONE 6: buildMonthGrid include l\'evento multi-day in tutte le rispettive celle giornaliere', () => {
+      const grid = buildMonthGrid(2026, 9, [multiDayEvent]); // Ottobre 2026
+      const flatCells = grid.weeks.flat();
+      const cell18 = flatCells.find((c) => c.dateString === '2026-10-18');
+      const cell19 = flatCells.find((c) => c.dateString === '2026-10-19');
+      const cell20 = flatCells.find((c) => c.dateString === '2026-10-20');
+      const cell21 = flatCells.find((c) => c.dateString === '2026-10-21');
+
+      expect(cell18?.events.length).toBe(1);
+      expect(cell19?.events.length).toBe(1);
+      expect(cell20?.events.length).toBe(1);
+      expect(cell21?.events.length).toBe(0);
+    });
   });
 
   describe('4. Logica ODG: Conteggio Punti Aperti e Spunta Animata', () => {
@@ -363,6 +377,20 @@ describe('Calendario & ODG — Test Logica di Dominio', () => {
       expect(forwardedPoint?.riportato_da).toBe(p2.id); // Vincolo riportato_da rispettato!
       expect(forwardedPoint?.completato).toBe(false);
       expect(forwardedPoint?.ordine).toBeGreaterThan(p3Existing.ordine);
+
+      // CORREZIONE 3: Secondo riporto consecutivo (o doppio click) è IDEMPOTENTE!
+      const countSecondForward = await forwardUnfinishedOdgPunti(e1Id, e2Id);
+      expect(countSecondForward).toBe(0); // Nessun duplicato creato!
+
+      const targetPointsAfterSecond = await getOdgPunti(e2Id, false);
+      expect(targetPointsAfterSecond.length).toBe(2); // Invariato!
+    });
+
+    it('CORREZIONE 3: findNextFutureMeeting restituisce null se non esistono riunioni future', async () => {
+      // Data nel futuro lontano per cui non esiste alcuna riunione successiva
+      const currentInizio = '2030-12-31T20:00:00Z';
+      const next = await findNextFutureMeeting(currentInizio);
+      expect(next).toBeNull();
     });
   });
 

@@ -377,6 +377,30 @@ async function runAdminSecurityAudit() {
     .select();
   assert(anonDelOdgErr !== null || !anonDelOdg || anonDelOdg.length === 0, 'Tentativo DELETE anonimo su "odg_punti" respinto da RLS');
 
+  // Verifica che evento ed esca ODG siano rimasti perfettamente identici
+  const { data: recheckEvent } = await anonClient
+    .from('eventi')
+    .select('*')
+    .eq('id', canaryEvento.id)
+    .single();
+  assert(recheckEvent?.titolo === canaryEventTitle, 'Riga evento esca verificata: titolo integro e non alterato da anonimo');
+
+  const { data: recheckOdg } = await anonClient
+    .from('odg_punti')
+    .select('*')
+    .eq('id', canaryOdg.id)
+    .single();
+  assert(recheckOdg && recheckOdg.completato === false && recheckOdg.testo === 'Punto ODG Trappola Iniziale', 'Riga punto ODG esca verificata: completato=false e testo integro');
+
+  // Tentativo di listare file del bucket allegati da client anonimo
+  const { data: anonListFiles, error: anonListErr } = await anonClient.storage
+    .from('allegati')
+    .list();
+  assert(
+    anonListErr !== null || !anonListFiles || anonListFiles.length === 0,
+    'Client anonimo non può elencare i file del bucket allegati (respinto da Storage RLS o vuoto)'
+  );
+
   // Admin elimina punto ODG esca ed evento esca
   const { error: delOdgErr } = await adminClient.from('odg_punti').delete().eq('id', canaryOdg.id);
   assert(!delOdgErr, 'Admin elimina punto esca odg_punti');

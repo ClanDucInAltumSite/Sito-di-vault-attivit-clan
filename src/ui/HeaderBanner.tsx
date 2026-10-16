@@ -36,6 +36,11 @@ export function HeaderBanner({
       <div className="header-banner-media">
         <picture>
           <source
+            media="(max-width: 600px)"
+            type="image/webp"
+            srcSet={photo.srcMobile}
+          />
+          <source
             type="image/webp"
             srcSet={photo.srcset}
             sizes={photo.sizes}

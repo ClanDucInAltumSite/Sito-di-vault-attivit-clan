@@ -26,6 +26,7 @@ export interface EventoDetailSheetProps {
   onClose: () => void;
   onEdit?: (evento: Evento) => void;
   onDelete?: (evento: Evento) => void;
+  onCreateMeeting?: () => void;
   onChanged?: () => void;
 }
 
@@ -35,6 +36,7 @@ export function EventoDetailSheet({
   onClose,
   onEdit,
   onDelete,
+  onCreateMeeting,
   onChanged,
 }: EventoDetailSheetProps) {
   const { isAdmin } = useAdmin();
@@ -231,6 +233,7 @@ export function EventoDetailSheet({
         <OdgManager
           evento={evento}
           isAdmin={isAdmin}
+          onCreateMeeting={onCreateMeeting}
           onChanged={onChanged}
         />
 

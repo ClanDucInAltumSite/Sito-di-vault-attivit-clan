@@ -31,23 +31,31 @@ export function App() {
     const cleanupSync = initSyncEngine();
     const unsubscribeSync = subscribeSyncState(setSyncState);
 
-    // 2. Registrazione Service Worker controllata (PWA)
+    // 2. Registrazione Service Worker controllata (PWA) differita a window.load per non impattare FCP/LCP
     if ('serviceWorker' in navigator && import.meta.env.PROD) {
-      import('virtual:pwa-register')
-        .then(({ registerSW }) => {
-          const updateSW = registerSW({
-            onNeedRefresh() {
-              setPwaNeedRefresh(true);
-            },
-            onOfflineReady() {
-              console.log('App pronta per l\'uso offline (precache completata).');
-            },
+      const registerServiceWorker = () => {
+        import('virtual:pwa-register')
+          .then(({ registerSW }) => {
+            const updateSW = registerSW({
+              onNeedRefresh() {
+                setPwaNeedRefresh(true);
+              },
+              onOfflineReady() {
+                console.log('App pronta per l\'uso offline (precache completata).');
+              },
+            });
+            setUpdateSWFunction(() => updateSW);
+          })
+          .catch((err) => {
+            console.warn('Registrazione PWA non supportata o in dev mode:', err);
           });
-          setUpdateSWFunction(() => updateSW);
-        })
-        .catch((err) => {
-          console.warn('Registrazione PWA non supportata o in dev mode:', err);
-        });
+      };
+
+      if (document.readyState === 'complete') {
+        registerServiceWorker();
+      } else {
+        window.addEventListener('load', registerServiceWorker, { once: true });
+      }
     }
 
     // 3. Richiesta persistenza storage su browser supportati (evita eliminazione cache da iOS/Android)

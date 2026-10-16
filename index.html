@@ -4,10 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
     
-    <!-- Content Security Policy Restrittiva (Nessuna CDN esterna, solo dominio locale e Supabase con WebSockets) -->
+    <!-- Content Security Policy Restrittiva (Nessuna CDN esterna, solo dominio locale e Supabase del progetto con WebSockets) -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://lpeiyzwccedtqjbficjo.supabase.co https://*.supabase.co; connect-src 'self' https://lpeiyzwccedtqjbficjo.supabase.co wss://lpeiyzwccedtqjbficjo.supabase.co https://*.supabase.co wss://*.supabase.co; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self';"
+      content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://lpeiyzwccedtqjbficjo.supabase.co; connect-src 'self' https://lpeiyzwccedtqjbficjo.supabase.co wss://lpeiyzwccedtqjbficjo.supabase.co; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self';"
     />
 
     <title>Vault Clan — Duc In Altum</title>
@@ -19,22 +19,65 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Vault Clan" />
 
-    <link rel="icon" type="image/x-icon" href="./favicon.ico" />
-    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+    <link rel="icon" type="image/x-icon" href="%BASE_URL%favicon.ico" />
+    <link rel="apple-touch-icon" href="%BASE_URL%apple-touch-icon.png" />
 
     <!-- Preload LCP Image per prestazione massima Lighthouse (scoperta immediata nel documento iniziale) -->
     <link
       rel="preload"
       as="image"
-      href="./photos/home-800.webp"
-      imagesrcset="./photos/home-400.webp 400w, ./photos/home-800.webp 800w, ./photos/home-1200.webp 1200w"
-      imagesizes="(max-width: 600px) 400px, (max-width: 1024px) 800px, 1200px"
+      href="%BASE_URL%photos/home-400.webp"
+      media="(max-width: 600px)"
       type="image/webp"
       fetchpriority="high"
     />
+
+    <!-- Preload Font Inter Latin -->
+    <link
+      rel="preload"
+      as="font"
+      type="font/woff2"
+      crossorigin
+      href="%BASE_URL%fonts/inter-latin.woff2"
+    />
+
+    <!-- Critical CSS inline per LCP immediato e CLS zero (0.000) -->
+    <style>
+      body { margin: 0; background-color: #FAF8F5; }
+      .header-banner-home { position: relative; width: 100%; height: 220px; overflow: hidden; background-color: #462679; box-sizing: border-box; }
+      .header-banner-media { position: absolute; inset: 0; width: 100%; height: 100%; overflow: hidden; }
+      .header-banner-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+      .header-banner-scrim { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(70,38,121,0.2) 0%, rgba(70,38,121,0.7) 100%); }
+    </style>
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <div class="header-banner header-banner-home">
+        <div class="header-banner-media">
+          <picture>
+            <source
+              media="(max-width: 600px)"
+              type="image/webp"
+              srcset="%BASE_URL%photos/home-400.webp"
+            />
+            <source
+              type="image/webp"
+              srcset="%BASE_URL%photos/home-400.webp 400w, %BASE_URL%photos/home-800.webp 800w, %BASE_URL%photos/home-1200.webp 1200w"
+              sizes="(max-width: 600px) 400px, (max-width: 1024px) 800px, 1200px"
+            />
+            <img
+              src="%BASE_URL%photos/home-400.webp"
+              alt="Paesaggio montano con vette illuminate dal sole al tramonto"
+              width="1200"
+              height="675"
+              class="header-banner-img"
+              fetchpriority="high"
+            />
+          </picture>
+          <div class="header-banner-scrim" aria-hidden="true"></div>
+        </div>
+      </div>
+    </div>
     <script type="module" src="./src/main.tsx"></script>
   </body>
 </html>

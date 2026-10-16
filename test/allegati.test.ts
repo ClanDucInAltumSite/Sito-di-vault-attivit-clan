@@ -344,10 +344,14 @@ describe('FASE 5 — Allegati: Validazione, Storage, Cache e Resilienza', () => 
     const origFrom = supabase.from;
     (supabase as any).from = () => ({
       update: () => ({
-        eq: async () => ({ error: null }),
+        eq: () => ({
+          select: async () => ({ data: [{ id: 'mock' }], error: null }),
+        }),
       }),
       delete: () => ({
-        eq: async () => ({ error: null }),
+        eq: () => ({
+          select: async () => ({ data: [{ id: 'mock' }], error: null }),
+        }),
       }),
       rpc: async () => ({ data: 2, error: null }),
     });

@@ -1,13 +1,22 @@
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useRef } from 'preact/hooks';
 import { I18N } from '../../lib/i18n';
+import { navigate } from '../../app/router';
 import { GroupedList } from '../../ui/GroupedList';
 import { GroupedRow } from '../../ui/GroupedRow';
 import { Button } from '../../ui/Button';
 import { SectionIcon } from '../../ui/SectionIcon';
 import { Icon } from '../../ui/Icon';
 import { Badge } from '../../ui/Badge';
+import { Modal } from '../../ui/Modal';
 import { useAdmin, logoutAdmin } from '../../lib/auth';
-import { getTrashItems, exportBackupJson } from '../../lib/admin_actions';
+import {
+  getTrashItems,
+  exportBackupJson,
+  validateAndPreviewBackupJson,
+  executeBackupImport,
+  BackupPreviewDiff,
+} from '../../lib/admin_actions';
+import { getDetailedCounts } from '../../lib/db';
 import { getStorageUsageInfo, findOrphanStorageFiles, purgeOrphanStorageFiles, OrphanFileInfo } from '../../lib/attachments';
 import { downloadAllAttachmentsForOffline, getOfflineAttachmentStats } from '../../lib/storage-cache';
 import { AdminLoginModal } from './AdminLoginModal';
@@ -19,6 +28,14 @@ export function AdminView() {
   const [isTrashOpen, setIsTrashOpen] = useState(false);
   const [trashCount, setTrashCount] = useState<number>(0);
   const [isExporting, setIsExporting] = useState(false);
+
+  // Stato Import Backup JSON
+  const [backupPreview, setBackupPreview] = useState<BackupPreviewDiff | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Conteggi dettagliati sezioni
+  const [detailedCounts, setDetailedCounts] = useState<Record<string, { active: number; deleted: number; total: number }> | null>(null);
 
   // Stato Storage e Allegati
   const [storageInfo, setStorageInfo] = useState<{
@@ -48,6 +65,9 @@ export function AdminView() {
 
         const offline = await getOfflineAttachmentStats();
         setOfflineStats(offline);
+
+        const counts = await getDetailedCounts();
+        setDetailedCounts(counts);
       } catch (_err) {
         // Fallback silenzioso
       }
@@ -123,6 +143,45 @@ export function AdminView() {
       alert(err.message || 'Errore durante l\'esportazione del backup');
     } finally {
       setIsExporting(false);
+    }
+  };
+
+  const handleTriggerImport = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelected = async (e: Event) => {
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const diff = await validateAndPreviewBackupJson(text);
+      if (!diff.valid) {
+        alert(diff.error || 'File di backup non valido o danneggiato.');
+        return;
+      }
+      setBackupPreview(diff);
+    } catch (err: any) {
+      alert(err.message || 'Errore lettura file di backup');
+    } finally {
+      input.value = '';
+    }
+  };
+
+  const handleConfirmImport = async () => {
+    if (!backupPreview) return;
+    setIsImporting(true);
+    try {
+      const result = await executeBackupImport(backupPreview);
+      setBackupPreview(null);
+      await loadData();
+      alert(`Importazione completata con successo!\n- Inseriti: ${result.inserted}\n- Aggiornati: ${result.updated}\n- Ignorati (già aggiornati): ${result.skipped}`);
+    } catch (err: any) {
+      alert(err.message || 'Errore durante l\'importazione del backup');
+    } finally {
+      setIsImporting(false);
     }
   };
 
@@ -258,6 +317,59 @@ export function AdminView() {
                 </Button>
               }
             />
+            <GroupedRow
+              leading={<Icon name="upload" size={20} />}
+              title={I18N.admin.ripristinaJson}
+              subtitle="Importa un file JSON con anteprima differenziale e verifica schema"
+              trailing={
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleTriggerImport}
+                  isLoading={isImporting}
+                >
+                  <Icon name="upload" size={14} />
+                  <span>Importa</span>
+                </Button>
+              }
+            />
+          </GroupedList>
+
+          {/* Consistenza Archivio e Sezioni (Fase 8C) */}
+          <GroupedList
+            header="CONSISTENZA ARCHIVIO E CONTEGGI"
+            footer="Riepilogo elementi attivi e archiviati nel cestino per ciascuna sezione del Vault."
+          >
+            <GroupedRow
+              leading={<SectionIcon section="giochi" size="sm" />}
+              title="Giochi"
+              subtitle={`${detailedCounts?.giochi?.active ?? 0} attivi • ${detailedCounts?.giochi?.deleted ?? 0} nel cestino`}
+              trailing={<Badge variant="giallo" size="sm">{detailedCounts?.giochi?.active ?? 0}</Badge>}
+            />
+            <GroupedRow
+              leading={<SectionIcon section="bans" size="sm" />}
+              title="Bans"
+              subtitle={`${detailedCounts?.bans?.active ?? 0} attivi • ${detailedCounts?.bans?.deleted ?? 0} nel cestino`}
+              trailing={<Badge variant="rosso" size="sm">{detailedCounts?.bans?.active ?? 0}</Badge>}
+            />
+            <GroupedRow
+              leading={<SectionIcon section="canti" size="sm" />}
+              title="Canti"
+              subtitle={`${detailedCounts?.canti?.active ?? 0} attivi • ${detailedCounts?.canti?.deleted ?? 0} nel cestino`}
+              trailing={<Badge variant="azzurro" size="sm">{detailedCounts?.canti?.active ?? 0}</Badge>}
+            />
+            <GroupedRow
+              leading={<SectionIcon section="calendario" size="sm" />}
+              title="Eventi & Calendario"
+              subtitle={`${detailedCounts?.eventi?.active ?? 0} eventi attivi • ${detailedCounts?.odg_punti?.active ?? 0} punti ODG`}
+              trailing={<Badge variant="neutral" size="sm">{detailedCounts?.eventi?.active ?? 0}</Badge>}
+            />
+            <GroupedRow
+              leading={<Icon name="file" size={20} />}
+              title="Allegati (File)"
+              subtitle={`${detailedCounts?.allegati?.active ?? 0} file associati attivi`}
+              trailing={<Badge variant="neutral" size="sm">{detailedCounts?.allegati?.active ?? 0}</Badge>}
+            />
           </GroupedList>
 
           {/* Sistema & Infrastruttura Storage (Fase 5) */}
@@ -392,6 +504,24 @@ export function AdminView() {
               trailing={<Badge variant="azzurro" size="sm">OK</Badge>}
             />
           </GroupedList>
+
+          {/* DIAGNOSTICA E SVILUPPO (RISERVATA AGLI AMMINISTRATORI) */}
+          <GroupedList header="STRUMENTI DI DIAGNOSTICA">
+            <GroupedRow
+              leading={<SectionIcon section="admin" size="sm" />}
+              title="Stato Dati e Sincronizzazione"
+              subtitle="Verifica integrità IndexedDB locale, cursori e tabelle"
+              chevron
+              onClick={() => navigate('stato-dati')}
+            />
+            <GroupedRow
+              leading={<SectionIcon section="admin" size="sm" />}
+              title="Sistema di Design (Palette OKLCH & Tokens)"
+              subtitle="Verifica palette OKLCH, 5 foto testata, targa e motivi scout"
+              chevron
+              onClick={() => navigate('design')}
+            />
+          </GroupedList>
         </>
       )}
 
@@ -411,6 +541,93 @@ export function AdminView() {
         onClose={() => setIsTrashOpen(false)}
         onItemsChanged={loadData}
       />
+
+      {/* Input File Nascosto per Import Backup */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileSelected}
+        accept=".json,application/json"
+        style={{ display: 'none' }}
+      />
+
+      {/* Modale Anteprima Differenziale Import Backup JSON */}
+      {backupPreview && (
+        <Modal
+          isOpen={true}
+          onClose={() => setBackupPreview(null)}
+          title="Anteprima Importazione Backup"
+          footer={
+            <div style={{ display: 'flex', gap: 'var(--space-2)', justifyContent: 'flex-end', width: '100%' }}>
+              <Button variant="secondary" onClick={() => setBackupPreview(null)} disabled={isImporting}>
+                Annulla
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleConfirmImport}
+                isLoading={isImporting}
+                disabled={backupPreview.toInsert.length + backupPreview.toUpdate.length === 0}
+              >
+                Conferma e Applica ({backupPreview.toInsert.length + backupPreview.toUpdate.length} record)
+              </Button>
+            </div>
+          }
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+            <p style={{ margin: 0, fontSize: 'var(--font-size-sm)', color: 'var(--color-text)' }}>
+              Verifica differenziale del backup completata. Controlla le modifiche prima di applicarle a Supabase e al database locale:
+            </p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-2)' }}>
+              <div style={{ padding: 'var(--space-2)', borderRadius: 'var(--radius-sm)', background: 'var(--color-fill-quaternary)', textAlign: 'center' }}>
+                <div style={{ fontSize: 'var(--font-size-lg)', fontWeight: 700, color: 'var(--color-ink)' }}>
+                  {backupPreview.toInsert.length}
+                </div>
+                <div style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-secondary)' }}>
+                  Nuovi da inserire
+                </div>
+              </div>
+              <div style={{ padding: 'var(--space-2)', borderRadius: 'var(--radius-sm)', background: 'var(--color-fill-quaternary)', textAlign: 'center' }}>
+                <div style={{ fontSize: 'var(--font-size-lg)', fontWeight: 700, color: 'var(--color-ink)' }}>
+                  {backupPreview.toUpdate.length}
+                </div>
+                <div style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-secondary)' }}>
+                  Da aggiornare
+                </div>
+              </div>
+              <div style={{ padding: 'var(--space-2)', borderRadius: 'var(--radius-sm)', background: 'var(--color-fill-quaternary)', textAlign: 'center' }}>
+                <div style={{ fontSize: 'var(--font-size-lg)', fontWeight: 700, color: 'var(--color-text-secondary)' }}>
+                  {backupPreview.skippedOlder.length}
+                </div>
+                <div style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-secondary)' }}>
+                  Ignorati (più recenti)
+                </div>
+              </div>
+            </div>
+
+            {backupPreview.toInsert.length + backupPreview.toUpdate.length === 0 ? (
+              <div style={{ padding: 'var(--space-3)', background: 'var(--color-fill-secondary)', borderRadius: 'var(--radius-sm)', fontSize: 'var(--font-size-xs)' }}>
+                Nessuna novità rilevata: tutti i dati nel file di backup sono identici o più vecchi dei dati già presenti nel database.
+              </div>
+            ) : (
+              <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', padding: 'var(--space-2)' }}>
+                {backupPreview.toInsert.map((item) => (
+                  <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--font-size-xs)', padding: '3px 0' }}>
+                    <span style={{ fontWeight: 600 }}>[Nuovo {item.table}] {item.title}</span>
+                    <Badge variant="giallo" size="sm">+ Inserisci</Badge>
+                  </div>
+                ))}
+                {backupPreview.toUpdate.map((item) => (
+                  <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--font-size-xs)', padding: '3px 0' }}>
+                    <span style={{ fontWeight: 600 }}>[Modifica {item.table}] {item.title}</span>
+                    <Badge variant="azzurro" size="sm">Aggiorna</Badge>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

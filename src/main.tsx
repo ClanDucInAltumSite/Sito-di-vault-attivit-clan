@@ -2,7 +2,6 @@ import { render } from 'preact';
 import './styles/tokens.css';
 import './styles/global.css';
 import './styles/components.css';
-import './styles/print.css';
 import { App } from './app/App';
 
 const container = document.getElementById('app');

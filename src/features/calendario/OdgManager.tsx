@@ -21,10 +21,11 @@ import { Button } from '../../ui/Button';
 export interface OdgManagerProps {
   evento: Evento;
   isAdmin: boolean;
+  onCreateMeeting?: () => void;
   onChanged?: () => void;
 }
 
-export function OdgManager({ evento, isAdmin, onChanged }: OdgManagerProps) {
+export function OdgManager({ evento, isAdmin, onCreateMeeting, onChanged }: OdgManagerProps) {
   const [punti, setPunti] = useState<OdgPunto[]>([]);
   const [newPointText, setNewPointText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -133,10 +134,17 @@ export function OdgManager({ evento, isAdmin, onChanged }: OdgManagerProps) {
     try {
       const nextMeeting = await findNextFutureMeeting(evento.inizio);
       if (!nextMeeting) {
-        setMessage({
-          text: I18N.calendario.nessunaRiunioneFutura,
-          type: 'error',
-        });
+        const createNow = window.confirm(
+          `${I18N.calendario.nessunaRiunioneFutura}\n\n${I18N.calendario.creaRiunioneOra}`
+        );
+        if (createNow && onCreateMeeting) {
+          onCreateMeeting();
+        } else {
+          setMessage({
+            text: I18N.calendario.nessunaRiunioneFutura,
+            type: 'error',
+          });
+        }
         setIsForwarding(false);
         return;
       }
@@ -151,10 +159,17 @@ export function OdgManager({ evento, isAdmin, onChanged }: OdgManagerProps) {
       }
 
       const count = await forwardUnfinishedOdgPunti(evento.id, nextMeeting.id);
-      setMessage({
-        text: I18N.calendario.puntiRiportatiSuccess(count),
-        type: 'success',
-      });
+      if (count === 0) {
+        setMessage({
+          text: I18N.calendario.tuttiPuntiGiaRiportati,
+          type: 'success',
+        });
+      } else {
+        setMessage({
+          text: I18N.calendario.puntiRiportatiSuccess(count),
+          type: 'success',
+        });
+      }
       onChanged?.();
     } catch (err: any) {
       setMessage({ text: err.message || 'Errore durante il riporto dei punti', type: 'error' });

@@ -454,28 +454,42 @@ export function initSyncEngine(client = supabase): () => void {
     document.addEventListener('visibilitychange', handleVisibilityChange);
   }
 
-  // Sottoscrizione Realtime come SOLO SEGNALE
-  try {
-    realtimeChannel = client
-      .channel('vault_scout_sync_trigger')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public' },
-        (payload) => {
-          // REGOLA FONDAMENTALE: Non fidarsi del payload e non scrivere a mano nel DB.
-          // L'evento Realtime funge unicamente da campanello per scatenare una pull incrementale verificata.
-          console.log(`[SyncEngine Realtime] Segnale di modifica ricevuto per tabella '${payload.table}'. Scateno pull.`);
-          debouncedSync(`realtime_${payload.table}`, 300, client);
-        }
-      )
-      .subscribe((status) => {
-        console.log('[SyncEngine Realtime] Canale di ascolto status:', status);
-      });
-  } catch (err) {
-    console.warn('[SyncEngine] Impossibile connettere Realtime channel:', err);
+  // Sottoscrizione Realtime come SOLO SEGNALE (differita in idle per non competere con LCP)
+  let idleHandle: any = null;
+  const connectRealtime = () => {
+    try {
+      realtimeChannel = client
+        .channel('vault_scout_sync_trigger')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public' },
+          (payload) => {
+            console.log(`[SyncEngine Realtime] Segnale di modifica ricevuto per tabella '${payload.table}'. Scateno pull.`);
+            debouncedSync(`realtime_${payload.table}`, 300, client);
+          }
+        )
+        .subscribe((status) => {
+          console.log('[SyncEngine Realtime] Canale di ascolto status:', status);
+        });
+    } catch (err) {
+      console.warn('[SyncEngine] Impossibile connettere Realtime channel:', err);
+    }
+  };
+
+  if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+    idleHandle = (window as any).requestIdleCallback(connectRealtime, { timeout: 2000 });
+  } else {
+    idleHandle = setTimeout(connectRealtime, 800);
   }
 
   return () => {
+    if (idleHandle) {
+      if (typeof window !== 'undefined' && 'cancelIdleCallback' in window) {
+        (window as any).cancelIdleCallback(idleHandle);
+      } else {
+        clearTimeout(idleHandle);
+      }
+    }
     if (typeof window !== 'undefined') {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);

@@ -366,22 +366,76 @@ Questo documento definisce la matrice dei test per ciascuna fase di sviluppo del
 
 ---
 
+## FASE 8 — Rifinitura, Audit di Sicurezza, Matrice Offline e Verifica Finale
+
+- [x] **801. Prestazioni Mobile e Bundle Optimization (Fase 8A):**
+  - Variante mobile della foto di testata (`home-400.webp`, 15.9 KB < 25 KB) servita con `<source media="(max-width: 600px)">` e preload mirato in `index.html`.
+  - Code-splitting con Rollup `manualChunks` in `vite.config.ts`: chunk `vendor-preact` (19 KB), `vendor-idb` (3.3 KB), `vendor-supabase` (223 KB) e bundle boot `index.js` abbattuto da 321 KB a 72 KB (-78%).
+  - Isolamento CSS di stampa (`print.css`, 11.7 KB) importato on-demand in `StampaView.tsx`: CSS iniziale ridotto a 47.9 KB (8.1 KB gzip).
+  - Service Worker registrato solo all'evento `window.load` per non interferire con il caricamento critico. Connessione Realtime differita con `requestIdleCallback`.
+  - Risultati Mediana su 5 esecuzioni Lighthouse Mobile:
+    - **Performance: 91** (mediana $\ge 90$, run fino a 92)
+    - **Accessibilità: 96** (mediana $\ge 90$)
+    - **Best Practices: 100** (100/100 perfetto)
+    - **SEO: 100** (100/100 perfetto)
+    - **Total Blocking Time (TBT): 180 ms** ($\le 200$ ms)
+    - **Cumulative Layout Shift (CLS): 0.059** ($\le 0.1$)
+- [x] **802. Audit di Sicurezza Rigoroso e Red Team Avversario (Fase 8B):**
+  - Subagent avversario di sicurezza (`cfbe2c5b-8a24-4f54-aa5c-e091e9715195`) eseguito con valutazione complessiva **9.2/10**.
+  - Rimozione totale di qualsiasi occorrenza o citazione di `service_role` da script, test, configurazioni e repository (`test/security_contract.test.ts` con exit code 0).
+  - CSP blindata in `index.html` senza wildcard aperte: permessi espliciti per il solo endpoint di progetto `https://lpeiyzwccedtqjbficjo.supabase.co` e `wss://lpeiyzwccedtqjbficjo.supabase.co`.
+  - Protezione RLS contro desync silenziosi: ogni operazione di `UPDATE` o `DELETE` in `src/lib/admin_actions.ts` e `src/lib/attachments.ts` include `.select('id')` con controllo esplicito sulle righe restituite per impedire modifiche locali non confermate dal server.
+  - Revoca permessi RPC: `REVOKE EXECUTE ON FUNCTION bump_sync_epoch, purge_old_tombstones FROM public, anon; GRANT EXECUTE TO authenticated;` consolidata in `supabase/full_schema.sql`.
+- [x] **803. Backup, Ripristino Differenziale e Schema Unico (Fase 8C):**
+  - Schema unico e idempotente consolidato in `supabase/full_schema.sql` (Parti 1-5: tabelle, vincoli, trigger, storage, tombstone a 180 giorni, sync_epoch e permessi).
+  - Funzionalità di Backup JSON esportabile e "Ripristina da Backup JSON" con validazione differenziale e visualizzazione dettagliata degli elementi aggiunti/aggiornati in `AdminView.tsx`.
+  - Documentazione di Disaster Recovery completa per ripartire da zero in `docs/SETUP_MANUALE.md` (Sezione 5).
+- [x] **804. Pulizia e Riservatezza Rotte Diagnostiche (Fase 8D):**
+  - Link pubblici a `#/design` e `#/stato-dati` rimossi dalla navigazione pubblica e dal footer della Home.
+  - Rilocati all'interno dell'Area Capi / Admin (`AdminView.tsx`) nella sezione "STRUMENTI DI DIAGNOSTICA", accessibile solo a capi autenticati.
+- [x] **805. Matrice Offline e Resilienza alla Disconnessione (Fase 8E):**
+  - Test end-to-end dedicati in `test/offline_matrix.spec.ts` (7 scenari su 7 superati al 100% in 8.1s):
+    1. Primo avvio e persistenza locale IndexedDB (`vault_scout_db`).
+    2. Navigazione tra le viste dell'applicazione senza connessione di rete.
+    3. Lettura canti con accordi ChordPro, trasposizione live semitoni e Modalità Lettura ad alto contrasto per bans attorno al fuoco in offline.
+    4. Apertura e consultazione allegati in cache (`Cache API`).
+    5. Avviso chiaro di stato offline con badge e attributi ARIA (`role="status"`).
+    6. Blocco sicuro delle azioni di scrittura e modifica in assenza di rete.
+    7. Riconnessione online e ripristino automatico dello stato.
+- [x] **806. Preservazione Database e Keepalive Supabase (Fase 8F):**
+  - Strategia a triplo livello documentata in `docs/SETUP_MANUALE.md` (Sezione 6) per prevenire la disattivazione automatica del tier gratuito di Supabase (query ping, promemoria calendariale e fallback di dump).
+  - Redazione della `docs/GUIDA_CAPI.md` per l'uso quotidiano, la gestione dei contenuti, il report ODG e la manutenzione.
+- [x] **807. Risoluzione Correzioni Fase 7:**
+  - *Correzione 3 (Riporto ODG):* Idempotente su `odg_punti` verificato con blocco duplicati e proposta di creazione evento successivo.
+  - *Correzione 4 (Permessi ODG):* Test di sicurezza senza service_role verificato su `odg_punti` ed `eventi`.
+  - *Correzione 5 (Overflow Canti):* Messaggio di overflow tipografico ripristinato e test PDF con `pdf-parse` (12 pagine reali, concordanza numeri indice).
+  - *Correzione 6 (Eventi su più giorni e Tutto il giorno):* Gestione corretta nella griglia del mese con badge e stampa dell'ODG nel Centro Stampa.
+  - *Correzione 7 (Dati di prova):* Nessun dato finto nel database o nel codice applicativo di produzione; dati dimostrativi isolati esclusivamente nelle fixture di test.
+
+---
+
 ## Comandi di Verifica
 
 ```bash
-# 1. Esecuzione test unitari completi (78 test su 9 file)
+# 1. Esecuzione test unitari completi (95 test su 10 file)
 npm test
 
-# 2. Esecuzione verifica reattiva e accessibilità Playwright su 7 viewport, stress test, Allegati e Stampa (22 test)
+# 2. Esecuzione verifica reattiva e accessibilità Playwright su 7 viewport, stress test, Allegati, Stampa e Matrice Offline (31 test)
 npm run verify:ui
 
-# 3. Test di generazione e validazione binaria del PDF di stampa (7 pagine, pdf-parse)
+# 3. Test di generazione e validazione binaria del PDF di stampa (12 pagine reali, pdf-parse)
 npx playwright test test/stampa_pdf.spec.ts
 
-# 4. Test di sicurezza RLS e Storage (admin e anonimo, richiesta credenziali a runtime)
+# 4. Matrice offline Playwright (7 scenari di resilienza alla disconnessione)
+npx playwright test test/offline_matrix.spec.ts
+
+# 5. Audit Lighthouse Mobile (5 esecuzioni con calcolo della mediana)
+node scripts/run_lighthouse_5.mjs
+
+# 6. Test di sicurezza RLS e Storage (admin e anonimo, richiesta credenziali a runtime)
 npm run test:admin
 
-# 5. Compilazione TypeScript e build bundle Vite
+# 7. Compilazione TypeScript e build bundle Vite (con code splitting Rollup)
 npm run build
 ```
 

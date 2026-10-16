@@ -428,12 +428,16 @@ export async function reorderOdgPunti(_eventoId: string, orderedIds: string[]): 
     const pointId = orderedIds[i];
     if (!pointId) continue;
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('odg_punti')
       .update({ ordine: i, updated_at: now })
-      .eq('id', pointId);
+      .eq('id', pointId)
+      .select();
 
     if (error) throw new Error(error.message);
+    if (!data || data.length === 0) {
+      throw new Error('Operazione non autorizzata: permessi di amministratore mancanti.');
+    }
 
     const local = await db.get('odg_punti', pointId);
     if (local) {
@@ -476,13 +480,24 @@ export async function forwardUnfinishedOdgPunti(
 
   if (unfinished.length === 0) return 0;
 
+  // Carica i punti della riunione di destinazione (compresi cancellati per non ricreare duplicati)
   const toExisting = await getOdgPunti(toEventoId, true);
+  const alreadyForwardedSourceIds = new Set<string>(
+    toExisting
+      .filter((p) => p.riportato_da !== null && p.riportato_da !== undefined)
+      .map((p) => p.riportato_da as string)
+  );
+
+  // Filtra solo i punti che NON sono ancora stati riportati verso questa riunione
+  const toForward = unfinished.filter((p) => !alreadyForwardedSourceIds.has(p.id));
+  if (toForward.length === 0) return 0;
+
   let nextOrdine = toExisting.reduce((max, p) => Math.max(max, p.ordine), -1) + 1;
 
   const now = new Date().toISOString();
   const newRecords: OdgPunto[] = [];
 
-  for (const point of unfinished) {
+  for (const point of toForward) {
     const newId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `odg_${Date.now()}_${Math.random()}`;
     const payload = {
       id: newId,
@@ -519,12 +534,16 @@ export async function softDeleteRecord(table: ContentTableName, id: string): Pro
   }
 
   const now = new Date().toISOString();
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from(table)
     .update({ deleted_at: now, updated_at: now })
-    .eq('id', id);
+    .eq('id', id)
+    .select();
 
   if (error) throw new Error(error.message);
+  if (!data || data.length === 0) {
+    throw new Error('Operazione non autorizzata: permessi di amministratore mancanti.');
+  }
 
   const db = await getDb();
   const item = await db.get(table, id);
@@ -544,12 +563,16 @@ export async function restoreRecord(table: ContentTableName, id: string): Promis
   }
 
   const now = new Date().toISOString();
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from(table)
     .update({ deleted_at: null, updated_at: now })
-    .eq('id', id);
+    .eq('id', id)
+    .select();
 
   if (error) throw new Error(error.message);
+  if (!data || data.length === 0) {
+    throw new Error('Operazione non autorizzata: permessi di amministratore mancanti.');
+  }
 
   const db = await getDb();
   const item = await db.get(table, id);
@@ -570,8 +593,11 @@ export async function hardDeleteRecord(table: ContentTableName, id: string): Pro
 
   await deleteAssociatedStorageFiles(table, id);
 
-  const { error } = await supabase.from(table).delete().eq('id', id);
+  const { data, error } = await supabase.from(table).delete().eq('id', id).select();
   if (error) throw new Error(error.message);
+  if (!data || data.length === 0) {
+    throw new Error('Operazione non autorizzata: permessi di amministratore mancanti.');
+  }
 
   const db = await getDb();
   await db.delete(table, id);
@@ -704,4 +730,198 @@ export async function exportBackupJson(): Promise<void> {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+export interface BackupPreviewItem {
+  table: ContentTableName;
+  id: string;
+  title: string;
+  action: 'insert' | 'update' | 'skip_older';
+  currentUpdatedAt?: string;
+  backupUpdatedAt: string;
+  record: any;
+}
+
+export interface BackupPreviewDiff {
+  valid: boolean;
+  error?: string;
+  exportDate?: string;
+  totalInBackup: number;
+  toInsert: BackupPreviewItem[];
+  toUpdate: BackupPreviewItem[];
+  skippedOlder: BackupPreviewItem[];
+}
+
+/**
+ * Valida lo schema del file di backup JSON e genera l'anteprima delle modifiche (diff)
+ * senza toccare né scrivere nel database locale o remoto.
+ * Rifiuta schemi malformati o non conformi.
+ */
+export async function validateAndPreviewBackupJson(jsonString: string): Promise<BackupPreviewDiff> {
+  let parsed: any;
+  try {
+    parsed = JSON.parse(jsonString);
+  } catch (err: any) {
+    return {
+      valid: false,
+      error: `File JSON non valido o corrotto: ${err.message}`,
+      totalInBackup: 0,
+      toInsert: [],
+      toUpdate: [],
+      skippedOlder: [],
+    };
+  }
+
+  if (!parsed || typeof parsed !== 'object' || !parsed.tables || typeof parsed.tables !== 'object') {
+    return {
+      valid: false,
+      error: 'Formato backup non conforme: manca la sezione "tables" con i dati.',
+      totalInBackup: 0,
+      toInsert: [],
+      toUpdate: [],
+      skippedOlder: [],
+    };
+  }
+
+  const db = await getDb();
+  const toInsert: BackupPreviewItem[] = [];
+  const toUpdate: BackupPreviewItem[] = [];
+  const skippedOlder: BackupPreviewItem[] = [];
+  let totalCount = 0;
+
+  for (const table of CONTENT_TABLES) {
+    const rawRows = parsed.tables[table];
+    if (!rawRows) continue;
+
+    if (!Array.isArray(rawRows)) {
+      return {
+        valid: false,
+        error: `La tabella "${table}" nel backup deve essere un array di record.`,
+        totalInBackup: 0,
+        toInsert: [],
+        toUpdate: [],
+        skippedOlder: [],
+      };
+    }
+
+    const currentRows = await db.getAll(table);
+    const currentMap = new Map<string, any>(currentRows.map((r) => [r.id, r]));
+
+    for (const record of rawRows) {
+      if (!record || typeof record !== 'object' || !record.id || !record.created_at || !record.updated_at) {
+        return {
+          valid: false,
+          error: `Record malformato nella tabella "${table}": manca id, created_at o updated_at.`,
+          totalInBackup: 0,
+          toInsert: [],
+          toUpdate: [],
+          skippedOlder: [],
+        };
+      }
+
+      totalCount++;
+      const current = currentMap.get(record.id);
+      const title = record.nome || record.titolo || record.testo || record.nome_file || record.id;
+
+      if (!current) {
+        toInsert.push({
+          table,
+          id: record.id,
+          title,
+          action: 'insert',
+          backupUpdatedAt: record.updated_at,
+          record,
+        });
+      } else {
+        const backupTime = new Date(record.updated_at).getTime();
+        const currentTime = new Date(current.updated_at).getTime();
+
+        if (backupTime > currentTime) {
+          toUpdate.push({
+            table,
+            id: record.id,
+            title,
+            action: 'update',
+            currentUpdatedAt: current.updated_at,
+            backupUpdatedAt: record.updated_at,
+            record,
+          });
+        } else {
+          // Protezione: non sovrascrivere silenziosamente record con data uguale o più recente!
+          skippedOlder.push({
+            table,
+            id: record.id,
+            title,
+            action: 'skip_older',
+            currentUpdatedAt: current.updated_at,
+            backupUpdatedAt: record.updated_at,
+            record,
+          });
+        }
+      }
+    }
+  }
+
+  return {
+    valid: true,
+    exportDate: parsed.export_date,
+    totalInBackup: totalCount,
+    toInsert,
+    toUpdate,
+    skippedOlder,
+  };
+}
+
+/**
+ * Applica le modifiche del backup preventivamente validate con conferma esplicita dell'admin.
+ * Inserisce solo i nuovi e aggiorna quelli con timestamp più recente, preservando l'integrità.
+ */
+export async function executeBackupImport(diff: BackupPreviewDiff): Promise<{ inserted: number; updated: number; skipped: number }> {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    throw new Error(I18N.status.offlineNotice);
+  }
+
+  if (!diff.valid) {
+    throw new Error(diff.error || 'Backup non valido');
+  }
+
+  const itemsToApply = [...diff.toInsert, ...diff.toUpdate];
+  let inserted = 0;
+  let updated = 0;
+
+  // Raggruppa per tabella
+  const byTable = new Map<ContentTableName, any[]>();
+  for (const item of itemsToApply) {
+    const list = byTable.get(item.table) || [];
+    list.push(item.record);
+    byTable.set(item.table, list);
+    if (item.action === 'insert') inserted++;
+    else updated++;
+  }
+
+  for (const [table, records] of byTable.entries()) {
+    // Upsert su Supabase con la sessione Admin corrente
+    for (const record of records) {
+      const { error } = await supabase.from(table).upsert(record);
+      if (error) {
+        throw new Error(`Errore durante l'importazione nella tabella ${table}: ${error.message}`);
+      }
+    }
+
+    // Scrittura locale IndexedDB
+    await upsertRecords(table, records);
+  }
+
+  // Incrementa l'epoca sul server se possibile per allineare gli altri dispositivi
+  try {
+    await supabase.rpc('bump_sync_epoch');
+  } catch (_e) {
+    // Prosegue se RPC non supportata
+  }
+
+  return {
+    inserted,
+    updated,
+    skipped: diff.skippedOlder.length,
+  };
 }

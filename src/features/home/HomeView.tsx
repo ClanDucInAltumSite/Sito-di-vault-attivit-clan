@@ -29,8 +29,10 @@ import {
   SyncState,
   getSyncState,
 } from '../../lib/sync';
+import { useAdmin } from '../../lib/auth';
 
 export function HomeView() {
+  const { isAdmin } = useAdmin();
   const [searchQuery, setSearchQuery] = useState('');
   const [counts, setCounts] = useState({ giochi: 0, bans: 0, canti: 0, calendario: 0 });
   const [recentItems, setRecentItems] = useState<RecentItem[]>([]);
@@ -390,33 +392,19 @@ export function HomeView() {
                   : 'Offline'}
               </Badge>
             }
-            chevron
-            onClick={() => navigate('stato-dati')}
+            chevron={isAdmin}
+            onClick={isAdmin ? () => navigate('stato-dati') : undefined}
           />
         </GroupedList>
 
-        {/* 10. STRUMENTI, STATO DATI & DESIGN SYSTEM */}
+        {/* 10. STRUMENTI */}
         <GroupedList header="STRUMENTI">
-          <GroupedRow
-            leading={<SectionIcon section="admin" size="sm" />}
-            title="Stato Dati e Sync (FASE 2)"
-            subtitle="Verifica integrità IndexedDB locale, conteggio tabelle e cursori"
-            chevron
-            onClick={() => navigate('stato-dati')}
-          />
           <GroupedRow
             leading={<SectionIcon section="stampa" size="sm" />}
             title={I18N.stampa.title}
             subtitle="Componi fascicoli cartacei A4 per uscite e campi"
             chevron
             onClick={() => navigate('stampa')}
-          />
-          <GroupedRow
-            leading={<SectionIcon section="admin" size="sm" />}
-            title="Sistema di Design (FASE 1B)"
-            subtitle="Verifica palette OKLCH, 5 foto, targa e motivi scout"
-            chevron
-            onClick={() => navigate('design')}
           />
         </GroupedList>
       </div>

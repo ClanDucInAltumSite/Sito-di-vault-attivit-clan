@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'preact/hooks';
+import '../../styles/print.css';
 import { I18N } from '../../lib/i18n';
 import { Button } from '../../ui/Button';
 import { Icon } from '../../ui/Icon';
@@ -765,7 +766,7 @@ export function StampaView() {
             >
               <SectionIcon section="calendario" size="sm" />
               <h2 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 700, margin: 0 }}>
-                {I18N.stampa.schedaOdg} (Fase 7)
+                {I18N.stampa.schedaOdg}
               </h2>
             </div>
             <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-3)' }}>
@@ -1089,7 +1090,7 @@ export function StampaView() {
               </div>
             ))}
 
-            {/* 6. MODELLO SCHEDA ODG STAMPABILE (Preparatorio per Fase 7) */}
+            {/* 6. MODELLO SCHEDA ODG STAMPABILE */}
             {printableODG && (
               <div className="print-odg-sheet stampa-preview-paper">
                 <div className="print-odg-header">

@@ -254,12 +254,16 @@ export async function softDeleteAttachment(attachmentId: string): Promise<void> 
   }
 
   const now = new Date().toISOString();
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('allegati')
     .update({ deleted_at: now, updated_at: now })
-    .eq('id', attachmentId);
+    .eq('id', attachmentId)
+    .select();
 
   if (error) throw new Error(error.message);
+  if (!data || data.length === 0) {
+    throw new Error('Operazione non autorizzata: permessi di amministratore mancanti.');
+  }
 
   const db = await getDb();
   const existing = (await db.get('allegati', attachmentId)) as Allegato | undefined;
@@ -279,12 +283,16 @@ export async function restoreAttachment(attachmentId: string): Promise<void> {
   }
 
   const now = new Date().toISOString();
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('allegati')
     .update({ deleted_at: null, updated_at: now })
-    .eq('id', attachmentId);
+    .eq('id', attachmentId)
+    .select();
 
   if (error) throw new Error(error.message);
+  if (!data || data.length === 0) {
+    throw new Error('Operazione non autorizzata: permessi di amministratore mancanti.');
+  }
 
   const db = await getDb();
   const existing = (await db.get('allegati', attachmentId)) as Allegato | undefined;
@@ -316,8 +324,11 @@ export async function hardDeleteAttachment(attachment: Allegato): Promise<void> 
   }
 
   // 2. Rimuovi la riga dalla tabella
-  const { error } = await supabase.from('allegati').delete().eq('id', attachment.id);
+  const { data, error } = await supabase.from('allegati').delete().eq('id', attachment.id).select();
   if (error) throw new Error(error.message);
+  if (!data || data.length === 0) {
+    throw new Error('Operazione non autorizzata: permessi di amministratore mancanti.');
+  }
 
   // 3. Rimuovi da IndexedDB
   const db = await getDb();
