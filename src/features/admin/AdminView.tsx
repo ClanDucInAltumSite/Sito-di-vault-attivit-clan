@@ -288,7 +288,7 @@ export function AdminView() {
             <GroupedRow
               leading={<Icon name="check" size={20} />}
               title={I18N.auth.loggedInAsAdmin}
-              subtitle={userEmail || 'admin@clan.scout'}
+              subtitle={userEmail || 'Staff Capi (Admin)'}
               trailing={<Badge variant="azzurro" size="sm">Attiva</Badge>}
             />
           </GroupedList>

@@ -110,8 +110,10 @@ Ogni mese (o prima di grandi uscite):
 2. **Backup Dati JSON:** Tocca **"Esporta"** accanto a *"Backup Completo (JSON)"*. Verrà scaricato un file compatto con tutti i testi, accordi, date e punti ODG. Conservalo nel Google Drive di Clan o sulla cartella condivisa dei capi.
    - **ATTENZIONE:** Il file JSON contiene tutti i dati del database, ma **NON contiene i file fisici (foto e PDF)** caricati nello Storage!
 3. **Conservazione delle Foto e dei PDF:**
-   - **Dal sito:** Nel pannello Admin, tocca **"Esporta Elenco"** accanto a *"Elenco File Allegati in Storage"* per scaricare il file JSON con tutti i collegamenti diretti; poi tocca **"Scarica tutto"** su *"Archivio Offline Allegati"* per salvare tutti i documenti nella cache del tuo dispositivo.
-   - **Da Supabase:** Una volta ogni qualche mese, accedi a Supabase -> *Storage* -> cartella `allegati` e scarica una copia locale dei file sul computer della staff.
+   - **Chiarimento sul Manifest:** Il file esportabile da Admin (*"Esporta Elenco"*) è unicamente un elenco strutturato di indirizzi web (URL) e metadati; **NON è un archivio di backup dei file**.
+   - **Chiarimento sulla Cache Offline:** Il pulsante *"Scarica tutto"* scarica le immagini e i PDF esclusivamente nella memoria temporanea del browser di **quel dispositivo**, consentendo la lettura offline al singolo capo.
+   - **Il Vero Backup dei File:** I file originali (PDF, schemi, foto delle attività) devono essere conservati ordinatamente dalla staff capi nella **cartella condivisa del Clan (es. Google Drive della staff)**.
+   - **Dump di Emergenza:** Periodicamente, un capo può accedere alla dashboard web di Supabase -> *Storage* -> bucket `allegati` e scaricare un archivio compresso di tutti i file sul computer della staff.
 4. Per ripristinare il database da un backup JSON, tocca **"Ripristina da Backup JSON"**: l'anteprima differenziale ti mostrerà esattamente cosa verrà aggiunto o aggiornato prima di applicare le modifiche.
 
 ---

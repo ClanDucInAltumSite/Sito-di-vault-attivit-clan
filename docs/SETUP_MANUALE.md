@@ -33,8 +33,8 @@ L'applicazione prevede un'unica utenza admin (email + password) condivisa tra i 
 1. Sempre nella sezione **Authentication**, clicca sulla scheda **Users**.
 2. Clicca sul pulsante verde in alto a destra **"Add user"** e scegli **"Create user"**.
 3. Inserisci:
-   - **Email:** l'indirizzo email che useranno i capi (es. `clan.ducinaltum@gmail.com`).
-   - **Password:** una password sicura di almeno 8-12 caratteri (composta da lettere, numeri e simboli).
+   - **Email:** l'indirizzo email ufficiale della staff di Clan (annotato nel password manager del clan).
+   - **Password:** una password sicura generata e salvata nel password manager del clan.
    - Assicurati che sia spuntata la casella **"Auto Confirm User"** (così non servirà attendere o confermare l'email).
 4. Clicca su **"Create user"**.
 5. Nella lista degli utenti vedrai ora comparire l'utente appena creato. Accanto all'email compare una serie di lettere e numeri separati da trattini chiamata **User UID** (esempio: `a1b2c3d4-e5f6-7890-abcd-1234567890ab`).
@@ -112,7 +112,7 @@ Il nostro sistema include un'azione automatica a doppio effetto che ogni 2 giorn
 ### 4.1 Come Funziona l'Heartbeat dei 60 Giorni e i Suoi Limiti
 Nel file `.github/workflows/keepalive.yml`:
 1. **Calcolo Inattività:** Il workflow calcola i giorni trascorsi dall'ultimo commit: `DIFF_DAYS=$(( (CURRENT_DATE - LAST_COMMIT_DATE) / 86400 ))`.
-2. **Heartbeat Automatico:** Se `DIFF_DAYS > 40` (ovvero mancano meno di 20 giorni alla disattivazione di GitHub), il runner esegue un micro-commit automatico sul file `docs/keepalive_heartbeat.txt` con messaggio `chore(keepalive): heartbeat reset 60gg inattività [skip ci]` e lo spinge su `main`. Questo resetta a zero il timer di inattività di GitHub Actions.
+2. **Heartbeat Automatico:** Se `DIFF_DAYS > 40` (ovvero mancano meno di 20 giorni alla disattivazione di GitHub), il runner esegue un micro-commit automatico sul file `docs/keepalive_heartbeat.txt` con messaggio `chore(keepalive): heartbeat reset 60gg inattività [skip ci]` e lo spinge su `main`. Tale commit **dovrebbe evitare la disattivazione; GitHub non lo garantisce ufficialmente: per questo esistono il promemoria mensile e il ping esterno**.
 3. **Limiti Intrinseci dell'Heartbeat:**
    - **Permessi di Scrittura:** Richiede obbligatoriamente che i permessi di GitHub Actions siano impostati su *"Read and write permissions"* (Sezione 3.3). Se questo permesso non è concesso, il git push fallirà.
    - **Variabilità dei Cron Gratuiti:** I cron gratuiti di GitHub Actions sono ad alta tolleranza temporale; in orari di picco della piattaforma, l'esecuzione può subire ritardi di 1-2 ore (ampiamente assorbiti dalla frequenza di 2 giorni rispetto ai 7 giorni di Supabase).
@@ -132,9 +132,9 @@ Per garantire che il database non vada mai in pausa anche nell'eventualità di d
 1. Registrati gratuitamente su [https://cron-job.org](https://cron-job.org).
 2. Clicca sul pulsante **"Create cronjob"** (o "Crea cronjob").
 3. **Titolo:** `Vault Scout Clan Keepalive`.
-4. **URL:** Inserisci l'endpoint REST leggero di verifica metadati:
+4. **URL:** Inserisci l'endpoint REST leggero verificato (risponde HTTP 200 OK):
    ```text
-   https://lpeiyzwccedtqjbficjo.supabase.co/rest/v1/system_meta?select=sync_epoch
+   https://lpeiyzwccedtqjbficjo.supabase.co/rest/v1/giochi?select=id&limit=1
    ```
 5. **Pianificazione (Execution schedule):**
    - Seleziona **"Every 2 days"** (Ogni 2 giorni).
@@ -198,13 +198,11 @@ Nel caso estremo in cui il progetto Supabase venga cancellato, il database diven
 > Il file di backup JSON contiene **esclusivamente i dati testuali, le relazioni e i metadati** delle 6 tabelle del database (`giochi`, `bans`, `canti`, `eventi`, `odg_punti`, `allegati`).
 > **NON contiene i file fisici (fotografie, immagini e documenti PDF)** memorizzati nel bucket `allegati` di Supabase Storage!
 > 
-> **Procedura per conservare e mettere al sicuro foto e PDF:**
-> 1. **Dall'applicazione (Amministrazione):**
->    - Tocca **"Esporta Elenco"** nella riga *"Elenco File Allegati in Storage"* per scaricare il file `vault-scout-allegati-manifest-[data].json` con l'elenco completo di percorsi, dimensioni, tipologie MIME e URL diretti di download pubblico di tutti i file archiviati.
->    - Tocca **"Scarica tutto"** su *"Archivio Offline Allegati"* per scaricare tutti i documenti e le foto nella Cache API locale del dispositivo.
-> 2. **Dalla Dashboard di Supabase (Conservazione periodica consigliata):**
->    - Vai su **Storage** -> seleziona il bucket **`allegati`**.
->    - Seleziona le cartelle e i file e scarica un archivio di backup locale sul computer della staff di Clan o salvalo su Google Drive.
+> **Procedura e Chiarimenti per la Conservazione di Foto e PDF:**
+> 1. **Il Vero Backup dei File:** I file originali caricati (schemi, regolamenti, spartiti, foto) devono essere conservati ordinatamente dalla staff capi nella **cartella condivisa del Clan (es. Google Drive dei capi)**. Questo è l'unico vero archivio sicuro a lungo termine.
+> 2. **Chiarimento sul Manifest di Admin:** L'opzione *"Esporta Elenco"* scarica un file `.json` che è **esclusivamente un elenco di indirizzi web (URL)** e non un archivio di file. Serve come mappa di riferimento per ricollegare o riscaricare i file in caso di migrazione.
+> 3. **Chiarimento sulla Cache Offline:** Il pulsante *"Scarica tutto"* scarica i file unicamente nella memoria locale del browser di **quel dispositivo** (per l'uso offline del singolo capo), non creando un archivio esportabile.
+> 4. **Copia di Emergenza da Supabase:** Dalla dashboard web di Supabase -> **Storage** -> bucket `allegati`, la staff può scaricare periodicamente una copia locale dell'intero bucket sul PC.
 
 1. Apri il sito del Vault nel browser (o la PWA installata).
 2. Accedi come Admin inserendo email e password impostate al Passo 3.
@@ -228,8 +226,8 @@ Per la guida completa e il calendario operativo mese per mese, consulta il docum
 1. **Livello 1 — Workflow GitHub (`.github/workflows/keepalive.yml`):**
    - Gira ogni 2 giorni alle 06:00 UTC.
    - Esegue una query REST a Supabase mantenendo sveglio il database.
-   - Ogni 40 giorni effettua un micro-commit automatico su `docs/keepalive_heartbeat.txt` per resettare il timer di inattività di GitHub ed evitare che il workflow stesso si disattivi.
+   - Ogni 40 giorni effettua un micro-commit automatico su `docs/keepalive_heartbeat.txt`. Tale commit **dovrebbe evitare la disattivazione; GitHub non lo garantisce ufficialmente: per questo esistono il promemoria mensile e il ping esterno**.
 2. **Livello 2 — Cron Esterno Ridondante ([cron-job.org](https://cron-job.org)):**
-   - Servizio gratuito impostato per interrogare l'endpoint `system_meta` ogni 2 giorni con avviso email immediato in caso di errore (configurazione dettagliata nella Sezione 4.3).
+   - Servizio gratuito impostato per interrogare l'endpoint `giochi?select=id&limit=1` ogni 2 giorni con avviso email immediato in caso di errore (configurazione dettagliata nella Sezione 4.3).
 3. **Livello 3 — Promemoria Mensile dei Capi:**
-   - Impostare un promemoria ricorrente nel calendario capi con cadenza mensile (*"Controllo Vault Scout & Backup"*): entrare nell'area Admin, premere **"Esporta Backup JSON"** e **"Esporta Elenco Allegati"**, e conservare i file su Google Drive di Clan o inviarli via email alla staff.
+   - Impostare un promemoria ricorrente nel calendario capi con cadenza mensile (*"Controllo Vault Scout & Backup"*): entrare nell'area Admin, premere **"Esporta Backup JSON"** e verificare la conservazione dei file originali su Google Drive di Clan.

@@ -53,7 +53,7 @@ export const I18N = {
     loginTitle: 'Accesso Capi / Admin',
     loginDescription: 'Inserisci le credenziali admin per creare o modificare i contenuti.',
     emailLabel: 'Email Capi',
-    emailPlaceholder: 'es. clan.ducinaltum@gmail.com',
+    emailPlaceholder: 'es. staff.capi@gruppo.scout',
     passwordLabel: 'Password',
     passwordPlaceholder: 'Inserisci la password',
     loginButton: 'Accedi',

@@ -71,13 +71,17 @@ async function main() {
     console.log('✓ Server Preview pronto e rispondente');
 
     const results = [];
-    const tmpFile = 'temp_lighthouse_run.json';
+    const outputDir = path.resolve('docs/lighthouse');
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+    }
 
     // 2. Esegui 5 run Lighthouse mobile
     for (let i = 1; i <= RUNS_COUNT; i++) {
       console.log(`\n--- Run ${i} di ${RUNS_COUNT} in corso... ---`);
-      if (fs.existsSync(tmpFile)) {
-        fs.unlinkSync(tmpFile);
+      const runOutputFile = path.join(outputDir, `run${i}.json`);
+      if (fs.existsSync(runOutputFile)) {
+        fs.unlinkSync(runOutputFile);
       }
       
       const args = [
@@ -86,7 +90,7 @@ async function main() {
         `"${URL}"`,
         '--chrome-flags="--headless --no-sandbox --disable-dev-shm-usage"',
         '--output=json',
-        `--output-path="${tmpFile}"`,
+        `--output-path="${runOutputFile}"`,
         '--only-categories=performance,accessibility,best-practices,seo',
         '--throttling-method=simulate',
         '--form-factor=mobile',
@@ -98,12 +102,11 @@ async function main() {
 
       await runCommand('npx', args);
 
-      if (!fs.existsSync(tmpFile)) {
-        throw new Error(`File output ${tmpFile} non trovato dopo la run ${i}`);
+      if (!fs.existsSync(runOutputFile)) {
+        throw new Error(`File output ${runOutputFile} non trovato dopo la run ${i}`);
       }
 
-      const raw = JSON.parse(fs.readFileSync(tmpFile, 'utf8'));
-      fs.unlinkSync(tmpFile);
+      const raw = JSON.parse(fs.readFileSync(runOutputFile, 'utf8'));
 
       const perf = Math.round((raw.categories.performance?.score || 0) * 100);
       const a11y = Math.round((raw.categories.accessibility?.score || 0) * 100);
@@ -182,6 +185,7 @@ async function main() {
 
     // Salva i risultati in json per archivio
     fs.writeFileSync('docs/lighthouse_results.json', JSON.stringify({ runs: results, median }, null, 2));
+    fs.writeFileSync('docs/lighthouse/summary.json', JSON.stringify({ runs: results, median }, null, 2));
 
   } finally {
     console.log('\nArresto server Preview...');
