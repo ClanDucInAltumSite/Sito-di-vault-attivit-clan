@@ -6,7 +6,7 @@
 @media print {
   @page {
     size: A4 portrait;
-    margin: 15mm 12mm;
+    margin: 10mm 20mm 20mm 20mm;
   }
 
   /* Reset generale per risparmio inchiostro e leggibilità */
@@ -115,7 +115,9 @@
     justify-content: center;
     min-height: 240mm;
     text-align: center;
-    padding: 20mm 10mm;
+    padding: 0 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
   }
 
   .print-cover-logo {
@@ -148,7 +150,9 @@
   .print-index-page {
     break-after: page;
     page-break-after: always;
-    padding-top: 10mm;
+    padding: 0 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
   }
 
   .print-index-title {
@@ -370,9 +374,9 @@
 
   .canzoniere-header {
     display: block !important;
-    width: 170mm !important;
+    width: 100% !important;
     max-width: 100% !important;
-    margin: 0 auto !important;
+    margin: 0 !important;
   }
 
   .canzoniere-header-title {
@@ -432,8 +436,8 @@
     text-transform: uppercase !important;
     border-bottom: 0.5pt solid oklch(0.7 0 0) !important;
     padding-bottom: 4pt !important;
-    margin: 0 auto 8pt auto !important;
-    width: 170mm !important;
+    margin: 0 0 8pt 0 !important;
+    width: 100% !important;
     max-width: 100% !important;
     display: flex !important;
     justify-content: space-between !important;
@@ -443,9 +447,9 @@
     display: flex !important;
     flex-direction: row !important;
     justify-content: space-between !important;
-    width: 170mm !important;
+    width: 100% !important;
     max-width: 100% !important;
-    margin: 0 auto !important;
+    margin: 0 !important;
     flex: 1 !important;
     min-height: 0 !important;
     gap: 8mm !important;
@@ -579,7 +583,10 @@
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-md);
     padding: var(--space-6);
-    margin: var(--space-4) 0;
+    margin: var(--space-4) auto;
+    max-width: 210mm;
+    width: 100%;
+    box-sizing: border-box;
     transition: all var(--duration-normal) var(--ease-ios);
   }
 
@@ -668,13 +675,17 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  width: 210mm;
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 10mm 20mm 20mm 20mm;
 }
 
 .canzoniere-header {
   display: block;
-  width: 170mm;
+  width: 100%;
   max-width: 100%;
-  margin: 0 auto;
+  margin: 0;
 }
 
 .canzoniere-header-title {
@@ -734,8 +745,8 @@
   text-transform: uppercase;
   border-bottom: 0.5pt solid oklch(0.7 0 0);
   padding-bottom: 4pt;
-  margin: 0 auto 8pt auto;
-  width: 170mm;
+  margin: 0 0 8pt 0;
+  width: 100%;
   max-width: 100%;
   display: flex;
   justify-content: space-between;
@@ -745,9 +756,9 @@
   display: flex;
   flex-direction: row;
   justify-content: space-between;
-  width: 170mm;
+  width: 100%;
   max-width: 100%;
-  margin: 0 auto;
+  margin: 0;
   flex: 1;
   min-height: 0;
   gap: 8mm;

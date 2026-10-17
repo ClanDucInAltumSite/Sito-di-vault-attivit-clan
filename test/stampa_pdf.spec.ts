@@ -305,34 +305,8 @@ test.describe('FASE 6 - Verifica Reale della Generazione PDF, Indice Verificato 
     expect(bannerText).toContain("superano l'altezza A4");
 
     // =========================================================================
-    // CORREZIONE 3 - RASTERIZZAZIONE PNG DELLE PAGINE PER ISPEZIONE VISIVA
-    // La preview a schede è visibile in modalità stampa (@media print)
-    // =========================================================================
-    await page.emulateMedia({ media: 'print' });
-
-    await page.waitForSelector('.print-cover-page');
-    await page.waitForSelector('.print-index-page');
-    await page.waitForSelector('.print-continuous');
-    await page.waitForSelector('.print-song-page');
-
-    const printDir = path.resolve(process.cwd(), 'docs/design-review/print');
-    if (!fs.existsSync(printDir)) {
-      fs.mkdirSync(printDir, { recursive: true });
-    }
-
-    const previewPapers = page.locator('.stampa-preview-paper');
-    const paperCount = await previewPapers.count();
-    console.log(`[RASTERIZE] Trovate ${paperCount} schede di anteprima da salvare in PNG`);
-
-    for (let i = 0; i < paperCount; i++) {
-      const paper = previewPapers.nth(i);
-      const outPath = path.join(printDir, `page_${i + 1}.png`);
-      await paper.screenshot({ path: outPath });
-    }
-    expect(paperCount).toBeGreaterThanOrEqual(7);
-
-    // =========================================================================
     // GENERAZIONE PDF A4 REALE CON PLAYWRIGHT E PARSING BINARIO
+    // Single source of truth per i margini: @page CSS (10mm top, 20mm lati, 20mm fondo)
     // =========================================================================
     await page.emulateMedia({ media: 'print' });
 
@@ -343,16 +317,56 @@ test.describe('FASE 6 - Verifica Reale della Generazione PDF, Indice Verificato 
       path: pdfPath,
       format: 'A4',
       printBackground: true,
+      preferCSSPageSize: true,
       margin: {
-        top: '15mm',
-        bottom: '15mm',
-        left: '12mm',
-        right: '12mm',
+        top: '0mm',
+        bottom: '0mm',
+        left: '0mm',
+        right: '0mm',
       },
     });
 
     expect(fs.existsSync(pdfPath)).toBe(true);
     expect(pdfBuffer.length).toBeGreaterThan(5000);
+
+    // =========================================================================
+    // RASTERIZZAZIONE PNG DELLE SCHEDE A4 PER ISPEZIONE VISIVA
+    // Ciascuna scheda viene rasterizzata con geometria esatta A4 (210mm x 297mm)
+    // =========================================================================
+    await page.addStyleTag({
+      content: `
+        .stampa-preview-paper, .canzoniere-page {
+          width: 210mm !important;
+          max-width: 210mm !important;
+          min-height: 297mm !important;
+          margin: 0 auto 20mm auto !important;
+          padding: 10mm 20mm 20mm 20mm !important;
+          box-sizing: border-box !important;
+          background: white !important;
+        }
+        .canzoniere-columns-container, .canzoniere-header, .canzoniere-page2-header {
+          width: 100% !important;
+          max-width: 100% !important;
+          margin: 0 !important;
+        }
+      `,
+    });
+
+    const printDir = path.resolve(process.cwd(), 'docs/design-review/print');
+    if (!fs.existsSync(printDir)) {
+      fs.mkdirSync(printDir, { recursive: true });
+    }
+
+    const previewPapers = page.locator('.stampa-preview-paper');
+    const paperCount = await previewPapers.count();
+    console.log(`[RASTERIZE] Trovate ${paperCount} schede di anteprima da salvare in PNG (formato esatto A4)`);
+
+    for (let i = 0; i < paperCount; i++) {
+      const paper = previewPapers.nth(i);
+      const outPath = path.join(printDir, `page_${i + 1}.png`);
+      await paper.screenshot({ path: outPath });
+    }
+    expect(paperCount).toBeGreaterThanOrEqual(7);
 
     const parser = new PDFParse({ data: pdfBuffer });
     const info = await parser.getInfo();

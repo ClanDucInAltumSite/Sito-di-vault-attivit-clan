@@ -585,7 +585,7 @@ export function computePrintIndex(
   config: StampaConfig,
   printableODG: PrintableODG | null = null
 ): PrintIndexResult {
-  const PAGE_CAPACITY_PT = 1000;
+  const PAGE_CAPACITY_PT = 800;
   const CHARS_PER_LINE = 110;
   const LINE_H = 13.5;
   const startOffset = config.includeCoverAndIndex ? 3 : 1;
@@ -604,7 +604,7 @@ export function computePrintIndex(
     curY += headerH;
 
     for (const pg of printableData.giochi) {
-      const charCount = pg.gioco.regole?.length || 0;
+      const charCount = (pg.gioco.regole?.length || 0) + (pg.gioco.materiali?.length || 0);
       const lines = Math.max(1, Math.ceil(charCount / CHARS_PER_LINE));
       const hasMat = Boolean(pg.gioco.materiali);
       const imagesH = config.includeImages ? pg.images.length * 130 : 0;
@@ -651,7 +651,7 @@ export function computePrintIndex(
     curY += headerH;
 
     for (const pb of printableData.bans) {
-      const charCount = pb.ban.testo?.length || 0;
+      const charCount = (pb.ban.testo?.length || 0) + (pb.ban.note_gesti?.length || 0);
       const lines = Math.max(1, Math.ceil(charCount / CHARS_PER_LINE));
       const hasGesti = Boolean(pb.ban.note_gesti);
       const imagesH = config.includeImages ? pb.images.length * 130 : 0;
