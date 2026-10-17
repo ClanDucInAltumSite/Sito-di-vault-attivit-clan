@@ -370,6 +370,9 @@
 
   .canzoniere-header {
     display: block !important;
+    width: 170mm !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
   }
 
   .canzoniere-header-title {
@@ -429,7 +432,9 @@
     text-transform: uppercase !important;
     border-bottom: 0.5pt solid oklch(0.7 0 0) !important;
     padding-bottom: 4pt !important;
-    margin-bottom: 8pt !important;
+    margin: 0 auto 8pt auto !important;
+    width: 170mm !important;
+    max-width: 100% !important;
     display: flex !important;
     justify-content: space-between !important;
   }
@@ -454,7 +459,7 @@
   }
 
   .canzoniere-column-left {
-    border-right: 0.75pt solid oklch(0 0 0) !important;
+    border-right: 0.75pt solid oklch(0.7 0 0) !important;
     padding-right: 4mm !important;
   }
 
@@ -651,4 +656,160 @@
   margin: 0 !important;
   border: none !important;
 }
+
+/* ==============================================================================
+   FASE 9 - REGOLE CANZONIERE BASE (Valide per Schermo e Stampa)
+   ============================================================================== */
+.canzoniere-page {
+  box-sizing: border-box;
+  background: oklch(1 0 0);
+  color: oklch(0.33 0.02 255);
+  font-family: 'Roboto', system-ui, -apple-system, sans-serif;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.canzoniere-header {
+  display: block;
+  width: 170mm;
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+.canzoniere-header-title {
+  font-family: 'Roboto', sans-serif;
+  font-size: 22pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: oklch(0 0 0);
+  margin-top: 24pt;
+  margin-bottom: 6pt;
+  line-height: 1.0;
+  letter-spacing: -0.01em;
+}
+
+.canzoniere-header-author {
+  font-family: 'Roboto', sans-serif;
+  font-size: 11pt;
+  font-style: italic;
+  color: oklch(0.44 0.02 255);
+  margin-bottom: 4pt;
+  line-height: 1.2;
+}
+
+.canzoniere-header-params {
+  font-family: 'Roboto', sans-serif;
+  font-size: 11pt;
+  color: oklch(0.33 0.02 255);
+  margin-bottom: 6pt;
+  line-height: 1.25;
+  display: flex;
+  align-items: center;
+  gap: 16pt;
+}
+
+.canzoniere-arrow-glyph {
+  font-family: 'Nova Mono', monospace;
+  font-size: 17pt;
+  font-weight: 700;
+  color: oklch(0 0 0);
+  line-height: 1;
+  display: inline-block;
+}
+
+.canzoniere-header-divider {
+  border: none;
+  border-bottom: 1pt solid oklch(0.7 0 0);
+  margin-top: 4pt;
+  margin-bottom: 10pt;
+  width: 100%;
+}
+
+.canzoniere-page2-header {
+  font-family: 'Roboto', sans-serif;
+  font-size: 11pt;
+  font-weight: 700;
+  color: oklch(0 0 0);
+  text-transform: uppercase;
+  border-bottom: 0.5pt solid oklch(0.7 0 0);
+  padding-bottom: 4pt;
+  margin: 0 auto 8pt auto;
+  width: 170mm;
+  max-width: 100%;
+  display: flex;
+  justify-content: space-between;
+}
+
+.canzoniere-columns-container {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  width: 170mm;
+  max-width: 100%;
+  margin: 0 auto;
+  flex: 1;
+  min-height: 0;
+  gap: 8mm;
+}
+
+.canzoniere-column {
+  width: 81mm;
+  max-width: 81mm;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.canzoniere-column-left {
+  border-right: 0.75pt solid oklch(0.7 0 0);
+  padding-right: 4mm;
+}
+
+.canzoniere-column-right {
+  padding-left: 4mm;
+}
+
+.canzoniere-block {
+  margin-bottom: 1em;
+}
+
+.canzoniere-line-pair {
+  position: relative;
+  line-height: 1.25;
+  margin-bottom: 1pt;
+}
+
+.canzoniere-chords-row {
+  position: relative;
+  height: 1.15em;
+  font-family: 'Roboto', sans-serif;
+  font-weight: 700;
+  color: oklch(0 0 0);
+  white-space: pre;
+  overflow: visible;
+}
+
+.canzoniere-chord-item {
+  position: absolute;
+  white-space: nowrap;
+  font-weight: 700;
+  color: oklch(0 0 0);
+}
+
+.canzoniere-lyrics-row {
+  font-family: 'Roboto', sans-serif;
+  font-weight: 400;
+  color: oklch(0.33 0.02 255);
+  white-space: pre-wrap;
+  word-break: normal;
+}
+
+.canzoniere-rit-label {
+  font-family: 'Roboto', sans-serif;
+  font-weight: 700;
+  color: oklch(0.33 0.02 255);
+  margin-top: 2pt;
+  margin-bottom: 2pt;
+}
+
 
