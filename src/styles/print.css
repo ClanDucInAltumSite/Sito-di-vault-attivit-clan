@@ -61,7 +61,7 @@
 
   /* Elementi dell'interfaccia da nascondere tassativamente */
   nav,
-  header,
+  header:not(.canzoniere-header):not(.canzoniere-page2-header),
   .no-print,
   .bottom-nav,
   .top-bar,
@@ -345,6 +345,165 @@
   .print-font-10-5 { font-size: 10.5pt !important; }
   .print-font-10 { font-size: 10pt !important; }
   .print-font-9-5 { font-size: 9.5pt !important; }
+  .print-font-9 { font-size: 9pt !important; }
+
+  /* ==============================================================================
+     FASE 9 - CANZONIERE STILE IDENTICO AL DOCUMENTO DI RIFERIMENTO
+     ============================================================================== */
+  .canzoniere-page {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 267mm !important;
+    max-height: 267mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+    background: oklch(1 0 0) !important;
+    color: oklch(0.33 0.02 255) !important;
+    font-family: 'Roboto', system-ui, -apple-system, sans-serif !important;
+    break-before: page !important;
+    page-break-before: always !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .canzoniere-header {
+    display: block !important;
+  }
+
+  .canzoniere-header-title {
+    font-family: 'Roboto', sans-serif !important;
+    font-size: 22pt !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    color: oklch(0 0 0) !important;
+    margin-top: 24pt !important;
+    margin-bottom: 6pt !important;
+    line-height: 1.0 !important;
+    letter-spacing: -0.01em !important;
+  }
+
+  .canzoniere-header-author {
+    font-family: 'Roboto', sans-serif !important;
+    font-size: 11pt !important;
+    font-style: italic !important;
+    color: oklch(0.44 0.02 255) !important;
+    margin-bottom: 4pt !important;
+    line-height: 1.2 !important;
+  }
+
+  .canzoniere-header-params {
+    font-family: 'Roboto', sans-serif !important;
+    font-size: 11pt !important;
+    color: oklch(0.33 0.02 255) !important;
+    margin-bottom: 6pt !important;
+    line-height: 1.25 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 16pt !important;
+  }
+
+  .canzoniere-arrow-glyph {
+    font-family: 'Nova Mono', monospace !important;
+    font-size: 17pt !important;
+    font-weight: 700 !important;
+    color: oklch(0 0 0) !important;
+    line-height: 1 !important;
+    display: inline-block !important;
+  }
+
+  .canzoniere-header-divider {
+    border: none !important;
+    border-bottom: 1pt solid oklch(0.7 0 0) !important;
+    margin-top: 4pt !important;
+    margin-bottom: 10pt !important;
+    width: 100% !important;
+  }
+
+  .canzoniere-page2-header {
+    font-family: 'Roboto', sans-serif !important;
+    font-size: 11pt !important;
+    font-weight: 700 !important;
+    color: oklch(0 0 0) !important;
+    text-transform: uppercase !important;
+    border-bottom: 0.5pt solid oklch(0.7 0 0) !important;
+    padding-bottom: 4pt !important;
+    margin-bottom: 8pt !important;
+    display: flex !important;
+    justify-content: space-between !important;
+  }
+
+  .canzoniere-columns-container {
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: space-between !important;
+    width: 170mm !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+    flex: 1 !important;
+    min-height: 0 !important;
+    gap: 8mm !important;
+  }
+
+  .canzoniere-column {
+    width: 81mm !important;
+    max-width: 81mm !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+  }
+
+  .canzoniere-column-left {
+    border-right: 0.75pt solid oklch(0 0 0) !important;
+    padding-right: 4mm !important;
+  }
+
+  .canzoniere-column-right {
+    padding-left: 4mm !important;
+  }
+
+  .canzoniere-block {
+    margin-bottom: 1em !important;
+  }
+
+  .canzoniere-line-pair {
+    position: relative !important;
+    line-height: 1.25 !important;
+    margin-bottom: 1pt !important;
+  }
+
+  .canzoniere-chords-row {
+    position: relative !important;
+    height: 1.15em !important;
+    font-family: 'Roboto', sans-serif !important;
+    font-weight: 700 !important;
+    color: oklch(0.33 0.02 255) !important;
+    white-space: pre !important;
+    overflow: visible !important;
+  }
+
+  .canzoniere-chord-item {
+    position: absolute !important;
+    white-space: nowrap !important;
+    font-weight: 700 !important;
+    color: oklch(0.33 0.02 255) !important;
+  }
+
+  .canzoniere-lyrics-row {
+    font-family: 'Roboto', sans-serif !important;
+    font-weight: 400 !important;
+    color: oklch(0.33 0.02 255) !important;
+    white-space: pre-wrap !important;
+    word-break: normal !important;
+  }
+
+  .canzoniere-rit-label {
+    font-family: 'Roboto', sans-serif !important;
+    font-weight: 700 !important;
+    color: oklch(0.33 0.02 255) !important;
+    margin-top: 2pt !important;
+    margin-bottom: 2pt !important;
+  }
 
   /* --- 4. IMMAGINI IN STAMPA (Solo immagini, mai PDF) --- */
   .print-attachment-container {

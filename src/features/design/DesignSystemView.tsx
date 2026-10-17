@@ -41,6 +41,7 @@ export function DesignSystemView() {
     tonalita: 'Re',
     ritmo: 'Marcia scout',
     tempo_bpm: 112,
+    bpm_testo: '112',
     misura: '4/4',
     capotasto: 2,
     testo_chordpro: `[Re]Sai da dove viene, [Sol]sai dove ti porta\n[La]questo camminare, [Re]questa strada aperta...\n\n{ritornello}\n[Sol]Canta con noi, [La]batti le mani\n[Fa#m]Danza sui passi dei [Sim]tuoi domani`,

@@ -403,9 +403,9 @@ test.describe('FASE 6 - Verifica Reale della Generazione PDF, Indice Verificato 
       // 2. Verifica che il titolo compaia ESATTAMENTE nel testo estratto di quella pagina reale del PDF!
       const actualPageText = textResult.pages[declaredPageNum - 1].text;
       expect(
-        actualPageText,
+        actualPageText.toLowerCase(),
         `Il titolo "${item.titlePart}" è dichiarato a pag. ${declaredPageNum} nell'indice ma compare altrove nel PDF!`
-      ).toContain(item.titlePart);
+      ).toContain(item.titlePart.toLowerCase());
     }
 
     // =========================================================================

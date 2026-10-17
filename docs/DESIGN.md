@@ -288,3 +288,35 @@ I 5 tipi di attività previsti dal Clan utilizzano token OKLCH armonizzati:
 ### 12.5 Vetrina Design System (`#/design`, Sezione 19)
 - Esposizione di tutti i chip dei 5 tipi di evento, confronto diretto tra data standard e data odierna, e dimostrazione interattiva della spunta ODG completata e in attesa.
 
+---
+
+## 13. Specifiche Tipografiche e Layout Canzoniere A4 a Due Colonne (Fase 9)
+
+Conforme al documento e all'immagine di riferimento (`_riferimenti/riferimento_stile_canzoniere.png`):
+
+### 13.1 Geometria di Pagina A4
+- **Formato:** A4 verticale ($210 \times 297\text{ mm}$).
+- **Margini di Stampa:**
+  - Sinistro: $20\text{ mm}$ ($2,0\text{ cm}$)
+  - Destro: $20\text{ mm}$ ($2,0\text{ cm}$)
+  - Superiore: $10\text{ mm}$ ($1,0\text{ cm}$)
+  - Inferiore: $20\text{ mm}$ ($2,0\text{ cm}$)
+- **Colonne:** Due colonne simmetriche da $81\text{ mm}$ ciascuna, separate da un canaletto (gap) di $8\text{ mm}$.
+- **Separatore Verticale:** Linea continua da $0,75\text{ pt}$ in colore `--color-canzoniere-border` (`oklch(0.7 0 0)`), posizionata al centro del gap tra le due colonne.
+
+### 13.2 Tipografia Self-Hosted
+- **Corpo del Testo:** Font `Roboto` (Regular $400$, Bold $700$, Italic $400$), auto-ospitato localmente tramite `@fontsource/roboto`. Colore del testo `#2D3748` (`oklch(0.33 0.02 255)`), interlinea $1,25$. Dimensione base $11\text{ pt}$ con step-down automatico a $9\text{ pt}$ per canti ad alta densità.
+- **Intestazione a Tutta Larghezza:**
+  1. **Titolo:** `Roboto Bold` $22\text{ pt}$, MAIUSCOLO, nero puro (`oklch(0 0 0)`), interlinea $1,0$, spazio sopra $24\text{ pt}$ e sotto $6\text{ pt}$.
+  2. **Riga Parametri:** `Roboto Italic` $11\text{ pt}$ per l'autore o evento; etichetta `"Tonalità:"` in Regular con valore in Bold $11\text{ pt}$; andamento del ritmo con frecce (`↓ ↑`) renderizzate con il font a spaziatura fissa `Nova Mono Bold` $17\text{ pt}$ (`@fontsource/nova-mono`) per garantire perfetta leggibilità del tocco chitarristico.
+  3. **Separatore Orizzontale:** Riga continua sottile da $1\text{ pt}$ (`oklch(0.7 0 0)`) a tutta larghezza ($170\text{ mm}$).
+
+### 13.3 Accordi e Ritornello
+- **Accordi Sovrapposti Naturali:** Gli accordi sono renderizzati in `Roboto Bold` $700$ nero (`oklch(0 0 0)`), posizionati rigorosamente sopra la sillaba (`position: absolute; top: -1.2em`), senza allargare o frammentare le parole sottostanti.
+- **Blocco Ritornello (`.canzoniere-chorus`):** Testo in corsivo con rientro a sinistra di $3\text{ mm}$ e barra verticale sinistra continua dorata da $2\text{ pt}$ (`border-left: 2pt solid oklch(0.78 0.16 85)`).
+- **Separatore Strofe:** Margine inferiore calibrato di $6\text{ pt}$ tra blocchi strofa/ritornello.
+
+### 13.4 Motore di Paginazione e Bilanciamento
+- **Canti a Pagina Singola:** L'algoritmo distribuisce i blocchi per bilanciare l'altezza visiva tra colonna sinistra e destra.
+- **Canti Multipagina:** Spezzamento a livello di blocco (evita orfani) con step-down a $9\text{ pt}$ prima di forzare il passaggio a pagina successiva.
+- **Controllo Manuale:** Supporto ai marcatori `{nuova_pagina}` e `{nuova_colonna}`.

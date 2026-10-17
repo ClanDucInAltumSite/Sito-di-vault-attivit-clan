@@ -50,13 +50,19 @@ L'applicazione è progettata secondo il paradigma **Local-First PWA (Progressive
 │   │   ├── App.tsx               # Root component con gestione shell e banner
 │   │   ├── router.ts             # Router reattivo basato su Hash (#/)
 │   │   └── Shell.tsx             # Layout principale con TopBar, BottomNav e indicatori di stato (CompassSync)
-│   ├── features/
 │   │   ├── home/                 # Schermata Home viva (conteggi IndexedDB, prossimo evento, aggiunti di recente)
 │   │   ├── giochi/               # Lista card, dettaglio, filtri ricerca e modale CRUD admin
 │   │   ├── bans/                 # Lista, dettaglio con vista lettura ad alto contrasto, Wake Lock
-│   │   ├── canti/                # Lista canti, vista esecuzione (accordi, trasposizione), editor live ChordPro
+│   │   ├── canti/                # Modulo Canti e Canzoniere A4
+│   │   │   ├── CantiView.tsx             # Lista canti, ricerca pulita sul testo e modale importazione admin
+│   │   │   ├── CantoFormSheet.tsx        # Modale creazione/modifica canto (con bpm_testo)
+│   │   │   ├── CantoImportSheet.tsx      # Importazione a 3 vie (Word .docx via jszip, testo, AI prompt)
+│   │   │   ├── CanzonierePageRenderer.tsx # Rendering fedele A4 su 2 colonne con accordi sovrapposti
+│   │   │   ├── canzoniere_config.ts      # Geometria e costanti canzoniere (margini A4, 11/9pt, 81mm)
+│   │   │   ├── canzoniere_parser.ts      # Parser metadati, accordi ChordPro e blocchi strofa/ritornello
+│   │   │   └── canzoniere_layout.ts      # Algoritmo paginazione e bilanciamento 2 colonne
 │   │   ├── calendario/           # Vista mensile, lista prossimi eventi, gestione ODG con riporto
-│   │   ├── stampa/               # Schermata selezione elementi, preview impaginata e CSS print
+│   │   ├── stampa/               # Centro Stampa: fascicoli A4 canti, giochi, bans e schede ODG
 │   │   ├── admin/                # Schermata gestione: cestino, backup/restore JSON, stato storage
 │   │   ├── design/               # Vetrina del design system Apple-Grade (#/design)
 │   │   └── statodati/            # Schermata di verifica stato sincronizzazione e IndexedDB (#/stato-dati)

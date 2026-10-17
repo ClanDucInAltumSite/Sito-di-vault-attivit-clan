@@ -518,3 +518,32 @@ I requisiti cardine impongono:
 6. **Integrazione Home ("Prossimo Evento"):**
    - La funzione `getNextUpcomingEvent()` calcola il primo evento cronologicamente futuro (o in corso) ed estrae il conteggio dei punti ODG ancora aperti (`openOdgCount`).
    - La card nella Home renderizza il blocco data con `.calendar-date-block-today` se l'evento ricade oggi, il chip cromatico corrispondente al tipo (`riunione`, `uscita`, `scadenza`, `evento`, `altro`), e un badge rosso con i punti aperti. Il tocco naviga direttamente a `#/calendario?id=<uuid>`.
+
+---
+
+## ADR-0015 (Fase 9): Canzoniere A4 a Due Colonne, Stile Documento di Riferimento e Pipeline di Importazione Canti
+
+### Data
+2026-10-17
+
+### Contesto
+La Fase 9 richiede la riproduzione fedele dello stile grafico e tipografico del fascicolo cartaceo di riferimento (`Strade di coraggio - Canzoniere.docx` e `riferimento_stile_canzoniere.png`) per la stampa dei canti in formato A4 verticale, unitamente a una pipeline completa di importazione per i capi admin (da file Word `.docx`, da incolla testo diretto e tramite prompt per AI esterna).
+I requisiti cardine impongono:
+1. **Fedeltà al Riferimento:** Pagina A4 verticale (210×297 mm) con margini 2,0 cm (SX/DX), 1,0 cm (Superiore), 2,0 cm (Inferiore). Due colonne uguali da 81 mm separate da una linea verticale continua da 0,75 pt (`oklch(0.7 0 0)`), gap tra colonne di 8 mm.
+2. **Tipografia Self-Hosted:** Font `Roboto` (Regular 400, Bold 700, Italic 400) e `Nova Mono` (per le frecce ritmiche a spaziatura uniforme) installati via npm (`@fontsource/roboto`, `@fontsource/nova-mono`) e bundled localmente, senza alcuna chiamata a CDN esterne. Testo corpo `#2D3748` (`oklch(0.33 0.02 255)`), titolo a tutta larghezza in Roboto Bold maiuscolo 22 pt nero (`oklch(0 0 0)`), interlinea 1.0, spazio sopra 24 pt e sotto 6 pt.
+3. **Accordi Sovrapposti Naturali:** Gli accordi sono posizionati con precisione tipografica sopra la sillaba (`position: absolute; top: -1.2em`) con peso 700 nero, senza allargare artificialmente lo spazio tra le parole o sfasare il ritmo naturale della strofa.
+4. **Impaginazione Bilanciata e Controllo Overflow:** File di configurazione unico (`src/features/canti/canzoniere_config.ts`) con dimensione base 11 pt e step-down automatico a 9 pt per canzoni dense. Per i canti a pagina singola, l'algoritmo bilancia l'altezza delle due colonne; per i canti multipagina, lo spezzamento avviene rigorosamente a livello di blocco (mai troncare una strofa a metà se evitabile). Supporto ai tag `{nuova_pagina}` e `{nuova_colonna}`.
+5. **Nessun Dato Protetto da Copyright nel Repository:** Nessun testo di canzone reale o file coperto da diritto d'autore viene committato nel repository pubblico o nei test (la cartella `_riferimenti/` è rigorosamente inserita in `.gitignore`). I test utilizzano esclusivamente brani sintetici d'esempio inventati.
+6. **Riduzione della Visibilità Web:** Inclusione del tag `<meta name="robots" content="noindex, nofollow">` in `index.html` e file `public/robots.txt` con `Disallow: /`. Questo è esplicitamente inteso come misura tecnica di riduzione della visibilità e de-indicizzazione sui motori di ricerca, non come esenzione o protezione legale dal diritto d'autore.
+
+### Decisione sull'Integrazione AI: Prompt Esterno vs Funzione Server + AI
+1. **Decisione Adottata: Prompt AI Esterno (Zero Backend, Zero Chiavi API)**
+   - L'applicazione fornisce una guida e un prompt strutturato copia-incolla (`docs/PROMPT_IMPORT_CANTI.md`) con pulsante dedicato nella modale di importazione. L'amministratore copia il prompt e il testo/foto della canzone nel proprio strumento di intelligenza artificiale preferito (ChatGPT, Claude, Google Gemini) via browser, e incolla l'output ChordPro standardizzato nell'app.
+   - **Vantaggi:** Costo di gestione e infrastruttura zero; nessuna chiave API memorizzata nel client o su server; totale indipendenza da limiti di budget; nessun rischio di furto credenziali o abusi.
+2. **Valutazione dell'Evoluzione Futura: "Funzione Server (Supabase Edge Function) + AI"**
+   - Abbiamo analizzato la possibilità di integrare un endpoint backend automatico (es. Edge Function che invoca OpenAI GPT-4o o Google Gemini API).
+   - **Costi e Sostenibilità:** Una Edge Function richiede un account a pagamento o una chiave con carta di credito collegata. Un picco di chiamate o un crawler malevolo potrebbe azzerare i crediti in pochi minuti.
+   - **Rischio Rifiuto Copyright (LLM Provider Refusal):** I principali fornitori di modelli linguistici applicano filtri automatici rigorosi per il copyright: richieste contenenti testi di canzoni note vengono sistematicamente respinte con messaggi di violazione delle policy (*"I cannot reproduce copyrighted song lyrics"*), rendendo il servizio server inaffidabile.
+   - **Sicurezza:** Richiederebbe autenticazione rigorosa e rate-limiting complesso per evitare che l'endpoint venga sfruttato come proxy gratuito per chiamate AI a spese del gruppo scout.
+   - **Conclusione:** L'approccio con prompt esterno e importazione lato client (con parsing .docx via `jszip` in chunk asincrono) è la soluzione architetturalmente più robusta, sicura, economica e sostenibile a lungo termine per il Clan.
+

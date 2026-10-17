@@ -33,6 +33,7 @@ import {
 import { ChordProRenderer, stripChords } from '../../lib/chordpro';
 import { SearchField } from '../../ui/SearchField';
 import { matchesQuery } from '../../lib/search';
+import { CanzonierePageRenderer } from '../canti/CanzonierePageRenderer';
 
 type SectionTab = 'tutti' | 'giochi' | 'bans' | 'canti' | 'odg';
 
@@ -1198,83 +1199,98 @@ export function StampaView() {
               </div>
             )}
 
-            {/* 5. SEZIONE CANTI (Ogni canto inizia su nuova pagina, accordi in nero su testo) */}
+            {/* 5. SEZIONE CANTI (Stile Canzoniere A4 a due colonne - Fase 9) */}
             {printableData.canti.map((ps) => (
               <div key={ps.canto.id} className="print-song-wrapper">
-                {ps.pages.map((page) => (
-                  <div
-                    key={`${ps.canto.id}-p${page.pageIndex}`}
-                    className={`print-song-page stampa-preview-paper print-font-${page.fontSizePt
-                      .toString()
-                      .replace('.', '-')}`}
-                  >
-                    {/* Avviso di Overflow (Visibile solo a schermo prima della stampa) */}
-                    {page.hasOverflow && (
-                      <div className="stampa-overflow-alert no-print">
-                        <Icon name="info" size={16} />
-                        <span>
-                          {I18N.stampa.paginaNonEntra} (Pagina {page.pageIndex}/{ps.pageCount})
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Intestazione: Completa a pagina 1, Ridotta a pagine >= 2 */}
-                    {page.isFirstPage ? (
-                      <div className="print-song-header">
-                        <h2 className="print-song-title">{ps.canto.titolo}</h2>
-                        <div className="print-song-meta">
-                          {ps.canto.autore && <span>Autore: {ps.canto.autore}</span>}
-                          {ps.canto.tonalita && <span> • Tonalità: {ps.canto.tonalita}</span>}
-                          {ps.pageCount > 1 && (
-                            <span>
-                              {' '}
-                              • {I18N.stampa.paginaDi(page.pageIndex, ps.pageCount)}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="print-song-reduced-header">
-                        <span>{ps.canto.titolo}</span>
-                        <span>
-                          {page.pageIndex}/{ps.pageCount}
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Rendering ChordPro con accordi in nero pieno sopra le sillabe */}
-                    <div style={{ flex: 1 }}>
-                      <ChordProRenderer
-                        chordproText={page.rawChordpro}
-                        showChords={true}
-                        transposeDelta={0}
-                        fontSizeRem={page.fontSizePt / 12}
-                      />
-                    </div>
-
-                    {/* Immagini allegate all'ultima pagina del canto */}
-                    {config.includeImages &&
-                      page.pageIndex === ps.pageCount &&
-                      ps.images.length > 0 && (
-                        <div className="print-attachment-container">
-                          {ps.images.map((img, iIdx) =>
-                            img.src ? (
-                              <img
-                                key={iIdx}
-                                src={img.src}
-                                alt={img.name}
-                                className="print-attachment-image"
-                              />
-                            ) : (
-                              <div key={iIdx} className="print-img-warning">
-                                [{I18N.stampa.immagineNonDisponibileOffline}: {img.name}]
-                              </div>
-                            )
-                          )}
+                {ps.canzoniereResult ? (
+                  ps.canzoniereResult.pages.map((page) => (
+                    <div key={`${ps.canto.id}-p${page.pageNumber}`} className="print-song-page">
+                      {/* Avviso di Overflow (Visibile solo a schermo prima della stampa) */}
+                      {ps.hasAnyOverflow && page.isFirstPage && (
+                        <div className="stampa-overflow-alert no-print">
+                          <Icon name="info" size={16} />
+                          <span>
+                            {I18N.stampa.paginaNonEntra} ({ps.canto.titolo})
+                          </span>
                         </div>
                       )}
+                      <CanzonierePageRenderer page={page} isScreenPreview={true} />
+                    </div>
+                  ))
+                ) : (
+                  ps.pages.map((page) => (
+                    <div
+                      key={`${ps.canto.id}-p${page.pageIndex}`}
+                      className={`print-song-page stampa-preview-paper print-font-${page.fontSizePt
+                        .toString()
+                        .replace('.', '-')}`}
+                    >
+                      {/* Avviso di Overflow (Visibile solo a schermo prima della stampa) */}
+                      {page.hasOverflow && (
+                        <div className="stampa-overflow-alert no-print">
+                          <Icon name="info" size={16} />
+                          <span>
+                            {I18N.stampa.paginaNonEntra} (Pagina {page.pageIndex}/{ps.pageCount})
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Intestazione: Completa a pagina 1, Ridotta a pagine >= 2 */}
+                      {page.isFirstPage ? (
+                        <div className="print-song-header">
+                          <h2 className="print-song-title">{ps.canto.titolo}</h2>
+                          <div className="print-song-meta">
+                            {ps.canto.autore && <span>Autore: {ps.canto.autore}</span>}
+                            {ps.canto.tonalita && <span> • Tonalità: {ps.canto.tonalita}</span>}
+                            {ps.pageCount > 1 && (
+                              <span>
+                                {' '}
+                                • {I18N.stampa.paginaDi(page.pageIndex, ps.pageCount)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="print-song-reduced-header">
+                          <span>{ps.canto.titolo}</span>
+                          <span>
+                            {page.pageIndex}/{ps.pageCount}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Rendering ChordPro con accordi in nero pieno sopra le sillabe */}
+                      <div style={{ flex: 1 }}>
+                        <ChordProRenderer
+                          chordproText={page.rawChordpro}
+                          showChords={true}
+                          transposeDelta={0}
+                          fontSizeRem={page.fontSizePt / 12}
+                        />
+                      </div>
+                    </div>
+                  ))
+                )}
+
+                {/* Immagini allegate all'ultima pagina del canto */}
+                {config.includeImages && ps.images.length > 0 && (
+                  <div className="print-attachment-container">
+                    {ps.images.map((img, iIdx) =>
+                      img.src ? (
+                        <img
+                          key={iIdx}
+                          src={img.src}
+                          alt={img.name}
+                          className="print-attachment-image"
+                        />
+                      ) : (
+                        <div key={iIdx} className="print-img-warning">
+                          [{I18N.stampa.immagineNonDisponibileOffline}: {img.name}]
+                        </div>
+                      )
+                    )}
                   </div>
-                ))}
+                )}
               </div>
             ))}
 

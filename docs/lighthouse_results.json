@@ -2,62 +2,62 @@
   "runs": [
     {
       "run": 1,
-      "perf": 93,
-      "lcpSec": 3.03,
-      "tbtMs": 95,
+      "perf": 92,
+      "lcpSec": 3.18,
+      "tbtMs": 50,
       "cls": 0.059,
       "a11y": 96,
-      "bp": 100,
-      "seo": 100
+      "bp": 92,
+      "seo": 63
     },
     {
       "run": 2,
-      "perf": 83,
-      "lcpSec": 3.13,
-      "tbtMs": 394,
+      "perf": 91,
+      "lcpSec": 3.25,
+      "tbtMs": 60,
       "cls": 0.059,
       "a11y": 96,
-      "bp": 100,
-      "seo": 100
+      "bp": 92,
+      "seo": 63
     },
     {
       "run": 3,
-      "perf": 90,
-      "lcpSec": 3.03,
-      "tbtMs": 207,
+      "perf": 91,
+      "lcpSec": 3.17,
+      "tbtMs": 75,
       "cls": 0.059,
       "a11y": 96,
-      "bp": 100,
-      "seo": 100
+      "bp": 92,
+      "seo": 63
     },
     {
       "run": 4,
       "perf": 91,
-      "lcpSec": 3.03,
-      "tbtMs": 166,
+      "lcpSec": 3.17,
+      "tbtMs": 101,
       "cls": 0.059,
       "a11y": 96,
-      "bp": 100,
-      "seo": 100
+      "bp": 92,
+      "seo": 63
     },
     {
       "run": 5,
-      "perf": 92,
-      "lcpSec": 3.02,
-      "tbtMs": 115,
-      "cls": 0.059,
+      "perf": 85,
+      "lcpSec": 3.44,
+      "tbtMs": 148,
+      "cls": 0.104,
       "a11y": 96,
-      "bp": 100,
-      "seo": 100
+      "bp": 92,
+      "seo": 63
     }
   ],
   "median": {
     "perf": 91,
-    "lcpSec": 3.03,
-    "tbtMs": 166,
+    "lcpSec": 3.18,
+    "tbtMs": 75,
     "cls": 0.059,
     "a11y": 96,
-    "bp": 100,
-    "seo": 100
+    "bp": 92,
+    "seo": 63
   }
 }

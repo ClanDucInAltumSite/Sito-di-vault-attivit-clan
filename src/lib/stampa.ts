@@ -6,6 +6,7 @@
 import { Gioco, Ban, Canto, Allegato, getDb } from './db';
 import { parseChordProAST, ChordProAST } from './chordpro';
 import { resolveAttachmentSource } from './storage-cache';
+import { layoutCanzoniereSong, LayoutSongResult } from '../features/canti/canzoniere_layout';
 
 export const SESSION_STORAGE_SELECTION_KEY = 'stampa_selection';
 
@@ -74,6 +75,7 @@ export interface PrintableSong {
   pageCount: number;
   hasAnyOverflow: boolean;
   images: { name: string; src: string | null; isOffline: boolean }[];
+  canzoniereResult?: LayoutSongResult;
 }
 
 export interface PrintableGioco {
@@ -493,9 +495,10 @@ export async function loadPrintableData(config: StampaConfig): Promise<Printable
   for (const id of config.selectedCantiIds) {
     const c = cantiMap.get(id);
     if (c) {
+      const canzoniereResult = layoutCanzoniereSong(c);
       const pageTexts = splitSongIntoPages(c.testo_chordpro);
-      const totalPages = pageTexts.length;
-      let songHasOverflow = false;
+      const totalPages = canzoniereResult ? canzoniereResult.declaredPageCount : pageTexts.length;
+      let songHasOverflow = canzoniereResult.hasOverflow;
       const pages: PrintableSongPage[] = pageTexts.map((text, idx) => {
         const isFirst = idx === 0;
         const overflowResult = measureSongPageOverflow(text, isFirst, {
@@ -518,6 +521,10 @@ export async function loadPrintableData(config: StampaConfig): Promise<Printable
         };
       });
 
+      if (canzoniereResult.hasOverflow) {
+        globalHasOverflow = true;
+      }
+
       const images = config.includeImages ? await loadItemPrintImages('canto', c.id) : [];
       orderedCanti.push({
         canto: c,
@@ -525,6 +532,7 @@ export async function loadPrintableData(config: StampaConfig): Promise<Printable
         pageCount: totalPages,
         hasAnyOverflow: songHasOverflow,
         images,
+        canzoniereResult,
       });
     }
   }
@@ -577,7 +585,9 @@ export function computePrintIndex(
   config: StampaConfig,
   printableODG: PrintableODG | null = null
 ): PrintIndexResult {
-  const PAGE_CAPACITY_PT = 750;
+  const PAGE_CAPACITY_PT = 1000;
+  const CHARS_PER_LINE = 110;
+  const LINE_H = 13.5;
   const startOffset = config.includeCoverAndIndex ? 3 : 1;
 
   let curPage = startOffset;
@@ -590,15 +600,15 @@ export function computePrintIndex(
 
   // 1. GIOCHI (flusso continuo)
   if (printableData.giochi.length > 0) {
-    const headerH = 40;
+    const headerH = 30;
     curY += headerH;
 
     for (const pg of printableData.giochi) {
       const charCount = pg.gioco.regole?.length || 0;
-      const lines = Math.max(1, Math.ceil(charCount / 72));
+      const lines = Math.max(1, Math.ceil(charCount / CHARS_PER_LINE));
       const hasMat = Boolean(pg.gioco.materiali);
       const imagesH = config.includeImages ? pg.images.length * 130 : 0;
-      const itemH = 26 + (hasMat ? 20 : 0) + lines * 15.4 + 14 + imagesH;
+      const itemH = 20 + (hasMat ? 14 : 0) + lines * LINE_H + 8 + imagesH;
 
       if (pg.isShort) {
         if (curY + itemH > PAGE_CAPACITY_PT && curY > headerH) {
@@ -633,7 +643,7 @@ export function computePrintIndex(
 
   // 2. BANS (flusso continuo, segue giochi)
   if (printableData.bans.length > 0) {
-    const headerH = 40;
+    const headerH = 30;
     if (curY + headerH > PAGE_CAPACITY_PT) {
       curPage += 1;
       curY = 0;
@@ -642,10 +652,10 @@ export function computePrintIndex(
 
     for (const pb of printableData.bans) {
       const charCount = pb.ban.testo?.length || 0;
-      const lines = Math.max(1, Math.ceil(charCount / 72));
+      const lines = Math.max(1, Math.ceil(charCount / CHARS_PER_LINE));
       const hasGesti = Boolean(pb.ban.note_gesti);
       const imagesH = config.includeImages ? pb.images.length * 130 : 0;
-      const itemH = 26 + (hasGesti ? 24 : 0) + lines * 15.4 + 14 + imagesH;
+      const itemH = 20 + (hasGesti ? 14 : 0) + lines * LINE_H + 8 + imagesH;
 
       if (pb.isShort) {
         if (curY + itemH > PAGE_CAPACITY_PT && curY > headerH) {
@@ -693,7 +703,9 @@ export function computePrintIndex(
         section: 'canti',
         startPage: cantoStart,
       });
-      const numPages = Math.max(1, pc.pages.length);
+      const numPages = pc.canzoniereResult
+        ? Math.max(1, pc.canzoniereResult.declaredPageCount)
+        : Math.max(1, pc.pages.length);
       curPage += numPages;
     }
   }

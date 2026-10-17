@@ -14,9 +14,11 @@ import { useAdmin } from '../../lib/auth';
 import { matchesQuery, HighlightText } from '../../lib/search';
 import { softDeleteRecord } from '../../lib/admin_actions';
 import { subscribeSyncState } from '../../lib/sync';
-import { stripChords, calculatePageCount } from '../../lib/chordpro';
+import { stripChords } from '../../lib/chordpro';
+import { splitSongIntoPages } from '../../lib/stampa';
 import { CantoReadingMode } from './CantoReadingMode';
 import { CantoFormSheet } from './CantoFormSheet';
+import { CantoImportSheet } from './CantoImportSheet';
 import { DeleteConfirmModal } from '../../ui/DeleteConfirmModal';
 
 type SortOption = 'az' | 'za' | 'recenti' | 'vecchi';
@@ -49,6 +51,7 @@ export function CantiView() {
   const [selectedCanto, setSelectedCanto] = useState<Canto | null>(null);
   const [isReadingModeOpen, setIsReadingModeOpen] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
   const [editingCanto, setEditingCanto] = useState<Canto | null>(null);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [deletingCanto, setDeletingCanto] = useState<Canto | null>(null);
@@ -157,9 +160,18 @@ export function CantiView() {
             style={{
               display: 'flex',
               justifyContent: 'flex-end',
+              gap: 'var(--space-2)',
               marginBottom: 'var(--space-3)',
             }}
           >
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setIsImportOpen(true)}
+            >
+              <Icon name="upload" size={16} />
+              <span>Importa</span>
+            </Button>
             <Button
               variant="primary"
               size="sm"
@@ -274,7 +286,7 @@ export function CantiView() {
               const isNew =
                 Date.now() - new Date(canto.created_at).getTime() < SEVEN_DAYS_MS;
 
-              const pageCount = calculatePageCount(canto.testo_chordpro);
+              const pageCount = splitSongIntoPages(canto.testo_chordpro).length;
               const metaParts = [];
               if (canto.tonalita) metaParts.push(`Tonalità: ${canto.tonalita}`);
               if (canto.tempo_bpm) metaParts.push(`${canto.tempo_bpm} BPM`);
@@ -346,6 +358,17 @@ export function CantiView() {
         onSaved={async (saved) => {
           await loadData();
           setSelectedCanto(saved);
+        }}
+      />
+
+      {/* Sheet Importazione Canti con 3 ingressi (Admin) */}
+      <CantoImportSheet
+        isOpen={isImportOpen}
+        onClose={() => setIsImportOpen(false)}
+        onSuccess={async (saved) => {
+          await loadData();
+          setSelectedCanto(saved);
+          setIsReadingModeOpen(true);
         }}
       />
 

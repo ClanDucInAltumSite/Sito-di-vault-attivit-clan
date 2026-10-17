@@ -187,6 +187,7 @@ export async function saveCanto(input: {
   tonalita?: string;
   ritmo?: string;
   tempo_bpm?: number | null;
+  bpm_testo?: string | null;
   misura?: string;
   capotasto?: number | null;
   testo_chordpro: string;
@@ -198,12 +199,26 @@ export async function saveCanto(input: {
   const now = new Date().toISOString();
   let savedRecord: Canto;
 
+  const rawBpmTesto = (input.bpm_testo || '').trim() || null;
+  // Se tempo_bpm non è passato ma bpm_testo contiene un numero, estraiamo un intero ragionevole per il metronomo
+  let calculatedBpm = typeof input.tempo_bpm === 'number' && !isNaN(input.tempo_bpm) ? input.tempo_bpm : null;
+  if (calculatedBpm === null && rawBpmTesto) {
+    const numMatch = rawBpmTesto.match(/\d+/);
+    if (numMatch) {
+      const parsed = parseInt(numMatch[0], 10);
+      if (parsed >= 30 && parsed <= 300) {
+        calculatedBpm = parsed;
+      }
+    }
+  }
+
   const payload = {
     titolo: input.titolo.trim(),
     autore: (input.autore || '').trim() || null,
     tonalita: (input.tonalita || '').trim() || null,
     ritmo: (input.ritmo || '').trim() || null,
-    tempo_bpm: typeof input.tempo_bpm === 'number' && !isNaN(input.tempo_bpm) ? input.tempo_bpm : null,
+    tempo_bpm: calculatedBpm,
+    bpm_testo: rawBpmTesto || (calculatedBpm !== null ? String(calculatedBpm) : null),
     misura: (input.misura || '').trim() || null,
     capotasto: typeof input.capotasto === 'number' && !isNaN(input.capotasto) ? input.capotasto : null,
     testo_chordpro: input.testo_chordpro.trim(),

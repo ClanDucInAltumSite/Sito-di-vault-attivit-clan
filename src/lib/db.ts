@@ -38,6 +38,7 @@ export interface Canto {
   tonalita: string | null;
   ritmo: string | null;
   tempo_bpm: number | null;
+  bpm_testo: string | null;
   misura: string | null;
   capotasto: number | null;
   testo_chordpro: string;

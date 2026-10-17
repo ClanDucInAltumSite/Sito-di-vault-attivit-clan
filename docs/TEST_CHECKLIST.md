@@ -291,19 +291,20 @@ Di seguito è riportato il resoconto analitico e la copertura dei test eseguiti 
 | **601-611** | **Fase 6:** Centro Stampa A4 (Fascicoli, Overflow Misurato, Indice Reale) | `stampa_pdf.spec.ts` (test binario PDF 12 pag, pdf-parse) | **100% PASS** |
 | **701-709** | **Fase 7:** Calendario e ODG (Multi-day, Riporto Idempotente, Spunte, Deep-link) | `calendario_odg.test.ts` (17 test), verifica permessi anonimi | **100% PASS** |
 | **801-807** | **Fase 8:** Rifinitura Finale, Bundle Code-Split, Red Team, Matrice Offline | `offline_matrix.spec.ts` (7 scenari), audit Red Team, Lighthouse 5 run | **100% PASS** |
+| **901-906** | **Fase 9:** Canzoniere Stile Riferimento, 2 Colonne A4, Importazione Word (.docx) & AI | `canzoniere_parser.test.ts` (14 test), `canzoniere_layout.test.ts` (7 test), `stampa_pdf.spec.ts` (10 pag A4, indice reale) | **100% PASS** |
 
 ---
 
 ## 3. COMANDI DI ESECUZIONE VERIFICA LOCALE
 
 ```bash
-# 1. Esecuzione test unitari completi (95 test su 10 file)
+# 1. Esecuzione test unitari completi (116 test su 12 file)
 npm test
 
 # 2. Esecuzione verifica reattiva e accessibilità Playwright su 7 viewport, stress test e controlli UI (31 test)
 npm run verify:ui
 
-# 3. Test di generazione e validazione binaria del PDF di stampa (12 pagine reali, pdf-parse)
+# 3. Test di generazione e validazione binaria del PDF di stampa (10 pagine reali, 0 pagine bianche, indice coincidente al 100%)
 npx playwright test test/stampa_pdf.spec.ts
 
 # 4. Matrice offline Playwright (7 scenari di resilienza alla disconnessione)
@@ -315,6 +316,6 @@ node scripts/run_lighthouse_5.mjs
 # 6. Test di sicurezza RLS e Storage (admin e anonimo, richiesta credenziali a runtime da tastiera)
 npm run test:admin
 
-# 7. Compilazione TypeScript e build bundle Vite (con code-splitting Rollup)
+# 7. Compilazione TypeScript e build bundle Vite (con code-splitting Rollup e importazione dinamica jszip)
 npm run build
 ```

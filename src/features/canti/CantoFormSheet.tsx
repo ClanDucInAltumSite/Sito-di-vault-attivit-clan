@@ -28,6 +28,7 @@ export function CantoFormSheet({
   const [tonalita, setTonalita] = useState('');
   const [ritmo, setRitmo] = useState('');
   const [tempoBpm, setTempoBpm] = useState<string>('');
+  const [bpmTesto, setBpmTesto] = useState<string>('');
   const [misura, setMisura] = useState('');
   const [capotasto, setCapotasto] = useState<string>('');
   const [testoChordpro, setTestoChordpro] = useState('');
@@ -45,6 +46,7 @@ export function CantoFormSheet({
       setTonalita(initialCanto?.tonalita || '');
       setRitmo(initialCanto?.ritmo || '');
       setTempoBpm(initialCanto?.tempo_bpm ? String(initialCanto.tempo_bpm) : '');
+      setBpmTesto(initialCanto?.bpm_testo || (initialCanto?.tempo_bpm ? String(initialCanto.tempo_bpm) : ''));
       setMisura(initialCanto?.misura || '');
       setCapotasto(initialCanto?.capotasto ? String(initialCanto.capotasto) : '');
       setTestoChordpro(initialCanto?.testo_chordpro || '');
@@ -102,6 +104,7 @@ export function CantoFormSheet({
         tonalita,
         ritmo,
         tempo_bpm: tempoBpm ? parseInt(tempoBpm, 10) : null,
+        bpm_testo: bpmTesto || undefined,
         misura,
         capotasto: capotasto ? parseInt(capotasto, 10) : null,
         testo_chordpro: testoChordpro,
@@ -235,7 +238,7 @@ export function CantoFormSheet({
 
           <div className="ios-form-group" style={{ marginBottom: 0 }}>
             <label className="ios-form-label" htmlFor="canto-bpm">
-              {I18N.canti.tempoBpm}
+              {I18N.canti.tempoBpm} (Metronomo)
             </label>
             <input
               id="canto-bpm"
@@ -245,7 +248,26 @@ export function CantoFormSheet({
               min="30"
               max="280"
               value={tempoBpm}
-              onInput={(e) => setTempoBpm((e.target as HTMLInputElement).value)}
+              onInput={(e) => {
+                const val = (e.target as HTMLInputElement).value;
+                setTempoBpm(val);
+                if (!bpmTesto) setBpmTesto(val);
+              }}
+              disabled={isSaving}
+            />
+          </div>
+
+          <div className="ios-form-group" style={{ marginBottom: 0 }}>
+            <label className="ios-form-label" htmlFor="canto-bpm-testo">
+              BPM (Testo Esatto / Intervallo)
+            </label>
+            <input
+              id="canto-bpm-testo"
+              type="text"
+              className="ios-form-input"
+              placeholder="es. circa 92-94 o 112"
+              value={bpmTesto}
+              onInput={(e) => setBpmTesto((e.target as HTMLInputElement).value)}
               disabled={isSaving}
             />
           </div>

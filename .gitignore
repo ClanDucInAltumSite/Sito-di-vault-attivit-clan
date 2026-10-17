@@ -32,3 +32,6 @@ pnpm-debug.log*
 coverage/
 test-results/
 playwright-report/
+
+# Riferimenti privati e protetti (canzoni reali, mai committare)
+_riferimenti/

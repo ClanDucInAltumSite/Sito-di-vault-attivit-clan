@@ -51,6 +51,7 @@ CREATE TABLE IF NOT EXISTS public.canti (
   tonalita text NULL,
   ritmo text NULL,
   tempo_bpm integer NULL CHECK (tempo_bpm IS NULL OR (tempo_bpm >= 30 AND tempo_bpm <= 300)),
+  bpm_testo text NULL,
   misura text NULL,
   capotasto integer NULL CHECK (capotasto IS NULL OR (capotasto >= 0 AND capotasto <= 12)),
   testo_chordpro text NOT NULL,
