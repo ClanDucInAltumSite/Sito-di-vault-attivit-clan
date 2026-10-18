@@ -35,3 +35,6 @@ playwright-report/
 
 # Riferimenti privati e protetti (canzoni reali, mai committare)
 _riferimenti/
+
+# Archivi esportati
+*.zip
