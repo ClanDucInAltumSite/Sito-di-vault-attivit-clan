@@ -1,4 +1,4 @@
-<svg viewBox="0 0 1200 480" fill="none" xmlns="http://www.w3.org/2000/svg" class="topo-contour-svg" preserveAspectRatio="none" role="img" aria-label="Carta topografica della Majella e Monte Amaro">
+<svg viewBox="0 0 1200 480" fill="none" xmlns="http://www.w3.org/2000/svg" class="topo-contour-svg" preserveAspectRatio="xMidYMax slice" role="img" aria-label="Carta topografica della Majella e Monte Amaro">
   <defs>
     <pattern id="topoHachure" width="16" height="8" patternUnits="userSpaceOnUse">
       <line x1="8" y1="0" x2="8" y2="4" stroke="var(--color-ink)" stroke-width="0.8" opacity="0.15" />

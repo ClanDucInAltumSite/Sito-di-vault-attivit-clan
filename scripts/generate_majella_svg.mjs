@@ -324,8 +324,8 @@ export async function generateMajellaSvg() {
     };
   });
 
-  // Assemblaggio SVG
-  let svg = `<svg viewBox="0 0 1200 480" fill="none" xmlns="http://www.w3.org/2000/svg" class="topo-contour-svg" preserveAspectRatio="none" role="img" aria-label="Carta topografica della Majella e Monte Amaro">\n`;
+  // Assemblaggio SVG con proporzioni reali 1:1 e preserveAspectRatio responsive
+  let svg = `<svg viewBox="0 0 1200 480" fill="none" xmlns="http://www.w3.org/2000/svg" class="topo-contour-svg" preserveAspectRatio="xMidYMax slice" role="img" aria-label="Carta topografica della Majella e Monte Amaro">\n`;
 
   // Definizioni pattern
   svg += `  <defs>\n`;
@@ -486,7 +486,9 @@ export function TopographicBackground({ className = '' }: TopographicBackgroundP
             const scrollY = window.scrollY || document.documentElement.scrollTop;
             const maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
             const progress = Math.min(1, Math.max(0, scrollY / maxScroll));
-            const parallaxOffset = Math.round(progress * -90);
+            const isMobile = window.innerWidth <= 768;
+            const maxOffset = isMobile ? -45 : -75;
+            const parallaxOffset = Math.round(progress * maxOffset);
             containerRef.current.style.transform = \`translate3d(0, \${parallaxOffset}px, 0)\`;
           }
           ticking = false;

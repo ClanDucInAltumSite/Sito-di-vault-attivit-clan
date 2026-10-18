@@ -26,7 +26,9 @@ export function TopographicBackground({ className = '' }: TopographicBackgroundP
             const scrollY = window.scrollY || document.documentElement.scrollTop;
             const maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
             const progress = Math.min(1, Math.max(0, scrollY / maxScroll));
-            const parallaxOffset = Math.round(progress * -90);
+            const isMobile = window.innerWidth <= 768;
+            const maxOffset = isMobile ? -45 : -75;
+            const parallaxOffset = Math.round(progress * maxOffset);
             containerRef.current.style.transform = `translate3d(0, ${parallaxOffset}px, 0)`;
           }
           ticking = false;
@@ -61,7 +63,7 @@ export function TopographicBackground({ className = '' }: TopographicBackgroundP
 
       {/* Rete vettoriale reale della Majella con parallasse diretta su ref */}
       <div ref={containerRef} className="topo-svg-container">
-        <svg viewBox="0 0 1200 480" fill="none" xmlns="http://www.w3.org/2000/svg" className="topo-contour-svg" preserveAspectRatio="none" role="img" aria-label="Carta topografica della Majella e Monte Amaro">
+        <svg viewBox="0 0 1200 480" fill="none" xmlns="http://www.w3.org/2000/svg" className="topo-contour-svg" preserveAspectRatio="xMidYMax slice" role="img" aria-label="Carta topografica della Majella e Monte Amaro">
   <defs>
     <pattern id="topoHachure" width="16" height="8" patternUnits="userSpaceOnUse">
       <line x1="8" y1="0" x2="8" y2="4" stroke="var(--color-ink)" strokeWidth="0.8" opacity="0.15" />

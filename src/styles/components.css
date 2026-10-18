@@ -1592,10 +1592,23 @@ select.ios-form-input option {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: -110px;
+  bottom: -100px;
   width: 100%;
-  height: calc(100% + 110px);
+  height: calc(100% + 100px);
   will-change: transform;
+}
+
+@media (max-width: 768px) {
+  .topo-contour-wrapper {
+    height: 340px;
+    mask-image: linear-gradient(to top, transparent 0%, black 16%, black 58%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to top, transparent 0%, black 16%, black 58%, transparent 100%);
+  }
+
+  .topo-svg-container {
+    bottom: -65px;
+    height: calc(100% + 65px);
+  }
 }
 
 .topo-contour-svg {
@@ -1656,6 +1669,21 @@ select.ios-form-input option {
   font-style: italic;
   letter-spacing: 0.08em;
   font-size: 8.5px;
+}
+
+@media (max-width: 768px) {
+  .topo-elevation-text {
+    font-size: 11px;
+    opacity: 0.30;
+  }
+  .topo-peak-title {
+    font-size: 12.5px;
+    opacity: 0.45;
+  }
+  .topo-couloir-label {
+    font-size: 10.5px;
+    opacity: 0.32;
+  }
 }
 
 /* Varianti Tema Scuro */
