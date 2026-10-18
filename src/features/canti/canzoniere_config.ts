@@ -52,7 +52,8 @@ export interface CanzoniereConfig {
     minSizePt: number; // 9 pt minimo (-2 pt)
     maxSizePt: number; // 13 pt massimo per riempimento pagina
     stepPt: number; // 0.5 pt a gradino
-    lineHeight: number; // 1.25 interlinea standard
+    lineHeight: number; // 1.5 interlinea standard (passo 16.5 pt su 11 pt)
+    lineStepPt: number; // 16.5 pt passo esatto tra righe a 11 pt
     arrowBaseSizePt: number; // 17 pt per Nova Mono
     arrowWeight: number;
   };
@@ -105,6 +106,8 @@ export interface CanzoniereConfig {
     minLinesPerBlockSplit: number;
     // Ultima pagina di un canto multi-pagina: bilanciata e mai con meno di 6 righe
     minLinesLastPage: number;
+    // Soglia di riempimento pagina per espansione adattiva verso maxSizePt (88%)
+    fillTargetPercent: number;
   };
 }
 
@@ -145,7 +148,8 @@ export const CANZONIERE_CONFIG: CanzoniereConfig = {
     minSizePt: 9, // Riduzione massima -2 pt (fino a 9 pt)
     maxSizePt: 13, // Ingrandimento controllato per evitare vuoti (fino a 13 pt)
     stepPt: 0.5, // Passi di 0,5 pt
-    lineHeight: 1.25, // Interlinea del corpo 1,25 (Word standard)
+    lineHeight: 1.5, // Interlinea del corpo 1.5 (passo 16.5 pt su 11 pt)
+    lineStepPt: 16.5, // Passo esatto tra righe a 11 pt
     arrowBaseSizePt: 17, // Nova Mono Bold 17 pt per frecce (↓ ↑)
     arrowWeight: 700,
   },
@@ -193,5 +197,6 @@ export const CANZONIERE_CONFIG: CanzoniereConfig = {
     smallOverflowMaxPercent: 0.15,
     minLinesPerBlockSplit: 3,
     minLinesLastPage: 6,
+    fillTargetPercent: 88, // Se l'altezza colonna è < 88% dell'area utile, scala font fino a maxSizePt
   },
 };

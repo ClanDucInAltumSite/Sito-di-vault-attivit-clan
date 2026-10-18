@@ -77,9 +77,6 @@
   .stampa-screen-panel,
   .stampa-overflow-banner,
   .ios-segmented-control,
-  .topo-contour-wrapper,
-  .topo-ambient-glow,
-  .topo-svg-container,
   .scout-trail-svg,
   .scout-compass-widget,
   button:not(.print-keep),
@@ -331,8 +328,8 @@
   }
 
   .song-chorus-block {
-    border-left: 2pt solid oklch(0 0 0) !important;
-    padding-left: 8pt !important;
+    border-left: none !important;
+    padding-left: 0 !important;
     margin: 8pt 0 !important;
     background: transparent !important;
   }
@@ -472,46 +469,67 @@
   }
 
   .canzoniere-block {
-    margin-bottom: 1em !important;
+    margin-bottom: 1.5em !important;
   }
 
-  .canzoniere-line-pair {
+  .canzoniere-line-item {
+    font-family: 'Roboto', system-ui, -apple-system, sans-serif !important;
+    font-weight: 400 !important;
+    color: oklch(0.33 0.02 255) !important;
+    line-height: 1.5 !important;
     position: relative !important;
-    line-height: 1.25 !important;
-    margin-bottom: 1pt !important;
+    white-space: pre-wrap !important;
+    word-break: normal !important;
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
   }
 
-  .canzoniere-chords-row {
+  .canzoniere-line-item.has-chords {
+    margin-top: 1.5em !important;
+  }
+
+  .canzoniere-line-item.is-chord-only {
+    white-space: pre !important;
+  }
+
+  .canzoniere-chord-anchor {
+    display: inline-block !important;
+    width: 0 !important;
     position: relative !important;
-    height: 1.15em !important;
+    vertical-align: baseline !important;
+  }
+
+  .canzoniere-chord-badge {
+    position: absolute !important;
+    bottom: 1.35em !important;
+    left: 0 !important;
+    white-space: nowrap !important;
+    font-family: 'Roboto', sans-serif !important;
+    font-weight: 700 !important;
+    color: oklch(0.33 0.02 255) !important;
+    line-height: 1.2 !important;
+    pointer-events: none !important;
+  }
+
+  .canzoniere-chord-only-item {
     font-family: 'Roboto', sans-serif !important;
     font-weight: 700 !important;
     color: oklch(0.33 0.02 255) !important;
     white-space: pre !important;
-    overflow: visible !important;
   }
 
-  .canzoniere-chord-item {
-    position: absolute !important;
-    white-space: nowrap !important;
-    font-weight: 700 !important;
-    color: oklch(0.33 0.02 255) !important;
-  }
-
-  .canzoniere-lyrics-row {
-    font-family: 'Roboto', sans-serif !important;
-    font-weight: 400 !important;
-    color: oklch(0.33 0.02 255) !important;
-    white-space: pre-wrap !important;
-    word-break: normal !important;
+  .canzoniere-line-empty {
+    line-height: 1.5 !important;
+    height: 1.5em !important;
   }
 
   .canzoniere-rit-label {
     font-family: 'Roboto', sans-serif !important;
     font-weight: 700 !important;
     color: oklch(0.33 0.02 255) !important;
-    margin-top: 2pt !important;
-    margin-bottom: 2pt !important;
+    line-height: 1.5 !important;
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
   }
 
   /* --- 4. IMMAGINI IN STAMPA (Solo immagini, mai PDF) --- */
@@ -780,47 +798,77 @@
   padding-left: 4mm;
 }
 
+.canzoniere-page.stampa-preview-paper {
+  width: 210mm;
+  min-width: 210mm;
+  max-width: 210mm;
+  box-sizing: border-box;
+  padding: 10mm 20mm 20mm 20mm;
+  background: oklch(1 0 0);
+  color: oklch(0.33 0.02 255);
+}
+
 .canzoniere-block {
-  margin-bottom: 1em;
+  margin-bottom: 1.5em;
 }
 
-.canzoniere-line-pair {
-  position: relative;
-  line-height: 1.25;
-  margin-bottom: 1pt;
-}
-
-.canzoniere-chords-row {
-  position: relative;
-  height: 1.15em;
-  font-family: 'Roboto', sans-serif;
-  font-weight: 700;
-  color: oklch(0 0 0);
-  white-space: pre;
-  overflow: visible;
-}
-
-.canzoniere-chord-item {
-  position: absolute;
-  white-space: nowrap;
-  font-weight: 700;
-  color: oklch(0 0 0);
-}
-
-.canzoniere-lyrics-row {
-  font-family: 'Roboto', sans-serif;
+.canzoniere-line-item {
+  font-family: 'Roboto', system-ui, -apple-system, sans-serif;
   font-weight: 400;
   color: oklch(0.33 0.02 255);
+  line-height: 1.5;
+  position: relative;
   white-space: pre-wrap;
   word-break: normal;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.canzoniere-line-item.has-chords {
+  margin-top: 1.5em;
+}
+
+.canzoniere-line-item.is-chord-only {
+  white-space: pre;
+}
+
+.canzoniere-chord-anchor {
+  display: inline-block;
+  width: 0;
+  position: relative;
+  vertical-align: baseline;
+}
+
+.canzoniere-chord-badge {
+  position: absolute;
+  bottom: 1.35em;
+  left: 0;
+  white-space: nowrap;
+  font-family: 'Roboto', sans-serif;
+  font-weight: 700;
+  color: oklch(0.33 0.02 255);
+  line-height: 1.2;
+}
+
+.canzoniere-chord-only-item {
+  font-family: 'Roboto', sans-serif;
+  font-weight: 700;
+  color: oklch(0.33 0.02 255);
+  white-space: pre;
+}
+
+.canzoniere-line-empty {
+  line-height: 1.5;
+  height: 1.5em;
 }
 
 .canzoniere-rit-label {
   font-family: 'Roboto', sans-serif;
   font-weight: 700;
   color: oklch(0.33 0.02 255);
-  margin-top: 2pt;
-  margin-bottom: 2pt;
+  line-height: 1.5;
+  margin-top: 0;
+  margin-bottom: 0;
 }
 
 

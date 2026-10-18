@@ -279,7 +279,8 @@ export function CantiView() {
               const pageCount = splitSongIntoPages(canto.testo_chordpro).length;
               const metaParts = [];
               if (canto.tonalita) metaParts.push(`Tonalità: ${canto.tonalita}`);
-              if (canto.tempo_bpm) metaParts.push(`${canto.tempo_bpm} BPM`);
+              if (canto.bpm_testo) metaParts.push(`${canto.bpm_testo} BPM`);
+              else if (canto.tempo_bpm) metaParts.push(`${canto.tempo_bpm} BPM`);
               if (canto.misura) metaParts.push(canto.misura);
               metaParts.push(pageCount === 1 ? '1 pag.' : `${pageCount} pag.`);
 

@@ -52,13 +52,12 @@ describe('FASE 9 - Canzoniere Parser & Chord Alignment Pipeline', () => {
   });
 
   describe('2. Allineamento Accordi su Testo (Proporzionale Roboto e Monospace)', () => {
-    it('sposta un accordo che cade a metà di una parola al suo inizio sillaba/parola', () => {
-      // Accordi sopra la parola "camminare" posti a metà parola (es. sopra "min")
-      // Deve effettuare lo snap all'inizio della parola "camminare"
+    it('un accordo che cade a metà di una parola rimane sulla sillaba esatta (senza saltare a inizio parola)', () => {
+      // In Fase 9B, gli accordi a metà parola restano sulla sillaba esatta
       const chordLine = '            SOL';
       const lyricsLine = 'verso camminare insieme';
       const merged = alignChordsOverLyrics(chordLine, lyricsLine, false);
-      expect(merged).toContain('[SOL]camminare');
+      expect(merged).toContain('c[SOL]amminare');
     });
 
     it('un accordo posizionato esattamente sopra la parola rimane lì', () => {

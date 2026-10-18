@@ -1,4 +1,8 @@
 import { h, JSX } from 'preact';
+import { transposeChord } from './chord_theory';
+import { CantoLineRenderer, CantoLineData } from '../features/canti/CantoLineRenderer';
+
+export * from './chord_theory';
 
 /* ==============================================================================
    TIPI E INTERFACCE CHORDPRO
@@ -26,134 +30,36 @@ export interface ChordProAST {
   pageCount: number;
 }
 
-/* ==============================================================================
-   TEORIA MUSICALE E TRASPOSIZIONE (ITALIANO E AMERICANO)
-   ============================================================================== */
-
-const ITALIAN_NOTES_SHARP = ['Do', 'Do#', 'Re', 'Re#', 'Mi', 'Fa', 'Fa#', 'Sol', 'Sol#', 'La', 'La#', 'Si'];
-const ITALIAN_NOTES_FLAT = ['Do', 'Reb', 'Re', 'Mib', 'Mi', 'Fa', 'Solb', 'Sol', 'Lab', 'La', 'Sib', 'Si'];
-
-const AMERICAN_NOTES_SHARP = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-const AMERICAN_NOTES_FLAT = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
-
-const NOTE_TO_SEMITONE: Record<string, number> = {
-  // Italiano
-  'do': 0, 'do#': 1, 'reb': 1,
-  're': 2, 're#': 3, 'mib': 3,
-  'mi': 4, 'fab': 4, 'mi#': 5,
-  'fa': 5, 'fa#': 6, 'solb': 6,
-  'sol': 7, 'sol#': 8, 'lab': 8,
-  'la': 9, 'la#': 10, 'sib': 10,
-  'si': 11, 'dob': 11, 'si#': 0,
-
-  // Americano
-  'c': 0, 'c#': 1, 'db': 1,
-  'd': 2, 'd#': 3, 'eb': 3,
-  'e': 4, 'fb': 4, 'e#': 5,
-  'f': 5, 'f#': 6, 'gb': 6,
-  'g': 7, 'g#': 8, 'ab': 8,
-  'a': 9, 'a#': 10, 'bb': 10,
-  'b': 11, 'cb': 11, 'b#': 0,
-};
-
-// Regex per individuare la radice della nota (Italiana o Americana)
-const ROOT_NOTE_REGEX = /^(Do|Re|Mi|Fa|Sol|La|Si|[A-G])([#b\u266F\u266D]?)/i;
-
 /**
- * Trasone una singola nota radice (es. "Do", "Fa#", "Bb", "Sol") di delta semitoni.
+ * Converte una SongLine AST in CantoLineData strutturato per CantoLineRenderer.
  */
-function transposeNote(noteName: string, delta: number, preferFlat = false): string {
-  const clean = noteName.replace('\u266F', '#').replace('\u266D', 'b');
-  const lower = clean.toLowerCase();
-  const originalSemitone = NOTE_TO_SEMITONE[lower];
+export function songLineToCantoLineData(line: SongLine): CantoLineData {
+  let lyrics = '';
+  const chords: { chord: string; charIndex: number }[] = [];
 
-  if (originalSemitone === undefined) {
-    return noteName; // Non riconosciuta come nota, ritorna intatta
-  }
-
-  // Calcola nuovo semitono normalizzato 0..11
-  const newSemitone = (((originalSemitone + delta) % 12) + 12) % 12;
-
-  const isItalian = /^(do|re|mi|fa|sol|la|si)/i.test(noteName);
-  const useFlat = preferFlat || clean.includes('b');
-
-  if (isItalian) {
-    const list = useFlat ? ITALIAN_NOTES_FLAT : ITALIAN_NOTES_SHARP;
-    return list[newSemitone] ?? noteName;
-  } else {
-    const list = useFlat ? AMERICAN_NOTES_FLAT : AMERICAN_NOTES_SHARP;
-    return list[newSemitone] ?? noteName;
-  }
-}
-
-/**
- * Traspone un accordo completo (es. "Dom7", "Fa#maj7", "Re/Fa#", "Cadd9/G", "Sol4").
- */
-export function transposeChord(chord: string, delta: number): string {
-  if (delta === 0) return chord;
-
-  const trimmed = chord.trim();
-  if (!trimmed) return chord;
-
-  // Gestione slash chords tipo "Do/Mi" o "C/E"
-  const slashParts = trimmed.split('/');
-  const mainPart = slashParts[0] || '';
-  const bassPart = slashParts[1];
-
-  const match = mainPart.match(ROOT_NOTE_REGEX);
-  if (!match || !match[0]) return chord;
-
-  const root = match[0];
-  const suffix = mainPart.slice(root.length);
-  const preferFlat = Boolean(root.includes('b') || (bassPart && bassPart.includes('b')));
-
-  const transposedRoot = transposeNote(root, delta, preferFlat);
-  let result = `${transposedRoot}${suffix}`;
-
-  if (bassPart) {
-    const bassMatch = bassPart.match(ROOT_NOTE_REGEX);
-    if (bassMatch && bassMatch[0]) {
-      const bassRoot = bassMatch[0];
-      const bassSuffix = bassPart.slice(bassRoot.length);
-      const transposedBass = transposeNote(bassRoot, delta, preferFlat);
-      result += `/${transposedBass}${bassSuffix}`;
-    } else {
-      result += `/${bassPart}`;
+  for (const u of line.units) {
+    if (u.chord) {
+      chords.push({ chord: u.chord, charIndex: lyrics.length });
     }
+    lyrics += u.lyric;
   }
 
-  return result;
-}
+  const hasChords = chords.length > 0;
+  const isChordOnly = hasChords && !lyrics.trim();
+  const isRitLabel = !hasChords && /^RIT[.:]?$/i.test(lyrics.trim());
 
-/**
- * Traspone l'intero testo ChordPro di delta semitoni.
- */
-export function transposeChordPro(chordproText: string, delta: number): string {
-  if (delta === 0) return chordproText;
-  return chordproText.replace(/\[([^\]]+)\]/g, (_, chordInside) => {
-    return `[${transposeChord(chordInside, delta)}]`;
-  });
+  return {
+    lyrics,
+    chords,
+    isRitLabel,
+    isChordOnly,
+    hasChords,
+  };
 }
 
 /* ==============================================================================
-   PULIZIA PER RICERCA E CONTEGGIO PAGINE
+   CONTEGGIO PAGINE E VALIDAZIONE SOFT CHORDPRO
    ============================================================================== */
-
-/**
- * Rimuove tutti gli accordi [...] e le direttive {...} dal testo ChordPro,
- * restituendo il testo pulito per l'indicizzazione di ricerca.
- * In questo modo cercare "Do" non troverà tutti i canti con l'accordo di Do.
- */
-export function stripChords(chordproText: string): string {
-  if (!chordproText) return '';
-  return chordproText
-    .replace(/\{[^}]*\}/g, ' ') // Rimuove direttive ChordPro
-    .replace(/\[[^\]]*\]/g, '')  // Rimuove gli accordi
-    .replace(/\r\n/g, '\n')
-    .replace(/\t/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
 
 /**
  * Calcola il numero di pagine stimate per la stampa in base alle direttive {nuova_pagina}.
@@ -163,10 +69,6 @@ export function calculatePageCount(chordproText: string): number {
   const matches = chordproText.match(/\{(nuova_pagina|np|new_page)\}/gi);
   return (matches?.length || 0) + 1;
 }
-
-/* ==============================================================================
-   VALIDAZIONE SOFT DEGLI ACCORDI PER L'EDITOR ADMIN
-   ============================================================================== */
 
 export interface ChordValidationResult {
   isValid: boolean;
@@ -221,26 +123,21 @@ export function validateChordPro(chordproText: string): ChordValidationResult {
 
 /**
  * Parsea una singola riga di testo ChordPro in un array di ChordUnit.
- * Esempio: "[Do]Nel mezzo del [Sol]cammin" ->
- * [
- *   { chord: "Do", lyric: "Nel mezzo del " },
- *   { chord: "Sol", lyric: "cammin" }
- * ]
+ * Rimuove preventivamente tutte le direttive {...} inline affinché non appaiano mai nel testo.
  */
 export function parseLine(line: string, delta = 0): SongLine {
+  const cleanLine = line.replace(/\{[^}]*\}/g, '');
   const units: ChordUnit[] = [];
   const regex = /\[([^\]]*)\]/g;
   let lastIndex = 0;
   let match: RegExpExecArray | null;
 
-  // Se la riga non inizia con un accordo, il testo iniziale ha chord undefined
-  while ((match = regex.exec(line)) !== null) {
+  while ((match = regex.exec(cleanLine)) !== null) {
     const chordIndex = match.index;
     const rawChord = match[1] || '';
 
     if (chordIndex > lastIndex) {
-      // C'è del testo prima dell'accordo corrente
-      const textBefore = line.slice(lastIndex, chordIndex);
+      const textBefore = cleanLine.slice(lastIndex, chordIndex);
       if (units.length === 0) {
         units.push({ lyric: textBefore });
       } else {
@@ -254,8 +151,8 @@ export function parseLine(line: string, delta = 0): SongLine {
     lastIndex = regex.lastIndex;
   }
 
-  if (lastIndex < line.length) {
-    const remainingText = line.slice(lastIndex);
+  if (lastIndex < cleanLine.length) {
+    const remainingText = cleanLine.slice(lastIndex);
     if (units.length === 0) {
       units.push({ lyric: remainingText });
     } else {
@@ -264,7 +161,6 @@ export function parseLine(line: string, delta = 0): SongLine {
     }
   }
 
-  // Se la riga è completamente vuota
   if (units.length === 0) {
     units.push({ lyric: '' });
   }
@@ -274,6 +170,8 @@ export function parseLine(line: string, delta = 0): SongLine {
 
 /**
  * Parsea l'intero testo ChordPro generando un AST strutturato in sezioni.
+ * Tutte le direttive invisibili ({nuova_colonna}, {nc}, metadati, ecc.) vengono filtrate
+ * e non finiscono mai nel testo né generano righe vuote o artefatti visivi.
  */
 export function parseChordProAST(chordproText: string, delta = 0): ChordProAST {
   const sections: SongSection[] = [];
@@ -326,12 +224,19 @@ export function parseChordProAST(chordproText: string, delta = 0): ChordProAST {
         sections.push({ type: 'page_break', lines: [] });
         currentSection = { type: 'verse', lines: [] };
         continue;
+      } else if (name === 'nuova_colonna' || name === 'nc' || name === 'column_break' || name === 'colb') {
+        // Direttiva di colonna per la stampa: invisibile nella lettura lineare
+        continue;
       } else if (name === 'c' || name === 'comment') {
         if (currentSection.lines.length > 0) {
           sections.push(currentSection);
         }
         sections.push({ type: 'comment', label: arg, lines: [] });
         currentSection = { type: 'verse', lines: [] };
+        continue;
+      } else {
+        // QUALSIASI ALTRA DIRETTIVA {...} (es. title, artist, key, tempo, ecc.)
+        // NON deve MAI finire nel testo o produrre righe!
         continue;
       }
     }
@@ -373,9 +278,10 @@ export interface RenderChordProProps {
 
 /**
  * Componente Preact per il rendering reattivo di ChordPro.
- * Gli accordi sono posizionati verticalmente sopra le rispettive sillabe tramite
- * contenitori inline-flex ('song-unit'). Se la riga va a capo sullo schermo mobile,
- * l'accordo resta ancorato esattamente sopra la sua sillaba.
+ * Utilizza CantoLineRenderer per renderizzare ogni riga con:
+ * - accordi posizionati verticalmente sopra le sillabe esatte a zero-width
+ * - testo fluido a interlinea 1.5 naturale (nessuno spazio forzato a 2.4 su righe senza accordi)
+ * - nessuna linea tratteggiata di salto pagina su schermo (lettura continua)
  */
 export function ChordProRenderer({
   chordproText,
@@ -391,35 +297,16 @@ export function ChordProRenderer({
       className: 'song-sheet-content',
       style: {
         fontSize: `${fontSizeRem}rem`,
-        lineHeight: showChords ? 2.4 : 1.7,
+        lineHeight: 1.5,
         fontFamily: 'var(--font-sans)',
         color: 'var(--color-text)',
         wordBreak: 'break-word',
       },
     },
     ast.sections.map((section, sIdx) => {
+      // Nessun riquadro tratteggiato per {nuova_pagina} nella lettura (la lettura su schermo è continua)
       if (section.type === 'page_break') {
-        return h(
-          'div',
-          {
-            key: `pb-${sIdx}`,
-            className: 'song-page-break-indicator',
-            style: {
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              padding: '12px 0',
-              margin: '16px 0',
-              borderTop: '1px dashed var(--color-border)',
-              borderBottom: '1px dashed var(--color-border)',
-              color: 'var(--color-text-secondary)',
-              fontSize: '0.85em',
-              fontWeight: 600,
-            },
-          },
-          [h('span', null, '[Interruzione pagina per la stampa]')]
-        );
+        return null;
       }
 
       if (section.type === 'comment') {
@@ -476,74 +363,12 @@ export function ChordProRenderer({
               )
             : null,
           ...section.lines.map((line, lIdx) => {
-            return h(
-              'div',
-              {
-                key: `l-${lIdx}`,
-                className: 'song-line',
-                style: {
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  alignItems: 'flex-end',
-                  minHeight: showChords ? '2.4em' : '1.4em',
-                },
-              },
-              line.units.map((unit, uIdx) => {
-                if (!showChords) {
-                  return h(
-                    'span',
-                    { key: `u-${uIdx}`, style: { whiteSpace: 'pre-wrap' } },
-                    unit.lyric
-                  );
-                }
-
-                // Quando showChords è attivo, l'accordo sta in colonna sopra la sillaba
-                const chordContent = unit.chord ? unit.chord : '\u00A0';
-                const isOnlyChord = unit.chord && (!unit.lyric || unit.lyric.trim() === '');
-
-                return h(
-                  'span',
-                  {
-                    key: `u-${uIdx}`,
-                    className: 'song-unit',
-                    style: {
-                      display: 'inline-flex',
-                      flexDirection: 'column',
-                      verticalAlign: 'bottom',
-                      marginRight: isOnlyChord ? '8px' : '0',
-                    },
-                  },
-                  [
-                    h(
-                      'span',
-                      {
-                        className: 'song-chord',
-                        style: {
-                          color: 'var(--color-calendario)',
-                          fontWeight: 700,
-                          fontSize: '0.85em',
-                          lineHeight: '1.2',
-                          userSelect: 'none',
-                          minHeight: '1.2em',
-                        },
-                      },
-                      chordContent
-                    ),
-                    h(
-                      'span',
-                      {
-                        className: 'song-lyric',
-                        style: {
-                          whiteSpace: 'pre',
-                          lineHeight: '1.4',
-                        },
-                      },
-                      unit.lyric || (isOnlyChord ? '\u00A0' : '')
-                    ),
-                  ]
-                );
-              })
-            );
+            return h(CantoLineRenderer, {
+              key: `l-${lIdx}`,
+              line: songLineToCantoLineData(line),
+              showChords,
+              transposeDelta,
+            });
           }),
         ]
       );

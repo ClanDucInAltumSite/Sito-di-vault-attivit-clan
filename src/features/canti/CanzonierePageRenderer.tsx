@@ -1,4 +1,5 @@
 import { CanzonierePage, SongBlock } from './canzoniere_layout';
+import { CantoLineRenderer } from './CantoLineRenderer';
 
 export interface CanzonierePageRendererProps {
   page: CanzonierePage;
@@ -11,64 +12,20 @@ export function CanzonierePageRenderer({ page, isScreenPreview = false }: Canzon
 
   const renderBlock = (block: SongBlock) => (
     <div key={block.id} className="canzoniere-block">
-      {block.lines.map((line, idx) => {
-        if (line.isRitLabel) {
-          return (
-            <div key={idx} className="canzoniere-rit-label" style={{ fontSize }}>
-              {line.lyrics}
-            </div>
-          );
-        }
-
-        if (line.hasChords && !line.isChordOnly) {
-          return (
-            <div key={idx} className="canzoniere-line-pair">
-              {/* Riga accordi sovrapposti posizionati esattamente */}
-              <div className="canzoniere-chords-row" style={{ fontSize }}>
-                {line.chords.map((ch, cIdx) => (
-                  <span
-                    key={cIdx}
-                    className="canzoniere-chord-item"
-                    style={{ left: `${ch.offsetPx}px` }}
-                  >
-                    {ch.chord}
-                  </span>
-                ))}
-              </div>
-              {/* Riga testo naturale in Roboto Regular */}
-              <div className="canzoniere-lyrics-row" style={{ fontSize }}>
-                {line.lyrics || '\u00A0'}
-              </div>
-            </div>
-          );
-        }
-
-        if (line.isChordOnly) {
-          return (
-            <div key={idx} className="canzoniere-line-pair">
-              <div className="canzoniere-chords-row" style={{ fontSize }}>
-                {line.chords.map((ch, cIdx) => (
-                  <span
-                    key={cIdx}
-                    className="canzoniere-chord-item"
-                    style={{ left: `${ch.offsetPx}px` }}
-                  >
-                    {ch.chord}
-                  </span>
-                ))}
-              </div>
-            </div>
-          );
-        }
-
-        return (
-          <div key={idx} className="canzoniere-line-pair">
-            <div className="canzoniere-lyrics-row" style={{ fontSize }}>
-              {line.lyrics || '\u00A0'}
-            </div>
-          </div>
-        );
-      })}
+      {block.lines.map((line, idx) => (
+        <CantoLineRenderer
+          key={idx}
+          line={{
+            lyrics: line.lyrics,
+            chords: line.chords,
+            isRitLabel: line.isRitLabel,
+            isChordOnly: line.isChordOnly,
+            hasChords: line.hasChords,
+          }}
+          fontSize={fontSize}
+          isPrint={true}
+        />
+      ))}
     </div>
   );
 

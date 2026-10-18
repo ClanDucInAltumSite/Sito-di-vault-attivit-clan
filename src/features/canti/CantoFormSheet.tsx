@@ -522,14 +522,16 @@ export function CantoFormSheet({
             </div>
 
             {/* Griglia Metadati Musicali */}
+            {/* Griglia Metadati Musicali Simmetrica (2 Colonne fisse) */}
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                gridTemplateColumns: '1fr 1fr',
                 gap: 'var(--space-3)',
                 marginBottom: 'var(--space-4)',
               }}
             >
+              {/* Riga 1: Tonalità | Capotasto */}
               <div className="ios-form-group" style={{ marginBottom: 0 }}>
                 <label className="ios-form-label" htmlFor="canto-tonalita">
                   {I18N.canti.tonalita}
@@ -541,57 +543,6 @@ export function CantoFormSheet({
                   placeholder="es. Re, Mi-, G"
                   value={tonalita}
                   onInput={(e) => setTonalita((e.target as HTMLInputElement).value)}
-                  disabled={isSaving}
-                />
-              </div>
-
-              <div className="ios-form-group" style={{ marginBottom: 0 }}>
-                <label className="ios-form-label" htmlFor="canto-bpm">
-                  {I18N.canti.tempoBpm} (Metronomo)
-                </label>
-                <input
-                  id="canto-bpm"
-                  type="number"
-                  className="ios-form-input"
-                  placeholder="es. 112"
-                  min="30"
-                  max="280"
-                  value={tempoBpm}
-                  onInput={(e) => {
-                    const val = (e.target as HTMLInputElement).value;
-                    setTempoBpm(val);
-                    if (!bpmTesto) setBpmTesto(val);
-                  }}
-                  disabled={isSaving}
-                />
-              </div>
-
-              <div className="ios-form-group" style={{ marginBottom: 0 }}>
-                <label className="ios-form-label" htmlFor="canto-bpm-testo">
-                  BPM (Testo / Intervallo)
-                </label>
-                <input
-                  id="canto-bpm-testo"
-                  type="text"
-                  className="ios-form-input"
-                  placeholder="es. circa 92-94 o 112"
-                  value={bpmTesto}
-                  onInput={(e) => setBpmTesto((e.target as HTMLInputElement).value)}
-                  disabled={isSaving}
-                />
-              </div>
-
-              <div className="ios-form-group" style={{ marginBottom: 0 }}>
-                <label className="ios-form-label" htmlFor="canto-misura">
-                  {I18N.canti.misura}
-                </label>
-                <input
-                  id="canto-misura"
-                  type="text"
-                  className="ios-form-input"
-                  placeholder="es. 4/4, 3/4, 6/8"
-                  value={misura}
-                  onInput={(e) => setMisura((e.target as HTMLInputElement).value)}
                   disabled={isSaving}
                 />
               </div>
@@ -609,6 +560,43 @@ export function CantoFormSheet({
                   max="12"
                   value={capotasto}
                   onInput={(e) => setCapotasto((e.target as HTMLInputElement).value)}
+                  disabled={isSaving}
+                />
+              </div>
+
+              {/* Riga 2: Misura | BPM (Unico campo per metronomo e stampa) */}
+              <div className="ios-form-group" style={{ marginBottom: 0 }}>
+                <label className="ios-form-label" htmlFor="canto-misura">
+                  {I18N.canti.misura}
+                </label>
+                <input
+                  id="canto-misura"
+                  type="text"
+                  className="ios-form-input"
+                  placeholder="es. 4/4, 3/4, 6/8"
+                  value={misura}
+                  onInput={(e) => setMisura((e.target as HTMLInputElement).value)}
+                  disabled={isSaving}
+                />
+              </div>
+
+              <div className="ios-form-group" style={{ marginBottom: 0 }}>
+                <label className="ios-form-label" htmlFor="canto-bpm-testo">
+                  BPM (Velocità)
+                </label>
+                <input
+                  id="canto-bpm-testo"
+                  type="text"
+                  className="ios-form-input"
+                  placeholder="es. circa 92-94 o 112"
+                  value={bpmTesto}
+                  onInput={(e) => {
+                    const val = (e.target as HTMLInputElement).value;
+                    setBpmTesto(val);
+                    const n = val.match(/\d+/);
+                    if (n && n[0]) setTempoBpm(n[0]);
+                    else setTempoBpm('');
+                  }}
                   disabled={isSaving}
                 />
               </div>

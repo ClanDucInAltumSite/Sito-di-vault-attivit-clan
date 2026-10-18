@@ -912,12 +912,11 @@
   color: var(--color-neutral-text);
 }
 
-/* --- 12. CANTI: RITORNELLO CON BARRA GIALLA & ACCORDI --- */
+/* --- 12. CANTI: RITORNELLO & ACCORDI --- */
 .song-chorus-block {
-  border-left: 4px solid var(--color-giochi);
-  background-color: var(--color-giochi-tenue);
-  padding: var(--space-3) var(--space-4);
-  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  border-left: none;
+  background-color: transparent;
+  padding: 0;
   margin: var(--space-3) 0;
 }
 
@@ -1551,144 +1550,6 @@ select.ios-form-input option {
   }
 }
 
-/* --- 20. SFONDO TOPOGRAFICO GLOBALE (FONDO SCHERMO AMBIENTALE E VIVO) --- */
-.topo-contour-wrapper {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 380px;
-  pointer-events: none;
-  user-select: none;
-  z-index: 0;
-  overflow: hidden;
-  mask-image: linear-gradient(to top, black 25%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to top, black 25%, transparent 100%);
-}
-
-.topo-ambient-glow {
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(
-    ellipse 95% 80% at 50% 100%,
-    oklch(0.22 0.05 305 / 0.22) 0%,
-    oklch(0.18 0.02 305 / 0.08) 50%,
-    transparent 100%
-  );
-  pointer-events: none;
-}
-
-@media (prefers-color-scheme: light) {
-  .topo-ambient-glow {
-    background: radial-gradient(
-      ellipse 95% 80% at 50% 100%,
-      oklch(0.94 0.02 305 / 0.35) 0%,
-      oklch(0.97 0.01 305 / 0.10) 50%,
-      transparent 100%
-    );
-  }
-}
-
-.topo-svg-container {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  width: 100%;
-  height: 100%;
-  will-change: transform;
-  transition: transform 100ms ease-out;
-}
-
-.topo-contour-svg {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-  overflow: visible;
-}
-
-/* Isoipse standard: tratto sottilissimo e trasparente per non disturbare il testo */
-.topo-line {
-  fill: none;
-  stroke: var(--color-ink);
-  stroke-width: 0.8;
-  opacity: 0.055;
-  stroke-linecap: round;
-  vector-effect: non-scaling-stroke;
-}
-
-/* Isoipse direttrici: tratto leggermente più visibile con quote IGM */
-.topo-line-major {
-  stroke-width: 1.35;
-  opacity: 0.11;
-}
-
-/* Sentiero escursionistico scout (tratteggio giallo leggero) */
-.topo-line-accent {
-  stroke: var(--color-giochi);
-  stroke-width: 1;
-  opacity: 0.25;
-  stroke-dasharray: 4 6;
-}
-
-/* Quote altimetriche stampate lungo le curve di livello */
-.topo-elevation-text {
-  opacity: 0.18;
-  font-size: 9px;
-  font-family: var(--font-sans);
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  user-select: none;
-}
-
-/* Animazione fluida e impercettibile (slow breathing wave su sole proprietà transform) */
-.topo-contour-anim-1 {
-  animation: topoWaveOne 20s ease-in-out infinite alternate;
-  will-change: transform;
-}
-
-.topo-contour-anim-2 {
-  animation: topoWaveTwo 26s ease-in-out infinite alternate;
-  will-change: transform;
-}
-
-.topo-contour-anim-3 {
-  animation: topoWaveThree 22s ease-in-out infinite alternate;
-  will-change: transform;
-}
-
-@keyframes topoWaveOne {
-  0% { transform: translateY(0); }
-  50% { transform: translateY(-4px); }
-  100% { transform: translateY(2px); }
-}
-
-@keyframes topoWaveTwo {
-  0% { transform: translateY(0); }
-  50% { transform: translateY(3px); }
-  100% { transform: translateY(-3px); }
-}
-
-@keyframes topoWaveThree {
-  0% { transform: translateY(0); }
-  50% { transform: translateY(-5px); }
-  100% { transform: translateY(1px); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .topo-contour-anim-1,
-  .topo-contour-anim-2,
-  .topo-contour-anim-3,
-  .topo-svg-container {
-    animation: none !important;
-    transition: none !important;
-    transform: none !important;
-  }
-}
 
 /* --- 20. ALLEGATI (IMMAGINI E DOCUMENTI PDF) --- */
 .attachment-gallery-section {
@@ -2351,5 +2212,70 @@ select.ios-form-input option {
   margin: 0 auto var(--space-4);
   width: fit-content;
 }
+
+/* ==============================================================================
+   Renderer Unificato Canti (CantoLineRenderer & ChordPro)
+   Accordi ancorati a zero-width sopra le sillabe, interlinea fluida 1.5
+   ============================================================================== */
+.canzoniere-line-item {
+  font-family: 'Roboto', var(--font-sans), system-ui, sans-serif;
+  font-weight: 400;
+  color: var(--color-text);
+  line-height: 1.5;
+  position: relative;
+  white-space: pre-wrap;
+  word-break: normal;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.canzoniere-line-item.has-chords {
+  margin-top: 1.5em;
+}
+
+.canzoniere-line-item.is-chord-only {
+  white-space: pre;
+}
+
+.canzoniere-chord-anchor {
+  display: inline-block;
+  width: 0;
+  position: relative;
+  vertical-align: baseline;
+}
+
+.canzoniere-chord-badge {
+  position: absolute;
+  bottom: 1.35em;
+  left: 0;
+  white-space: nowrap;
+  font-family: 'Roboto', var(--font-sans), sans-serif;
+  font-weight: 700;
+  color: var(--color-ink, oklch(0.28 0.10 305));
+  line-height: 1.2;
+  pointer-events: none;
+}
+
+.canzoniere-chord-only-item {
+  font-family: 'Roboto', var(--font-sans), sans-serif;
+  font-weight: 700;
+  color: var(--color-ink, oklch(0.28 0.10 305));
+  white-space: pre;
+}
+
+.canzoniere-line-empty {
+  line-height: 1.5;
+  height: 1.5em;
+}
+
+.canzoniere-rit-label {
+  font-family: 'Roboto', var(--font-sans), sans-serif;
+  font-weight: 700;
+  color: var(--color-text);
+  line-height: 1.5;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
 
 

@@ -5,7 +5,6 @@ import { useAdmin } from '../lib/auth';
 import { AdminLoginModal } from '../features/admin/AdminLoginModal';
 import { Icon, IconName } from '../ui/Icon';
 import { BrandLogo } from '../ui/BrandLogo';
-import { TopographicBackground } from '../ui/TopographicBackground';
 import { CompassSync } from '../ui/ScoutMotifs';
 
 export interface ShellProps {
@@ -167,9 +166,6 @@ export function Shell({
           </button>
         </div>
       </header>
-
-      {/* Sfondo Topografico Ambientale Globale (visibile in tutte le pagine) */}
-      <TopographicBackground />
 
       {/* Contenuto Principale con scroll e padding sicuro */}
       <main style={{ flex: 1, minHeight: 0, position: 'relative' }}>

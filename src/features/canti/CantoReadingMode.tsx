@@ -212,7 +212,7 @@ export function CantoReadingMode({
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: 'var(--z-modal, 2000)',
+        zIndex: 'var(--z-sticky, 100)',
         backgroundColor: 'var(--color-bg)',
         color: 'var(--color-text)',
         display: 'flex',
@@ -632,9 +632,9 @@ export function CantoReadingMode({
               </Badge>
             ) : null}
 
-            {canto.tempo_bpm ? (
+            {(canto.bpm_testo || canto.tempo_bpm) ? (
               <Badge variant="neutral" size="sm">
-                {canto.tempo_bpm} BPM
+                {canto.bpm_testo ? `${canto.bpm_testo} BPM` : `${canto.tempo_bpm} BPM`}
               </Badge>
             ) : null}
 

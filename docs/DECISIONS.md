@@ -547,3 +547,41 @@ I requisiti cardine impongono:
    - **Sicurezza:** Richiederebbe autenticazione rigorosa e rate-limiting complesso per evitare che l'endpoint venga sfruttato come proxy gratuito per chiamate AI a spese del gruppo scout.
    - **Conclusione:** L'approccio con prompt esterno e importazione lato client (con parsing .docx via `jszip` in chunk asincrono) è la soluzione architetturalmente più robusta, sicura, economica e sostenibile a lungo termine per il Clan.
 
+
+
+---
+
+## ADR-0016 (Fase 9B): Perfezionamento Tipografico Canzoniere A4, Ancoraggio Accordi a Larghezza Zero, Interlinea Esatta 16.5 pt e Gestione Resiliente BPM
+
+### Data
+2026-10-18
+
+### Contesto e Diagnosi Misurata
+A seguito del confronto metrologico tra il PDF stampato e il documento di riferimento Google Docs ("Strade di coraggio - Canzoniere"):
+1. **Font Incorporati:** Il PDF di Chromium incorporava Arial e Consolas-Bold al posto di Roboto e Nova Mono, a causa del caricamento lazy dei font e della mancanza di un `@font-face` esplicito per il peso 700 di Nova Mono.
+2. **Geometria Tipografica:** Il corpo usava altezza e interlinea inferiori all'originale. In Docs/Word l'interlinea 1.25 equivale in CSS a un passo di **16.5 pt** (`line-height: 1.5` su font base 11 pt). Le righe senza accordi riservavano erroneamente spazio bianco sopra.
+3. **Riempimento Pagina:** L'algoritmo di espansione per canti a 1 pagina non colmava lo spazio utile in basso. Impostata soglia `fillTargetPercent: 88` con scaling fino a 13 pt (disattivabile impostando `maxSizePt = baseSizePt`).
+4. **Ancoraggio Accordi:** Gli accordi venivano spostati forzatamente a inizio parola perdendo la sillaba, e il calcolo basato su caratteri fissi (0.52 em) causava derive.
+5. **Direttive e UI:** `{nuova_colonna}` e altre direttive ChordPro non dovevano apparire nel testo né generare box tratteggiati; la modale di inserimento risultava asimmetrica; i modali di modifica ed eliminazione rimanevano coperti dal z-index della modalità lettura.
+6. **BPM e Rifiuto Perdita Dati:** Il campo testuale `bpm_testo` deve essere preservato esattamente (es. "circa 92–94") e non appiattito a intero; se la colonna non esiste sul database Supabase, `saveCanto` deve bloccare l'operazione con avviso esplicito sulla migrazione 0006 mancante, senza degradare in silenzio.
+
+### Decisioni Adottate
+1. **Pre-caricamento Font e @font-face Esplicito:**
+   - Creata utility `ensureCanzoniereFontsLoaded()` che invoca `document.fonts.load()` per tutti i pesi e stili di Roboto (400, italic, 700) e Nova Mono (400, 700) prima di avviare `window.print()` e prima delle misurazioni di layout.
+   - Aggiunto `@font-face` con `font-weight: 700` per Nova Mono in `tokens.css` per evitare il fallback su Consolas. Risultato misurato in PDF binario: 100% Roboto e NovaMono, 0 Arial, 0 Consolas.
+2. **Renderer Unificato `CantoLineRenderer` a Larghezza Zero:**
+   - Ciascun accordo è incapsulato in un'ancora inline a larghezza zero (`display: inline-block; width: 0; position: relative; vertical-align: baseline`) con badge in posizione assoluta (`bottom: 1.35em`). Il testo dei versi scorre continuo a livello di caratteri senza interruzioni di flusso.
+   - Le righe con accordi ricevono classe `.has-chords` con `margin-top: 1.5em`; le righe senza accordi non riservano alcuno spazio superiore.
+   - Risoluzione collisioni orizzontali automatica: se due accordi consecutivi distano meno di 0.4 em, il secondo viene traslato orizzontalmente senza eccedere l'ancoraggio successivo.
+   - Classi condivise inserite in `components.css` garantendo fedeltà sia a schermo che in stampa.
+3. **Parser Importatore Aggiornato:**
+   - Rimossa la forzatura all'inizio della parola: gli accordi a metà sillaba restano esattamente sulla sillaba assegnata (`cam[Re]mino`).
+   - Gli spazi bianchi sono misurati con font regular e gli accordi con font bold.
+   - Rimossa la deduzione automatica della tonalità dal primo accordo (`tonalita` resta `null` a meno di tag esplicito).
+4. **Invisibilità Rigorosa Direttive:**
+   - Qualsiasi direttiva ChordPro isolata `/^\{[^}]*\}$/` (inclusi `{nuova_colonna}`, `{nc}`, `{nuova_pagina}`, `{np}`, `{bpm:...}`, `{ritmo:...}`, ecc.) o inline viene rimossa dal testo e non genera elementi DOM visibili.
+5. **Z-Index e Modale Simmetrico:**
+   - `CantoReadingMode` impostato a `var(--z-sticky, 100)`: i fogli modali `BottomSheet` e `Modal` (`z-index: 1000`) si aprono ora in primo piano senza dover chiudere la lettura.
+   - Riorganizzato il form "Nuovo Canto" con griglia fissa 2 colonne perfettamente simmetrica: Riga 1: Tonalità | Capotasto; Riga 2: Misura | BPM (testo singolo); Riga 3: Ritmo con keypad frecce integrato.
+6. **Integrità BPM e Migrazione SQL 0006:**
+   - `admin_actions.ts` rifiuta il salvataggio se Supabase restituisce errore di colonna mancante per `bpm_testo`, segnalando la migrazione necessaria all'amministratore.

@@ -178,14 +178,55 @@ function measureStringWidth(text: string, isBold = false): number {
 }
 
 /**
+ * Misura accuratamente il prefisso di una riga accordi:
+ * i token di accordo possono essere in grassetto (DOCX), gli spazi/tabulazioni sono sempre a spaziatura normale.
+ */
+function measureChordLinePrefix(prefix: string, isChordBold = false): number {
+  if (typeof document !== 'undefined' && typeof document.createElement === 'function') {
+    try {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        let total = 0;
+        const parts = prefix.split(/(\s+)/);
+        for (const part of parts) {
+          if (!part) continue;
+          if (/^\s+$/.test(part)) {
+            ctx.font = "normal 11pt 'Roboto', sans-serif";
+            total += ctx.measureText(part).width;
+          } else {
+            ctx.font = `${isChordBold ? 'bold' : 'normal'} 11pt 'Roboto', sans-serif`;
+            total += ctx.measureText(part).width;
+          }
+        }
+        if (total > 0) return total;
+      }
+    } catch {
+      // Fallback analitico
+    }
+  }
+
+  let total = 0;
+  const parts = prefix.split(/(\s+)/);
+  for (const part of parts) {
+    if (!part) continue;
+    const isWhitespace = /^\s+$/.test(part);
+    total += measureStringWidth(part, isWhitespace ? false : isChordBold);
+  }
+  return total;
+}
+
+/**
  * Individua le posizioni degli accordi su una riga di testo e li inietta in ChordPro.
- * Esegue lo snapping a inizio sillaba/parola se cade a metà parola.
+ * Conserva la posizione reale sulla sillaba (closest character boundary), senza forzare
+ * lo spostamento arbitrario a inizio parola.
  */
 export function alignChordsOverLyrics(
   chordLine: string,
   lyricsLine: string,
   isMonospace = false,
-  _warnings?: string[]
+  _warnings?: string[],
+  isChordBold = false
 ): string {
   if (!lyricsLine.trim()) {
     // Riga di soli accordi senza testo (es. intro)
@@ -208,7 +249,7 @@ export function alignChordsOverLyrics(
     const chordText = match[0];
     const colIndex = match.index;
     const prefix = chordLine.slice(0, colIndex);
-    const pixelOffset = measureStringWidth(prefix, true);
+    const pixelOffset = measureChordLinePrefix(prefix, isChordBold);
     chords.push({ chord: chordText, colIndex, pixelOffset });
   }
 
@@ -240,22 +281,7 @@ export function alignChordsOverLyrics(
     charOffsets.push(accWidth);
   }
 
-  // Mappa sillabe / parole: individua gli indici di inizio parola
-  const wordStartIndices = new Set<number>();
-  let inWord = false;
-  for (let i = 0; i < lyricsLine.length; i++) {
-    const charAt = lyricsLine[i];
-    if (!charAt) continue;
-    const isLetter = /\S/.test(charAt);
-    if (isLetter && !inWord) {
-      wordStartIndices.add(i);
-      inWord = true;
-    } else if (!isLetter) {
-      inWord = false;
-    }
-  }
-
-  // Assegna ogni accordo al carattere più vicino
+  // Assegna ogni accordo al carattere più vicino senza forzare lo spostamento a inizio parola
   const chordAssignments: { charIdx: number; chord: string }[] = [];
 
   for (const ch of chords) {
@@ -273,28 +299,6 @@ export function alignChordsOverLyrics(
     }
 
     bestCharIdx = Math.min(bestCharIdx, lyricsLine.length);
-
-    // Se cade a metà di una parola, sposta all'inizio della parola
-    if (bestCharIdx > 0 && bestCharIdx < lyricsLine.length) {
-      const charAt = lyricsLine[bestCharIdx] || '';
-      if (/\S/.test(charAt)) {
-        // Cerca l'inizio della parola corrente
-        let wordStart = bestCharIdx;
-        while (wordStart > 0 && /\S/.test(lyricsLine[wordStart - 1] || '')) {
-          wordStart--;
-        }
-        bestCharIdx = wordStart;
-      } else if (charAt === ' ' && bestCharIdx + 1 < lyricsLine.length && /\S/.test(lyricsLine[bestCharIdx + 1] || '')) {
-        // Se è sullo spazio prima della parola successiva, aggancia all'inizio della parola
-        const nextWordStart = bestCharIdx + 1;
-        const nextOffset = charOffsets[nextWordStart] ?? 0;
-        const currOffset = charOffsets[bestCharIdx] ?? 0;
-        if (Math.abs(nextOffset - ch.pixelOffset) <= Math.abs(currOffset - ch.pixelOffset) + 20) {
-          bestCharIdx = nextWordStart;
-        }
-      }
-    }
-
     chordAssignments.push({ charIdx: bestCharIdx, chord: ch.chord });
   }
 
@@ -404,6 +408,7 @@ export async function parseDocx(
   let ritmo: string | null = null;
   let capotasto: number | null = null;
   let misura: string | null = null;
+  let tonalita: string | null = null;
 
   // 1. Estrazione metadati da paragrafi dell'intestazione (prima della tabella)
   const paragraphs = Array.from(doc.getElementsByTagName('w:p'));
@@ -451,7 +456,7 @@ export async function parseDocx(
     }
 
     // Riga parametri: "Tempo: 4/4 ; circa 92-94 BPM. Ritmo pennata: ..."
-    if (/tempo:/i.test(text) || /ritmo/i.test(text) || /capotasto:/i.test(text)) {
+    if (/tempo:/i.test(text) || /ritmo/i.test(text) || /capotasto:/i.test(text) || /tonalit/i.test(text)) {
       // Estrai Misura (es. 4/4, 3/4, 6/8)
       const misuraMatch = text.match(/tempo:\s*(\d+\/\d+)/i);
       if (misuraMatch && misuraMatch[1]) misura = misuraMatch[1];
@@ -472,6 +477,12 @@ export async function parseDocx(
       const capoMatch = text.match(/capotasto:\s*(\d+)/i);
       if (capoMatch && capoMatch[1]) {
         capotasto = parseInt(capoMatch[1], 10);
+      }
+
+      // Estrai eventuale tonalità esplicita (es. "Tonalità: Do" o "Key: C")
+      const tonMatch = text.match(/tonalit[àa]:\s*([^\t,;.]+)/i) || text.match(/key:\s*([^\t,;.]+)/i);
+      if (tonMatch && tonMatch[1]) {
+        tonalita = tonMatch[1].trim();
       }
     }
   }
@@ -546,7 +557,7 @@ export async function parseDocx(
     tempo_bpm,
     ritmo,
     capotasto,
-    tonalita: chordsMatches.length > 0 && chordsMatches[0] ? chordsMatches[0].replace(/[[\]]/g, '') : null,
+    tonalita, // Non deduce la tonalità dal primo accordo
     testo_chordpro: finalBody.trim(),
     warnings,
     stats: {
@@ -607,8 +618,8 @@ function extractParagraphsIntoLines(
       pendingChordLine = { text, isBold: isParagraphBold };
     } else {
       if (pendingChordLine) {
-        // Accoppia riga accordi con riga testo sottostante
-        const merged = alignChordsOverLyrics(pendingChordLine.text, text, isMonospace, warnings);
+        // Accoppia riga accordi con riga testo sottostante (usando isBold per calibrare larghezze)
+        const merged = alignChordsOverLyrics(pendingChordLine.text, text, isMonospace, warnings, pendingChordLine.isBold);
         outputLines.push(merged);
         pendingChordLine = null;
       } else {
@@ -640,6 +651,7 @@ export function parsePastedText(rawText: string, options: ParseOptions = {}): Pa
   let ritmo: string | null = null;
   let capotasto: number | null = null;
   let misura: string | null = null;
+  let tonalita: string | null = null;
 
   let bodyStartIndex = 0;
   const separatorIndex = lines.findIndex((l) => /^---+\s*$/.test(l.trim()));
@@ -672,6 +684,9 @@ export function parsePastedText(rawText: string, options: ParseOptions = {}): Pa
 
       const mCapo = trimmed.match(/^CAPOTASTO:\s*(\d+)$/i);
       if (mCapo && mCapo[1]) capotasto = parseInt(mCapo[1], 10);
+
+      const mTon = trimmed.match(/^TONALIT[ÀA]:\s*(.+)$/i) || trimmed.match(/^KEY:\s*(.+)$/i);
+      if (mTon && mTon[1]) tonalita = mTon[1].trim();
     }
   }
 
@@ -777,7 +792,7 @@ export function parsePastedText(rawText: string, options: ParseOptions = {}): Pa
     tempo_bpm,
     ritmo,
     capotasto,
-    tonalita: chordsMatches.length > 0 && chordsMatches[0] ? chordsMatches[0].replace(/[[\]]/g, '') : null,
+    tonalita, // Non deduce la tonalità dal primo accordo
     testo_chordpro: finalBody,
     warnings,
     stats: {

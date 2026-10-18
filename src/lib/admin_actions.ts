@@ -256,14 +256,10 @@ export async function saveCanto(input: {
 
   let { data, error } = await executeSupabaseSave(true);
 
-  // Fallback difensivo: se il database Supabase non ha ancora la colonna bpm_testo
-  // (es. migrazione SQL 0006 non ancora applicata in produzione), ritenta senza bpm_testo
-  // evitando errori bloccanti all'utente
+  // Se la colonna bpm_testo non esiste sul server Supabase (migrazione 0006 mancante),
+  // NON salvare in silenzio perdendo dati: segnala esplicitamente all'amministratore.
   if (error && (error.message?.includes('bpm_testo') || (error as any).code === 'PGRST204')) {
-    console.warn('[saveCanto] Colonna bpm_testo non trovata nello schema cache Supabase. Salvo senza bpm_testo sul server:', error.message);
-    const retry = await executeSupabaseSave(false);
-    data = retry.data;
-    error = retry.error;
+    throw new Error('Migrazione 0006 non applicata: salvataggio annullato. Esegui la migrazione SQL nel database Supabase per abilitare la colonna bpm_testo.');
   }
 
   if (error) throw new Error(error.message);

@@ -88,6 +88,7 @@ export default defineConfig({
     target: 'esnext',
     minify: 'esbuild',
     cssMinify: true,
+    assetsInlineLimit: 0,
     rollupOptions: {
       output: {
         manualChunks(id) {

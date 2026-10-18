@@ -14,7 +14,7 @@ import { Canto } from '../../lib/db';
 export interface ChordPlacement {
   chord: string;
   charIndex: number;
-  offsetPx: number;
+  offsetPx?: number;
 }
 
 export interface SongLine {
@@ -124,51 +124,46 @@ export function parseChordProLine(line: string, fontSizePt: number): SongLine {
     };
   }
 
-  // Estrai accordi e testo
+  // Rimuovi eventuali direttive inline {...} che non devono mai comparire nel testo
+  const cleanLine = line.replace(/\{[^}]*\}/g, '');
+
+  // Estrai accordi e testo ancorati a charIndex
   const chords: ChordPlacement[] = [];
   let lyrics = '';
   let i = 0;
 
-  // Calcolo approssimativo pixel per carattere a fontSizePt
-  const pxPerChar = (fontSizePt * 1.3333) * 0.52;
-  let minNextOffsetPx = 0;
-
-  while (i < line.length) {
-    if (line[i] === '[') {
-      const closeIdx = line.indexOf(']', i);
+  while (i < cleanLine.length) {
+    if (cleanLine[i] === '[') {
+      const closeIdx = cleanLine.indexOf(']', i);
       if (closeIdx !== -1) {
-        const chord = line.slice(i + 1, closeIdx);
+        const chord = cleanLine.slice(i + 1, closeIdx);
         const charIndex = lyrics.length;
-        const naturalOffsetPx = Math.round(charIndex * pxPerChar);
-        const offsetPx = Math.max(naturalOffsetPx, minNextOffsetPx);
-        const chordWidthPx = Math.max(16, chord.length * pxPerChar * 1.15);
-        minNextOffsetPx = offsetPx + chordWidthPx + 10;
-        chords.push({ chord, charIndex, offsetPx });
+        chords.push({ chord, charIndex });
         i = closeIdx + 1;
         continue;
       }
     }
-    lyrics += line[i];
+    lyrics += cleanLine[i];
     i++;
   }
 
   const isChordOnly = chords.length > 0 && !lyrics.trim();
 
-  // Stima se la riga sfora la larghezza colonna (81 mm ~ 306 px a 96dpi)
-  // Larghezza disponibile colonna in px = 81 * 3.7795 ~ 306 px
-  const colWidthPx = 81 * 3.7795;
-  const estimatedLineWidthPx = lyrics.length * pxPerChar;
-  const isTooLong = estimatedLineWidthPx > colWidthPx;
+  // Stima se la riga sfora la larghezza colonna (81 mm ~ 229.6 pt)
+  // Con Roboto Regular a fontSizePt, larghezza media per carattere ~ 0.50 * fontSizePt
+  const colWidthPt = 81 / 0.352778; // 229.6 pt
+  const charWidthPt = fontSizePt * 0.50;
+  const estimatedLineWidthPt = lyrics.length * charWidthPt;
+  const isTooLong = estimatedLineWidthPt > colWidthPt;
 
-  // Rileva se va a capo lasciando una sola parola (difetto del riferimento)
+  // Rileva se va a capo lasciando una sola parola (difetto del riferimento da evitare)
   let hasSingleWordWrap = false;
   if (isTooLong) {
     const words = lyrics.trim().split(/\s+/);
     if (words.length > 1) {
-      // Se l'ultima parola sfora da sola oltre colWidthPx
       const prefixWithoutLast = words.slice(0, -1).join(' ');
-      const prefixWidth = prefixWithoutLast.length * pxPerChar;
-      if (prefixWidth <= colWidthPx && estimatedLineWidthPx > colWidthPx) {
+      const prefixWidthPt = prefixWithoutLast.length * charWidthPt;
+      if (prefixWidthPt <= colWidthPt && estimatedLineWidthPt > colWidthPt) {
         hasSingleWordWrap = true;
       }
     }
@@ -290,6 +285,12 @@ export function groupIntoBlocks(
       continue;
     }
 
+    // Qualsiasi altra direttiva ChordPro {...} (es. {bpm:...}, {ritmo:...}, {capotasto:...}, sconosciute)
+    // deve essere completamente invisibile nel testo del canto
+    if (/^\{[^}]*\}$/.test(trimmed)) {
+      continue;
+    }
+
     if (!trimmed) {
       flushBlock();
       continue;
@@ -313,22 +314,23 @@ export function calculateBlockHeightMm(
 ): number {
   // 1 pt = 0.352778 mm
   const ptToMm = 0.352778;
-  const lineHeightMm = fontSizePt * config.typography.lineHeight * ptToMm;
-  const chordLineHeightMm = fontSizePt * 1.15 * ptToMm;
-  const blockGapMm = lineHeightMm; // Riga vuota di separazione
+  const lineStepMm = fontSizePt * config.typography.lineHeight * ptToMm; // 11 * 1.5 = 16.5 pt
+  const blockGapMm = lineStepMm; // Riga vuota di separazione tra blocchi = 1 passo (16.5 pt)
 
   let totalMm = 0;
 
   for (const line of lines) {
     if (line.isRitLabel) {
-      totalMm += lineHeightMm * 1.1;
+      totalMm += lineStepMm;
     } else if (line.hasChords && !line.isChordOnly) {
-      // Coppia: riga accordi sopra + riga testo
-      totalMm += chordLineHeightMm + lineHeightMm;
+      // Coppia: riga accordi sopra (1 passo) + riga testo (1 passo) = 2 passi esatti (33 pt)
+      totalMm += lineStepMm * 2;
     } else if (line.isChordOnly) {
-      totalMm += chordLineHeightMm;
+      // Solo accordi = 1 passo
+      totalMm += lineStepMm;
     } else {
-      totalMm += lineHeightMm;
+      // Solo testo (senza accordi) = 1 passo
+      totalMm += lineStepMm;
     }
   }
 
@@ -393,8 +395,9 @@ export function layoutCanzoniereSong(
     if (p1) {
       const maxColHeightUsed = Math.max(p1.leftColumn.totalHeightMm, p1.rightColumn.totalHeightMm);
       const maxSizePt = config.typography.maxSizePt || 13;
+      const fillTargetRatio = (config.pagination.fillTargetPercent || 88) / 100;
 
-      if (maxColHeightUsed < page1MaxColHeightMm * 0.80) {
+      if (maxColHeightUsed < page1MaxColHeightMm * fillTargetRatio && maxSizePt > baseSizePt) {
         for (let testSize = baseSizePt + stepPt; testSize <= maxSizePt; testSize += stepPt) {
           const candidate = attemptLayout(canto, testSize, page1MaxColHeightMm, page2PlusMaxColHeightMm, config);
           if (

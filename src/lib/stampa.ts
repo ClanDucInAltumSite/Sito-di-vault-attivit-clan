@@ -580,13 +580,20 @@ export interface PrintIndexResult {
  * - ODG: inizia su nuova pagina (break-before: page).
  * Se il numero non è determinabile, startPage vale null (così l'indice appare senza numeri).
  */
+function estimateTextLines(text: string, charsPerLine: number): number {
+  if (!text) return 0;
+  return text.split('\n').reduce((acc, line) => {
+    return acc + Math.max(1, Math.ceil(line.length / charsPerLine));
+  }, 0);
+}
+
 export function computePrintIndex(
   printableData: PrintableData,
   config: StampaConfig,
   printableODG: PrintableODG | null = null
 ): PrintIndexResult {
   const PAGE_CAPACITY_PT = 800;
-  const CHARS_PER_LINE = 110;
+  const CHARS_PER_LINE = 100;
   const LINE_H = 13.5;
   const startOffset = config.includeCoverAndIndex ? 3 : 1;
 
@@ -604,8 +611,9 @@ export function computePrintIndex(
     curY += headerH;
 
     for (const pg of printableData.giochi) {
-      const charCount = (pg.gioco.regole?.length || 0) + (pg.gioco.materiali?.length || 0);
-      const lines = Math.max(1, Math.ceil(charCount / CHARS_PER_LINE));
+      const regLines = estimateTextLines(pg.gioco.regole || '', CHARS_PER_LINE);
+      const matLines = pg.gioco.materiali ? estimateTextLines(pg.gioco.materiali, CHARS_PER_LINE) : 0;
+      const lines = Math.max(1, regLines + matLines);
       const hasMat = Boolean(pg.gioco.materiali);
       const imagesH = config.includeImages ? pg.images.length * 130 : 0;
       const itemH = 20 + (hasMat ? 14 : 0) + lines * LINE_H + 8 + imagesH;
@@ -651,8 +659,9 @@ export function computePrintIndex(
     curY += headerH;
 
     for (const pb of printableData.bans) {
-      const charCount = (pb.ban.testo?.length || 0) + (pb.ban.note_gesti?.length || 0);
-      const lines = Math.max(1, Math.ceil(charCount / CHARS_PER_LINE));
+      const testoLines = estimateTextLines(pb.ban.testo || '', CHARS_PER_LINE);
+      const gestiLines = pb.ban.note_gesti ? estimateTextLines(pb.ban.note_gesti, CHARS_PER_LINE) : 0;
+      const lines = Math.max(1, testoLines + gestiLines);
       const hasGesti = Boolean(pb.ban.note_gesti);
       const imagesH = config.includeImages ? pb.images.length * 130 : 0;
       const itemH = 20 + (hasGesti ? 14 : 0) + lines * LINE_H + 8 + imagesH;

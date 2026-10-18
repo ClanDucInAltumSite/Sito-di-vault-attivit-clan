@@ -34,6 +34,7 @@ import { ChordProRenderer, stripChords } from '../../lib/chordpro';
 import { SearchField } from '../../ui/SearchField';
 import { matchesQuery } from '../../lib/search';
 import { CanzonierePageRenderer } from '../canti/CanzonierePageRenderer';
+import { ensureCanzoniereFontsLoaded } from '../canti/canzoniere_fonts';
 
 type SectionTab = 'tutti' | 'giochi' | 'bans' | 'canti' | 'odg';
 
@@ -106,6 +107,9 @@ export function StampaView() {
         if (mounted) {
           setPrintableData(pData);
         }
+        if (mounted) {
+          ensureCanzoniereFontsLoaded().catch(() => {});
+        }
       } catch (err) {
         console.error('[StampaView] Errore caricamento dati IndexedDB:', err);
       } finally {
@@ -118,6 +122,17 @@ export function StampaView() {
       mounted = false;
     };
   }, []);
+
+  // Avvio stampa affidabile con attesa font
+  const handlePrint = async () => {
+    setIsLoading(true);
+    try {
+      await ensureCanzoniereFontsLoaded();
+      window.print();
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Aggiornamento dati stampabili quando cambia la configurazione
   const updateConfig = async (newConfig: StampaConfig) => {
@@ -315,7 +330,7 @@ export function StampaView() {
 
           <Button
             variant="primary"
-            onClick={() => window.print()}
+            onClick={handlePrint}
             disabled={totalItemsCount === 0 || isLoading}
             style={{
               minWidth: '220px',
