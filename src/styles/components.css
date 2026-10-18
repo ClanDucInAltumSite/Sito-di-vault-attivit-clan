@@ -1556,13 +1556,13 @@ select.ios-form-input option {
   left: 0;
   right: 0;
   bottom: 0;
-  height: 380px;
+  height: 420px;
   pointer-events: none;
   user-select: none;
   z-index: 0;
   overflow: hidden;
-  mask-image: linear-gradient(to top, black 25%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to top, black 25%, transparent 100%);
+  mask-image: linear-gradient(to top, transparent 0%, black 14%, black 65%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to top, transparent 0%, black 14%, black 65%, transparent 100%);
 }
 
 .topo-ambient-glow {
@@ -1592,9 +1592,9 @@ select.ios-form-input option {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 0;
+  bottom: -110px;
   width: 100%;
-  height: 100%;
+  height: calc(100% + 110px);
   will-change: transform;
 }
 

@@ -87,4 +87,21 @@ test.describe('FASE 9C — Screenshot e Verifica Visiva Sfondo Majella', () => {
       }
     }
   });
+
+  // Verifica scrolling a fine pagina per confermare assenza di linee o tagli sul fondo
+  test('Verifica assenza linee di taglio a fondo pagina (Home scrolled bottom)', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await page.goto('#/');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(400);
+
+    // Scorri completamente fino in fondo
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    await page.waitForTimeout(400);
+
+    const bottomScreenshotPath = path.join(outDir, 'home_bottom_scrolled_dark.png');
+    await page.screenshot({ path: bottomScreenshotPath, fullPage: false });
+    console.log(`[SCREENSHOT] Salvato fondo pagina: ${bottomScreenshotPath}`);
+  });
 });

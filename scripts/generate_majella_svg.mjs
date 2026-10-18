@@ -202,6 +202,59 @@ async function getDemData() {
   return { data: rasters[0], w, h };
 }
 
+function isBorderSegment(p1, p2) {
+  const margin = 2.0;
+  // Bordo inferiore
+  if (p1[1] >= SVG_HEIGHT - margin && p2[1] >= SVG_HEIGHT - margin) return true;
+  // Bordo superiore
+  if (p1[1] <= margin && p2[1] <= margin) return true;
+  // Bordo sinistro
+  if (p1[0] <= margin && p2[0] <= margin) return true;
+  // Bordo destro
+  if (p1[0] >= SVG_WIDTH - margin && p2[0] >= SVG_WIDTH - margin) return true;
+  return false;
+}
+
+function splitRingIntoChains(mapped) {
+  const chains = [];
+  let currentChain = [];
+
+  for (let i = 0; i < mapped.length - 1; i++) {
+    const p1 = mapped[i];
+    const p2 = mapped[i + 1];
+
+    if (isBorderSegment(p1, p2)) {
+      if (currentChain.length >= 2) {
+        chains.push(currentChain);
+      }
+      currentChain = [];
+    } else {
+      if (currentChain.length === 0) {
+        currentChain.push(p1);
+      }
+      currentChain.push(p2);
+    }
+  }
+
+  if (currentChain.length >= 2) {
+    chains.push(currentChain);
+  }
+
+  if (chains.length > 1) {
+    const first = chains[0];
+    const last = chains[chains.length - 1];
+    if (
+      first[0][0] === last[last.length - 1][0] &&
+      first[0][1] === last[last.length - 1][1]
+    ) {
+      chains[chains.length - 1] = last.concat(first.slice(1));
+      chains.shift();
+    }
+  }
+
+  return chains;
+}
+
 export async function generateMajellaSvg() {
   console.log('[MAJELLA] Avvio calcolo curve di livello dal DEM reale...');
   const { data, w, h } = await getDemData();
@@ -234,17 +287,25 @@ export async function generateMajellaSvg() {
           Number(((rx / w) * SVG_WIDTH).toFixed(1)),
           Number(((ry / h) * SVG_HEIGHT).toFixed(1)),
         ]);
-        const simp = simplifyDouglasPeucker(mapped, sqTol);
-        if (simp.length < 3) continue;
+        const chains = splitRingIntoChains(mapped);
 
-        // Path chiuso
-        const d = 'M' + simp.map((p) => `${p[0]},${p[1]}`).join('L') + 'Z';
-        animGroups[animId].push({
-          d,
-          cls,
-          elev: item.value,
-          isMajor,
-        });
+        for (const ch of chains) {
+          const simp = simplifyDouglasPeucker(ch, sqTol);
+          if (simp.length < 2) continue;
+
+          const isClosed =
+            simp[0][0] === simp[simp.length - 1][0] &&
+            simp[0][1] === simp[simp.length - 1][1];
+          const d =
+            'M' + simp.map((p) => `${p[0]},${p[1]}`).join('L') + (isClosed ? 'Z' : '');
+
+          animGroups[animId].push({
+            d,
+            cls,
+            elev: item.value,
+            isMajor,
+          });
+        }
       }
     }
   }
