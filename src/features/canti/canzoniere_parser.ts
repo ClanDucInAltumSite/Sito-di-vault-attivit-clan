@@ -298,6 +298,11 @@ export function alignChordsOverLyrics(
     chordAssignments.push({ charIdx: bestCharIdx, chord: ch.chord });
   }
 
+  // Se la riga di testo è vuota (solo accordi / intro / stacco), restituisci gli accordi spaziati
+  if (!lyricsLine.trim()) {
+    return chords.map((c) => `[${c.chord}]`).join('    ');
+  }
+
   // Ordina le assegnazioni per indice carattere
   chordAssignments.sort((a, b) => a.charIdx - b.charIdx);
 
@@ -308,6 +313,10 @@ export function alignChordsOverLyrics(
   for (let i = 0; i < chordAssignments.length; i++) {
     const item = chordAssignments[i];
     if (!item) continue;
+    // Se due accordi consecutivi cadono sullo stesso identico punto, separali con uno spazio
+    if (i > 0 && item.charIdx === lastChar) {
+      result += ' ';
+    }
     result += lyricsLine.slice(lastChar, item.charIdx);
     result += `[${item.chord}]`;
     lastChar = item.charIdx;
@@ -320,6 +329,40 @@ export function alignChordsOverLyrics(
 // ==============================================================================
 // PARSER 1: CARICA WORD (.docx)
 // ==============================================================================
+
+/**
+ * Estrae il testo da un nodo XML Word (w:p, w:r, ecc.) gestendo correttamente
+ * i tabulatori (<w:tab/> -> '    '), ritorni a capo (<w:br/> -> '\n') e trattini.
+ * Previene che accordi o parole separate da tab vengano attaccati insieme (es. SOLLAm -> SOL    LAm).
+ */
+export function extractWordNodeText(node: Node): string {
+  let result = '';
+  const walk = (n: Node) => {
+    if (n.nodeType === 3) {
+      result += n.nodeValue || '';
+    } else if (n.nodeType === 1) {
+      const el = n as Element;
+      const tag = (el.localName || el.nodeName).replace(/^.*:/, '').toLowerCase();
+      if (tag === 't') {
+        result += el.textContent || '';
+      } else if (tag === 'tab') {
+        result += '    '; // Word tab = 4 spazi
+      } else if (tag === 'br' || tag === 'cr') {
+        result += '\n';
+      } else if (tag === 'nobreakhyphen') {
+        result += '-';
+      } else {
+        for (let i = 0; i < el.childNodes.length; i++) {
+          const child = el.childNodes[i];
+          if (child) walk(child);
+        }
+      }
+    }
+  };
+  walk(node);
+  return result;
+}
+
 /**
  * Legge un documento Word .docx, estrae metadati, intestazione e corpo con tabella a 2 colonne.
  */
@@ -389,10 +432,7 @@ export async function parseDocx(
   // Estrai titolo
   for (const p of headerParagraphs) {
     const pStyle = p.getElementsByTagName('w:pStyle')[0]?.getAttribute('w:val');
-    const text = Array.from(p.getElementsByTagName('w:t'))
-      .map((t) => t.textContent || '')
-      .join('')
-      .trim();
+    const text = extractWordNodeText(p).trim();
 
     if (!text) continue;
 
@@ -540,9 +580,7 @@ function extractParagraphsIntoLines(
       isParagraphBold = boldRuns.length >= runs.length / 2;
     }
 
-    const text = runs
-      .map((r) => Array.from(r.getElementsByTagName('w:t')).map((t) => t.textContent || '').join(''))
-      .join('');
+    const text = extractWordNodeText(p);
 
     // Riga vuota
     if (!text.trim()) {
@@ -753,35 +791,32 @@ export function parsePastedText(rawText: string, options: ParseOptions = {}): Pa
 // ==============================================================================
 // PARSER 3: PROMPT FISSO PER AI ESTERNA (Sezione 6)
 // ==============================================================================
-export const AI_IMPORT_PROMPT = `Sto digitalizzando il canzoniere del mio gruppo scout a partire da materiale
-che ho già (foto, PDF o testo incollato qui). Il tuo compito è SOLO di
-formattazione: converti il materiale che ti fornisco nel formato indicato.
-Non cercare, ricordare né completare testi o accordi da tua conoscenza.
+export const AI_IMPORT_PROMPT = `Sto digitalizzando il canzoniere del mio gruppo scout a partire da materiale (foto, spartito, PDF, o testo grezzo).
+Il tuo compito è produrre una trascrizione perfetta, verificata e completa nel formato standard sotto indicato.
 
-REGOLE
-1. Usa esclusivamente ciò che leggi nel materiale. Se una parola o un accordo
-   non è leggibile, scrivi [?] al suo posto. Non inventare, non correggere
-   e non completare.
-2. Se non puoi trattare il materiale, dimmelo in una riga senza produrre
-   testo alternativo.
-3. Accordi tra parentesi quadre, subito prima della sillaba su cui cadono:
-   [Do]Nel mezzo del [Sol]cammin. Notazione italiana (Do, Re, Mi, Fa, Sol,
-   La, Si; m, 7, maj7, sus4, #, b).
-4. Rispetta le ripetizioni: gli accordi compaiono solo dove compaiono nel
-   materiale. Se una strofa è indicata come "RIT." o "RIT:" scrivi solo quella
-   sigla, senza ripetere testo né accordi.
-5. Struttura: blocchi separati da una riga vuota. Mantieni le righe come nel
-   materiale. Non unire né spezzare righe.
-6. Intestazione: copia i valori ESATTAMENTE come sono scritti (es. "circa
-   92-94", "Giù, Giù-Su, Su-Giù-Su (↓ ↓↑ ↑↓↑)"). Lascia vuoto ciò che non c'è.
-7. Nessuna spiegazione musicale e nessun commento.
+REGOLE DI VERIFICA, RICERCA ED ESATTEZZA:
+1. ACCURATEZZA ARMONICA: Verifica che gli accordi siano musicalmente corretti per questa canzone. Se il testo fornito contiene accordi incompleti, palesemente errati o mancanti, correggili incrociando SOLO fonti affidabili (canzonieri scout ufficiali AGESCI, spartiti e prontuari chitarra accreditati).
+2. COMPLETAMENTO METADATI MANCANTI: Cerca e compila le informazioni mancanti con la massima affidabilità:
+   - TEMPO: la misura musicale (es. 4/4, 3/4, 6/8).
+   - BPM: velocità metronomica indicativa (es. "circa 92-94" o "100").
+   - RITMO: descrizione della pennata con le frecce obbligatorie tra parentesi, ad esempio: "Giù, Giù-Su, Su-Giù-Su (↓ ↓↑ ↑↓↑)" oppure "Valzer (↓ ↑↑)".
+   - AUTORE: autore/i del canto o evento liturgico/scout (es. "Marco Frisina", "Clan La Roccia", "Route Nazionale").
+   - CAPOTASTO: indicare il tasto numerico (es. 2) o lasciare vuoto se assente.
+3. POSIZIONAMENTO DEGLI ACCORDI:
+   - Ogni accordo deve essere inserito tra parentesi quadre prima della sillaba esatta su cui cade (es. [Do]Nel [Sol]mezzo del [Lam]cammin).
+   - Notazione italiana obbligatoria: Do, Re, Mi, Fa, Sol, La, Si con relative alterazioni (m, 7, maj7, sus4, #, b, es. Lam, Sol7, Re/Fa#).
+   - IMPORTANTE: Gli accordi NON devono mai essere attaccati insieme (MAI [Do][Sol] o [Sol][Lam]). Se più accordi si susseguono senza testo (intro, stacco o a fine verso), separali SEMPRE con spazi (es. [Do] [Sol] [Lam]).
+   - Se un accordo sta a fine verso, posizionalo a fine riga dopo la parola, separato da uno spazio.
+4. STRUTTURA DEL TESTO:
+   - Suddividi strofe e ritornelli con una riga vuota tra loro.
+   - Per i ritornelli indica la riga con "RIT." (senza parentesi graffe).
+5. FORMATO DI USCITA RIGOROSO (fornisci ESCLUSIVAMENTE questo blocco di codice senza preamboli né spiegazioni):
 
-FORMATO DI USCITA (un unico blocco di codice):
 TITOLO: ...
-AUTORE: ... (autore o evento)
-TEMPO: ... (es. 4/4)
-BPM: ... (testo come scritto)
-RITMO: ... (testo come scritto, con le frecce)
-CAPOTASTO: ... (numero, vuoto se assente)
+AUTORE: ...
+TEMPO: ...
+BPM: ...
+RITMO: ...
+CAPOTASTO: ...
 ---
-(corpo del canto)`;
+(testo con gli accordi tra parentesi quadre)`;

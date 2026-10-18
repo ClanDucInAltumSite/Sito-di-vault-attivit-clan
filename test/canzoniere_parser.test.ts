@@ -227,12 +227,14 @@ AUTORE: Clan & Reparto
   });
 
   describe('5. Prompt Fisso per AI Esterna', () => {
-    it('include le 7 regole obbligatorie e il formato di uscita rigoroso', () => {
-      expect(AI_IMPORT_PROMPT).toContain('Non cercare, ricordare né completare testi o accordi da tua conoscenza');
-      expect(AI_IMPORT_PROMPT).toContain('Accordi tra parentesi quadre');
+    it('include verifica armonica, ricerca metadati mancanti, accordi spaziati e formato di uscita rigoroso', () => {
+      expect(AI_IMPORT_PROMPT).toContain('ACCURATEZZA ARMONICA');
+      expect(AI_IMPORT_PROMPT).toContain('COMPLETAMENTO METADATI MANCANTI');
+      expect(AI_IMPORT_PROMPT).toContain('parentesi quadre');
+      expect(AI_IMPORT_PROMPT).toContain('Gli accordi NON devono mai essere attaccati insieme');
       expect(AI_IMPORT_PROMPT).toContain('FORMATO DI USCITA');
-      expect(AI_IMPORT_PROMPT).toContain('BPM: ... (testo come scritto)');
-      expect(AI_IMPORT_PROMPT).toContain('RITMO: ... (testo come scritto, con le frecce)');
+      expect(AI_IMPORT_PROMPT).toContain('BPM:');
+      expect(AI_IMPORT_PROMPT).toContain('RITMO:');
     });
   });
 });

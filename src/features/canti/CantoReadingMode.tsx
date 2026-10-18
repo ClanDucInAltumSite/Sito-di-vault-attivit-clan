@@ -586,6 +586,7 @@ export function CantoReadingMode({
 
       {/* Contenuto scorrevole per la lettura del canto */}
       <main
+        className="canto-reading-scrollable"
         style={{
           flex: 1,
           overflowY: 'auto',

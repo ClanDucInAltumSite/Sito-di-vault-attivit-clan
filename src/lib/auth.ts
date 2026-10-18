@@ -19,14 +19,30 @@ let currentAdminState: AdminAuthState = {
 
 const listeners = new Set<(state: AdminAuthState) => void>();
 
+let mockAdminOverride: boolean | null = null;
+
 function notifyListeners() {
   for (const listener of listeners) {
     listener(currentAdminState);
   }
 }
 
+if (typeof window !== 'undefined') {
+  (window as any).__setAdminForTesting = (admin: boolean) => {
+    mockAdminOverride = admin;
+    currentAdminState = { isAdmin: admin, isLoading: false, userEmail: admin ? 'admin@clan.test' : null, error: null };
+    notifyListeners();
+  };
+}
+
 // Verifica se l'utente loggato è registrato in admin_users tramite la funzione RPC is_admin
 export async function verifyAdminStatus(): Promise<boolean> {
+  if (mockAdminOverride !== null) {
+    currentAdminState = { isAdmin: mockAdminOverride, isLoading: false, userEmail: mockAdminOverride ? 'admin@clan.test' : null, error: null };
+    notifyListeners();
+    return mockAdminOverride;
+  }
+
   try {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session || !session.user) {

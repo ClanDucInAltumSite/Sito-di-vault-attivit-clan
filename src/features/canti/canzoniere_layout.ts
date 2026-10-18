@@ -141,8 +141,8 @@ export function parseChordProLine(line: string, fontSizePt: number): SongLine {
         const charIndex = lyrics.length;
         const naturalOffsetPx = Math.round(charIndex * pxPerChar);
         const offsetPx = Math.max(naturalOffsetPx, minNextOffsetPx);
-        const chordWidthPx = Math.max(14, chord.length * pxPerChar * 1.1);
-        minNextOffsetPx = offsetPx + chordWidthPx + 3;
+        const chordWidthPx = Math.max(16, chord.length * pxPerChar * 1.15);
+        minNextOffsetPx = offsetPx + chordWidthPx + 10;
         chords.push({ chord, charIndex, offsetPx });
         i = closeIdx + 1;
         continue;
@@ -193,12 +193,13 @@ export function groupIntoBlocks(
   textChordpro: string,
   fontSizePt: number,
   config: CanzoniereConfig = CANZONIERE_CONFIG
-): { blocks: SongBlock[]; explicitColumnBreak: boolean; explicitPageBreak: boolean } {
+): { blocks: SongBlock[]; explicitColumnBreak: boolean; explicitColumnBreakIndex: number | null; explicitPageBreak: boolean } {
   const rawLines = textChordpro.split(/\r?\n/);
   const blocks: SongBlock[] = [];
   let currentLines: SongLine[] = [];
   let blockId = 0;
   let explicitColumnBreak = false;
+  let explicitColumnBreakIndex: number | null = null;
   let explicitPageBreak = false;
 
   const flushBlock = () => {
@@ -225,6 +226,7 @@ export function groupIntoBlocks(
     ) {
       flushBlock();
       explicitColumnBreak = true;
+      explicitColumnBreakIndex = blocks.length;
       continue;
     }
 
@@ -298,7 +300,7 @@ export function groupIntoBlocks(
 
   flushBlock();
 
-  return { blocks, explicitColumnBreak, explicitPageBreak };
+  return { blocks, explicitColumnBreak, explicitColumnBreakIndex, explicitPageBreak };
 }
 
 /**
@@ -382,6 +384,32 @@ export function layoutCanzoniereSong(
         if (!candidate.hasOverflow) break;
       }
     }
+  } else if (bestResult.pages.length === 1 && !bestResult.hasOverflow) {
+    // 3. STEP-UP: Se entra comodamente in 1 pagina ma lascia grandi vuoti ("voragini"),
+    // prova i gradini superiori (11.5 -> 12.0 -> 12.5 -> 13.0 pt) per riempire lo spazio
+    // e massimizzare leggibilità ed estetica professionale, purché rimanga in 1 pagina
+    // e non generi overflow, parole orfane o righe che sforano.
+    const p1 = bestResult.pages[0];
+    if (p1) {
+      const maxColHeightUsed = Math.max(p1.leftColumn.totalHeightMm, p1.rightColumn.totalHeightMm);
+      const maxSizePt = config.typography.maxSizePt || 13;
+
+      if (maxColHeightUsed < page1MaxColHeightMm * 0.80) {
+        for (let testSize = baseSizePt + stepPt; testSize <= maxSizePt; testSize += stepPt) {
+          const candidate = attemptLayout(canto, testSize, page1MaxColHeightMm, page2PlusMaxColHeightMm, config);
+          if (
+            candidate.pages.length === 1 &&
+            !candidate.hasOverflow &&
+            !candidate.hasSingleWordWrap &&
+            !candidate.hasTooLongLines
+          ) {
+            bestResult = candidate;
+          } else {
+            break;
+          }
+        }
+      }
+    }
   }
 
   return {
@@ -432,7 +460,7 @@ function attemptLayout(
   warnings: string[];
 } {
   const warnings: string[] = [];
-  const { blocks, explicitColumnBreak } = groupIntoBlocks(
+  const { blocks, explicitColumnBreak, explicitColumnBreakIndex } = groupIntoBlocks(
     canto.testo_chordpro,
     fontSizePt,
     config
@@ -463,13 +491,15 @@ function attemptLayout(
       if (pageText === undefined) continue;
       const isFirst = pIdx === 0;
       const maxColHeight = isFirst ? page1MaxColHeightMm : page2PlusMaxColHeightMm;
-      const { blocks: pageBlocks, explicitColumnBreak: pColBreak } = groupIntoBlocks(pageText, fontSizePt, config);
+      const { blocks: pageBlocks, explicitColumnBreak: pColBreak, explicitColumnBreakIndex: pColBreakIdx } = groupIntoBlocks(pageText, fontSizePt, config);
 
       let leftCol: ColumnContent;
       let rightCol: ColumnContent;
 
       if (pColBreak && pageBlocks.length >= 2) {
-        const mid = Math.ceil(pageBlocks.length / 2);
+        const mid = (pColBreakIdx !== null && pColBreakIdx > 0 && pColBreakIdx < pageBlocks.length)
+          ? pColBreakIdx
+          : Math.ceil(pageBlocks.length / 2);
         const lB = pageBlocks.slice(0, mid);
         const rB = pageBlocks.slice(mid);
         leftCol = {
@@ -530,9 +560,11 @@ function attemptLayout(
   // Caso 1: Canto con direttiva esplicita di colonna
   if (explicitColumnBreak && blocks.length >= 2) {
     // Dividi a metà o al marcatore esplicito
-    const mid = Math.ceil(blocks.length / 2);
-    const leftBlocks = blocks.slice(0, mid);
-    const rightBlocks = blocks.slice(mid);
+    const splitIdx = (explicitColumnBreakIndex !== null && explicitColumnBreakIndex > 0 && explicitColumnBreakIndex < blocks.length)
+      ? explicitColumnBreakIndex
+      : Math.ceil(blocks.length / 2);
+    const leftBlocks = blocks.slice(0, splitIdx);
+    const rightBlocks = blocks.slice(splitIdx);
 
     const leftCol: ColumnContent = {
       blocks: leftBlocks,
@@ -780,6 +812,21 @@ function balanceIntoTwoColumns(
     if (!b) {
       const emptyCol: ColumnContent = { blocks: [], totalHeightMm: 0, linesCount: 0 };
       return { fits: true, leftCol: emptyCol, rightCol: emptyCol, diffMm: 0 };
+    }
+    if (b.lines.length >= 6) {
+      const mid = Math.ceil(b.lines.length / 2);
+      const p1Lines = b.lines.slice(0, mid);
+      const p2Lines = b.lines.slice(mid);
+      const p1H = calculateBlockHeightMm(p1Lines, 11, CANZONIERE_CONFIG);
+      const p2H = calculateBlockHeightMm(p2Lines, 11, CANZONIERE_CONFIG);
+      const lB: SongBlock = { id: `${b.id}_c1`, lines: p1Lines, heightMm: p1H };
+      const rB: SongBlock = { id: `${b.id}_c2`, lines: p2Lines, heightMm: p2H };
+      return {
+        fits: p1H <= maxColHeightMm && p2H <= maxColHeightMm,
+        leftCol: { blocks: [lB], totalHeightMm: p1H, linesCount: p1Lines.length },
+        rightCol: { blocks: [rB], totalHeightMm: p2H, linesCount: p2Lines.length },
+        diffMm: Math.abs(p1H - p2H),
+      };
     }
     const leftCol: ColumnContent = { blocks: [b], totalHeightMm: b.heightMm, linesCount: b.lines.length };
     const rightCol: ColumnContent = { blocks: [], totalHeightMm: 0, linesCount: 0 };

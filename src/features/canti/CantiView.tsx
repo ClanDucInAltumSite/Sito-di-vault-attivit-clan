@@ -18,7 +18,6 @@ import { stripChords } from '../../lib/chordpro';
 import { splitSongIntoPages } from '../../lib/stampa';
 import { CantoReadingMode } from './CantoReadingMode';
 import { CantoFormSheet } from './CantoFormSheet';
-import { CantoImportSheet } from './CantoImportSheet';
 import { DeleteConfirmModal } from '../../ui/DeleteConfirmModal';
 
 type SortOption = 'az' | 'za' | 'recenti' | 'vecchi';
@@ -51,7 +50,6 @@ export function CantiView() {
   const [selectedCanto, setSelectedCanto] = useState<Canto | null>(null);
   const [isReadingModeOpen, setIsReadingModeOpen] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [isImportOpen, setIsImportOpen] = useState(false);
   const [editingCanto, setEditingCanto] = useState<Canto | null>(null);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [deletingCanto, setDeletingCanto] = useState<Canto | null>(null);
@@ -164,14 +162,6 @@ export function CantiView() {
               marginBottom: 'var(--space-3)',
             }}
           >
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setIsImportOpen(true)}
-            >
-              <Icon name="upload" size={16} />
-              <span>Importa</span>
-            </Button>
             <Button
               variant="primary"
               size="sm"
@@ -339,17 +329,19 @@ export function CantiView() {
           setSelectedCanto(null);
         }}
         onEdit={(c) => {
+          setIsReadingModeOpen(false);
           setEditingCanto(c);
           setIsFormOpen(true);
         }}
         onDelete={(c) => {
+          setIsReadingModeOpen(false);
           setDeletingCanto(c);
           setIsDeleteOpen(true);
         }}
         onUpdated={loadData}
       />
 
-      {/* Sheet Form Aggiungi/Modifica Canto (Admin) */}
+      {/* Sheet Form Aggiungi/Modifica Canto (Admin - Unificato 3-in-1) */}
       <CantoFormSheet
         isOpen={isFormOpen}
         onClose={() => setIsFormOpen(false)}
@@ -358,17 +350,6 @@ export function CantiView() {
         onSaved={async (saved) => {
           await loadData();
           setSelectedCanto(saved);
-        }}
-      />
-
-      {/* Sheet Importazione Canti con 3 ingressi (Admin) */}
-      <CantoImportSheet
-        isOpen={isImportOpen}
-        onClose={() => setIsImportOpen(false)}
-        onSuccess={async (saved) => {
-          await loadData();
-          setSelectedCanto(saved);
-          setIsReadingModeOpen(true);
         }}
       />
 

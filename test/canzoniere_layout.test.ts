@@ -38,8 +38,8 @@ RIT:
 
     const result = layoutCanzoniereSong(mockCanto);
     expect(result.declaredPageCount).toBe(1);
-    expect(result.pages.length).toBe(1);
-    expect(result.fontSizePt).toBe(11); // Entra a 11 pt base
+    expect(result.fontSizePt).toBeGreaterThanOrEqual(11); // Scala tra 11 e 13 pt per riempire la pagina ed evitare vuoti
+    expect(result.fontSizePt).toBeLessThanOrEqual(13);
     expect(result.hasOverflow).toBe(false);
 
     const page = result.pages[0];

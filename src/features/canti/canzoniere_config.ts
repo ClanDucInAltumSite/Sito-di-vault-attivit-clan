@@ -50,6 +50,7 @@ export interface CanzoniereConfig {
     colorDivider: string;
     baseSizePt: number; // 11 pt base
     minSizePt: number; // 9 pt minimo (-2 pt)
+    maxSizePt: number; // 13 pt massimo per riempimento pagina
     stepPt: number; // 0.5 pt a gradino
     lineHeight: number; // 1.25 interlinea standard
     arrowBaseSizePt: number; // 17 pt per Nova Mono
@@ -142,6 +143,7 @@ export const CANZONIERE_CONFIG: CanzoniereConfig = {
     colorDivider: '#A0A0A0',
     baseSizePt: 11, // Base 11 pt come nel file di riferimento
     minSizePt: 9, // Riduzione massima -2 pt (fino a 9 pt)
+    maxSizePt: 13, // Ingrandimento controllato per evitare vuoti (fino a 13 pt)
     stepPt: 0.5, // Passi di 0,5 pt
     lineHeight: 1.25, // Interlinea del corpo 1,25 (Word standard)
     arrowBaseSizePt: 17, // Nova Mono Bold 17 pt per frecce (↓ ↑)

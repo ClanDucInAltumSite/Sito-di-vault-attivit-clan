@@ -2219,4 +2219,137 @@ select.ios-form-input option {
   color: var(--color-bans);
 }
 
+/* ==============================================================================
+   CANTO READING MODE & UNIFIED FORM SHEET (FASE 9 REFINEMENTS)
+   ============================================================================== */
+
+/* Scrollbar raffinata e sottile per la modalità lettura (nessuna barra grigia nativa) */
+.canto-reading-scrollable {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
+
+.canto-reading-scrollable::-webkit-scrollbar {
+  width: 6px;
+}
+
+.canto-reading-scrollable::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.canto-reading-scrollable::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: var(--radius-full);
+}
+
+.canto-reading-scrollable::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-tertiary);
+}
+
+/* Keypad Frecce Ritmo Pennata */
+.canto-rhythm-keypad {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-top: var(--space-1);
+}
+
+.canto-rhythm-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 4px 8px;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-ios);
+  user-select: none;
+}
+
+.canto-rhythm-btn:hover {
+  border-color: var(--color-interactive);
+  background-color: var(--color-surface-hover);
+  color: var(--color-interactive);
+}
+
+.canto-rhythm-btn:active {
+  transform: scale(0.96);
+}
+
+/* Dropzone per File Word (.docx) */
+.canto-import-dropzone {
+  border: 2px dashed var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+  cursor: pointer;
+  background-color: var(--color-surface);
+  transition: all var(--duration-fast) var(--ease-ios);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.canto-import-dropzone:hover {
+  border-color: var(--color-interactive);
+  background-color: var(--color-surface-hover);
+}
+
+/* Card Workflow AI */
+.canto-ai-card {
+  padding: var(--space-4);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  border-left: 4px solid var(--color-interactive);
+}
+
+/* Toast/Banner Notifica senza overflow orizzontale */
+.canto-alert-banner {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  line-height: 1.4;
+  word-break: break-word;
+  white-space: normal;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.canto-alert-banner-success {
+  background-color: var(--color-giochi-tenue);
+  border: 1px solid var(--color-giochi-border);
+  color: var(--color-ink);
+}
+
+.canto-alert-banner-info {
+  background-color: var(--color-interactive-tenue);
+  border: 1px solid var(--color-interactive);
+  color: var(--color-ink);
+}
+
+/* Contenitore Anteprima Stampa A4 non deformato */
+.canto-print-preview-container {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  background: var(--color-fill-quaternary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  box-sizing: border-box;
+}
+
+.canto-print-preview-page-wrapper {
+  margin: 0 auto var(--space-4);
+  width: fit-content;
+}
+
 
