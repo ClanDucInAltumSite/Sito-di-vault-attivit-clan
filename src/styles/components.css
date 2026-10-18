@@ -1550,7 +1550,7 @@ select.ios-form-input option {
   }
 }
 
-/* --- 20. SFONDO TOPOGRAFICO GLOBALE (FONDO SCHERMO AMBIENTALE E VIVO) --- */
+/* --- 20. SFONDO TOPOGRAFICO GLOBALE — MAJELLA (FONDO SCHERMO AMBIENTALE E VIVO) --- */
 .topo-contour-wrapper {
   position: fixed;
   left: 0;
@@ -1596,7 +1596,6 @@ select.ios-form-input option {
   width: 100%;
   height: 100%;
   will-change: transform;
-  transition: transform 100ms ease-out;
 }
 
 .topo-contour-svg {
@@ -1620,28 +1619,62 @@ select.ios-form-input option {
   vector-effect: non-scaling-stroke;
 }
 
-/* Isoipse direttrici: tratto leggermente più visibile con quote IGM */
+/* Isoipse maestre/direttrici: tratto con tinta azzurra dai token (--color-canti) */
 .topo-line-major {
-  stroke-width: 1.35;
-  opacity: 0.11;
+  stroke: var(--color-canti);
+  stroke-width: 1.25;
+  opacity: 0.12;
 }
 
-/* Sentiero escursionistico scout (tratteggio giallo leggero) */
+/* Sentiero escursionistico scout CAI B5 (tratteggio giallo / giochi leggero) */
 .topo-line-accent {
   stroke: var(--color-giochi);
-  stroke-width: 1;
-  opacity: 0.25;
+  stroke-width: 1.2;
+  opacity: 0.35;
   stroke-dasharray: 4 6;
+  fill: none;
 }
 
-/* Quote altimetriche stampate lungo le curve di livello */
+/* Quote altimetriche stampate lungo le curve di livello ed etichette */
 .topo-elevation-text {
-  opacity: 0.18;
+  opacity: 0.22;
   font-size: 9px;
   font-family: var(--font-sans);
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   user-select: none;
+}
+
+.topo-peak-title {
+  opacity: 0.32;
+  font-weight: 700;
+  font-size: 9.5px;
+}
+
+.topo-couloir-label {
+  opacity: 0.24;
+  font-style: italic;
+  letter-spacing: 0.08em;
+  font-size: 8.5px;
+}
+
+/* Varianti Tema Scuro */
+@media (prefers-color-scheme: dark) {
+  .topo-line {
+    opacity: 0.08;
+  }
+  .topo-line-major {
+    opacity: 0.16;
+  }
+  .topo-line-accent {
+    opacity: 0.45;
+  }
+  .topo-elevation-text {
+    opacity: 0.30;
+  }
+  .topo-peak-title {
+    opacity: 0.42;
+  }
 }
 
 /* Animazione fluida e impercettibile (slow breathing wave su sole proprietà transform) */
@@ -1686,6 +1719,13 @@ select.ios-form-input option {
     animation: none !important;
     transition: none !important;
     transform: none !important;
+  }
+}
+
+/* Nascosto rigorosamente in stampa */
+@media print {
+  .topo-contour-wrapper {
+    display: none !important;
   }
 }
 

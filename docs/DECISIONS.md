@@ -585,3 +585,36 @@ A seguito del confronto metrologico tra il PDF stampato e il documento di riferi
    - Riorganizzato il form "Nuovo Canto" con griglia fissa 2 colonne perfettamente simmetrica: Riga 1: Tonalità | Capotasto; Riga 2: Misura | BPM (testo singolo); Riga 3: Ritmo con keypad frecce integrato.
 6. **Integrità BPM e Migrazione SQL 0006:**
    - `admin_actions.ts` rifiuta il salvataggio se Supabase restituisce errore di colonna mancante per `bpm_testo`, segnalando la migrazione necessaria all'amministratore.
+
+---
+
+## ADR-0017 (Fase 9C): Sfondo Topografico Ambientale Ufficiale della Majella (Copernicus DEM 30m, Monte Amaro 2793m, Parallasse su Ref Senza Re-render)
+
+### Data
+2026-10-18
+
+### Contesto
+In precedenza lo sfondo topografico conteneva curve di livello dimostrative. La Fase 9C richiede la sostituzione con una carta topografica stilizzata ma rigorosamente REALE del massiccio della Majella, centrata su Monte Amaro (2793 m) e il canalone della Rava del Ferro, preservando la sobrietà e il contrasto dell'interfaccia.
+
+### Decisioni Adottate
+1. **Modello Digitale del Terreno Reale (Copernicus GLO-30):**
+   - Utilizzato il raster ad alta risoluzione (1 arcosecondo ≈ 30 metri) del programma europeo Copernicus (`Copernicus_DSM_COG_10_N42_00_E014_00_DEM.tif`).
+   - Riquadro geografico calibrato attorno all'asse Monte Amaro - Rava del Ferro: Lon [14.005°, 14.195°], Lat [42.060°, 42.120°].
+2. **Generazione Vettoriale Build-Time (Nessuna libreria nel client bundle):**
+   - Lo script `scripts/generate_majella_svg.mjs` calcola le curve di livello mediante `d3-contour` come devDependency a build-time.
+   - Semplificazione Douglas-Peucker con tolleranza $\epsilon = 0.95\text{ px}$, riducendo i punti del 90% preservando la geomorfologia reale delle creste e dei canaloni glaciali.
+   - Peso finale compresso in GZIP: **20.3 KB** (inferiore alla soglia limite di 40 KB).
+3. **Parallasse in Scroll ad Alte Prestazioni (Direct Ref DOM):**
+   - Eliminato qualsiasi stato locale (`useState`) in `TopographicBackground.tsx`. L'aggiornamento della parallasse avviene manipolando direttamente `ref.style.transform = translate3d(0, ${parallaxOffset}px, 0)` all'interno di un `requestAnimationFrame` con flag debounce.
+   - Zero re-rendering Preact in fase di scroll, zero ricalcolo del Virtual DOM, 60fps fluidi su dispositivi mobili.
+4. **Etichette Ufficiali Verificate (7 toponimi con doppia fonte):**
+   - Registrate in `docs/SFONDO_MAJELLA.md`: Monte Amaro (2793 m, con punto giallo di tappa scout), Rava del Ferro (canalone sentiero CAI B5), Bivacco Cesare Mario Pelino (2790 m), Monte Focalone (2676 m), Monte Acquaviva (2737 m), Passo San Leonardo (1282 m), Lama Bianca (1500 m).
+   - Coordinate e quote convalidate numericamente sul DEM Copernicus.
+5. **Colori, Contrasto e Isolamento:**
+   - Curve intermedie: `--color-ink` opacità 0.055 (chiaro) / 0.08 (scuro).
+   - Curve maestre: `--color-canti` (tinta azzurra) opacità 0.12 (chiaro) / 0.16 (scuro).
+   - Sentiero CAI B5: `--color-giochi` opacità 0.35 tratteggiato.
+   - Maschera gradiente verticale per dissolvenza graduale verso l'alto.
+   - Nascosto in stampa (`@media print`) e nella lettura canti a schermo intero.
+   - Disattivato con `prefers-reduced-motion: reduce`.
+

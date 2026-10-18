@@ -326,7 +326,7 @@ export function EventoFormSheet({
             className="ios-form-input"
             value={titolo}
             onInput={(e) => setTitolo((e.target as HTMLInputElement).value)}
-            placeholder="es. Riunione di Clan, Uscita sui Sibillini..."
+            placeholder="es. Riunione di Clan, Uscita sulla Majella..."
             required
             disabled={isSaving}
           />

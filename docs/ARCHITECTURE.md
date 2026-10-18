@@ -81,6 +81,8 @@ L'applicazione è progettata secondo il paradigma **Local-First PWA (Progressive
 │   ├── ui/
 │   │   ├── BrandLogo.tsx         # Logo ufficiale completo o emblema su targa bianca con fallback
 │   │   ├── HeaderBanner.tsx      # Testata responsive con foto WebP, scrim viola e metadati
+│   │   ├── TopographicBackground.tsx # Sfondo ambientale Majella (Copernicus DEM 30m, parallasse diretta su ref)
+│   │   ├── topo_majella_svg.ts   # Vettoriale statico ottimizzato delle curve di livello reali della Majella
 │   │   ├── ScoutMotifs.tsx       # Motivi vettoriali scout: LogoReveal, TheTrail, CompassSync
 │   │   ├── PwaInstallGuide.tsx   # Guida contestuale all'installazione su Schermata Home iOS/Android
 │   │   ├── SectionIcon.tsx       # Quadratini arrotondati pieni per ogni sezione

@@ -1,0 +1,133 @@
+{
+  "dataset": "Copernicus GLO-30 Digital Elevation Model (European Space Agency / European Union)",
+  "license": "Copernicus Open Access Policy / Free and open public licence",
+  "retrievalDate": "2026-10-18",
+  "bbox": {
+    "lonMin": 14.005,
+    "lonMax": 14.195,
+    "latMin": 42.06,
+    "latMax": 42.12
+  },
+  "svgDimensions": {
+    "width": 1200,
+    "height": 480
+  },
+  "points": [
+    {
+      "id": "monte_amaro",
+      "name": "Monte Amaro",
+      "quota": 2793,
+      "lat": 42.086307,
+      "lon": 14.085878,
+      "type": "vetta_principale",
+      "marker": "triangle",
+      "highlight": true,
+      "description": "Vetta principale del massiccio della Majella (seconda cima degli Appennini)",
+      "sources": [
+        "CAI Sez. Pescara / CAI Sulmona - Carta dei Sentieri 1:25.000",
+        "Parco Nazionale della Majella - Toponimi e Rete Sentieristica Ufficiale",
+        "IGM Foglio 147 IV NO \"Monte Amaro\""
+      ],
+      "svgX": 510.8,
+      "svgY": 269.5
+    },
+    {
+      "id": "rava_del_ferro",
+      "name": "Rava del Ferro",
+      "quota": 2100,
+      "lat": 42.0915,
+      "lon": 14.0725,
+      "type": "canalone",
+      "marker": "line_label",
+      "rotate": -32,
+      "description": "Canalone glaciale sul versante ovest risalito dal celebre sentiero alpinistico CAI B5",
+      "sources": [
+        "CAI Pescara - Itinerario e relazione tecnica Sentiero B5",
+        "Parco Nazionale della Majella - Catasto Sentieri",
+        "Guida Monti d'Italia CAI-TCI \"Appennino Centrale\""
+      ],
+      "svgX": 426.3,
+      "svgY": 228
+    },
+    {
+      "id": "bivacco_pelino",
+      "name": "Bivacco Pelino",
+      "quota": 2790,
+      "lat": 42.0868,
+      "lon": 14.0872,
+      "type": "bivacco",
+      "marker": "dot",
+      "description": "Bivacco geodetico ad igloo rosso posizionato in vetta a Monte Amaro dal CAI Sulmona (1966)",
+      "sources": [
+        "CAI Sulmona - Ente gestore Bivacco Cesare Mario Pelino",
+        "Parco Nazionale della Majella - Rete Rifugi e Bivacchi"
+      ],
+      "svgX": 519.2,
+      "svgY": 265.6
+    },
+    {
+      "id": "monte_focalone",
+      "name": "Monte Focalone",
+      "quota": 2676,
+      "lat": 42.1072,
+      "lon": 14.115,
+      "type": "vetta",
+      "marker": "triangle",
+      "description": "Imponente vetta settentrionale della dorsale principale",
+      "sources": [
+        "Parco Nazionale della Majella - Carta Escursionistica 1:25.000",
+        "IGM Foglio 147 IV NE"
+      ],
+      "svgX": 694.7,
+      "svgY": 102.4
+    },
+    {
+      "id": "monte_acquaviva",
+      "name": "Monte Acquaviva",
+      "quota": 2737,
+      "lat": 42.1033,
+      "lon": 14.1211,
+      "type": "vetta",
+      "marker": "triangle",
+      "description": "Seconda elevazione del massiccio della Majella",
+      "sources": [
+        "CAI Chieti - Relazioni creste d'alta quota",
+        "CTR Regione Abruzzo 1:10.000"
+      ],
+      "svgX": 733.3,
+      "svgY": 133.6
+    },
+    {
+      "id": "passo_san_leonardo",
+      "name": "Passo San Leonardo",
+      "quota": 1282,
+      "lat": 42.0736,
+      "lon": 14.0303,
+      "type": "passo",
+      "marker": "dot",
+      "description": "Valico storico tra Pacentro e Sant'Eufemia a Maiella",
+      "sources": [
+        "Parco Nazionale della Majella - Valichi e accessi",
+        "IGM Foglio 146 I NE"
+      ],
+      "svgX": 159.8,
+      "svgY": 371.2
+    },
+    {
+      "id": "lama_bianca",
+      "name": "Lama Bianca",
+      "quota": 1500,
+      "lat": 42.1003,
+      "lon": 14.0594,
+      "type": "base_sentiero",
+      "marker": "dot",
+      "description": "Riserva naturale statale e punto di partenza dell'itinerario CAI B5 verso la Rava del Ferro",
+      "sources": [
+        "Carabinieri Biodiversità Pescara - Riserva Naturale Statale Lama Bianca",
+        "CAI Pescara - Punto di partenza sentiero B5"
+      ],
+      "svgX": 343.6,
+      "svgY": 157.6
+    }
+  ]
+}

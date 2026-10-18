@@ -257,7 +257,7 @@ export function DesignSystemView() {
                 <span className="event-type-chip event-chip-uscita">Uscita</span>
                 <span className="home-event-countdown">Tra 4 giorni</span>
               </div>
-              <div className="home-event-title">Uscita dei Passaggi sui Sibillini</div>
+              <div className="home-event-title">Uscita dei Passaggi sulla Majella</div>
               <div className="home-event-meta">
                 <span>Partenza ore 08:30 • Sede</span>
                 <span>3 punti ODG</span>

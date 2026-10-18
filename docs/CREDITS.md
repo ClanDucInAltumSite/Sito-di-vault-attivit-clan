@@ -25,3 +25,15 @@ I capi clan possono sostituire qualsiasi foto posizionando un file JPEG con lo s
 - **Marchio:** Clan "Duc In Altum" - Gruppo AGESCI Ponte San Giovanni 1.
 - **Colori Campionati:** Viola profondo (`#462679`), Giallo (`#FDC500`), Azzurro (`#00BDFF`), Rosso (`#E8442D`).
 - **File originali:** `assets/favicon.png` (derivazioni: `assets/logo-completo.png` e `assets/logo-emblema.png`).
+
+---
+
+## Modello Digitale del Terreno — Sfondo Topografico Majella (`public/assets/topo_majella.svg`)
+
+- **Fonte Dati:** **Copernicus Digital Elevation Model (GLO-30)**, prodotto dall'Agenzia Spaziale Europea (ESA) e dalla Commissione Europea nell'ambito del programma spaziale europeo Copernicus.
+- **Tile Utilizzato:** `Copernicus_DSM_COG_10_N42_00_E014_00_DEM.tif` (copertura Lat 42°–43° N, Lon 14°–15° E, risoluzione 30 m).
+- **Data di Acquisizione ed Elaborazione:** 18 ottobre 2026.
+- **Licenza:** Copernicus Open Access Policy (libero utilizzo commerciale e non commerciale con attribuzione).
+- **Testo di Attribuzione:** *"© European Union, Copernicus Land Monitoring Service, European Environment Agency (EEA) / ESA."*
+- **Elaborazione Vettoriale:** Curve di livello estratte ed elaborate con Douglas-Peucker dallo script build-time `scripts/generate_majella_svg.mjs`.
+

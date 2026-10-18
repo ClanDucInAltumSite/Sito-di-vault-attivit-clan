@@ -96,6 +96,18 @@ L'interfaccia adotta un modello fisico a tre livelli:
 - **Livello 1 - Tessere e Card a Riposo:** Superfici bianche opache con bordo sottile (`1px solid var(--color-border)`) e ombra subliminale (`--shadow-rest`). Tessere 2×2 in Home con quadratino colorato 36×36px e grande numero indicatore.
 - **Livello 2 - Elementi Sospesi e Traslucidi:** Barre di navigazione superiore e inferiore con effetto vetro `backdrop-filter: blur(20px)`, Targa bianca del logo con ombra morbida a sbalzo (`--shadow-targa`), Bottom Sheet che scorre dal basso con maniglia arrotondata e blocco scroll.
 
+### 5.1 Sfondo Topografico Ambientale Ufficiale (Massiccio della Majella)
+L'applicazione integra uno sfondo cartografico vettoriale sobrio ed elegante, calcolato direttamente dal modello altimetrico digitale reale **Copernicus GLO-30** (risoluzione 30m):
+- **Territorio:** Massiccio della Majella, centrato sulla vetta di **Monte Amaro (2.793 m)**, sul canalone della **Rava del Ferro** e sui rilievi di Monte Focalone e Monte Acquaviva.
+- **Toponimi e Punti Ufficiali (7 verificati):** Monte Amaro (2793 m, con marcatore circolare giallo di tappa scout), Rava del Ferro (canalone CAI B5), Bivacco Cesare Mario Pelino (2790 m), Monte Focalone (2676 m), Monte Acquaviva (2737 m), Passo San Leonardo (1282 m), Lama Bianca (1500 m).
+- **Linee e Colori:**
+  - *Curve intermedie (passo 100 m):* sottilissime in inchiostro (`--color-ink`, opacità 0.055 in tema chiaro, 0.08 in tema scuro).
+  - *Curve maestre (passo 200 m):* spessore 1.25px con tinta azzurro scout (`--color-canti`, opacità 0.12 in chiaro, 0.16 in scuro).
+  - *Sentiero CAI B5:* tratteggio giallo scout (`--color-giochi`, opacità 0.35).
+- **Comportamento Fisico:** Posizionato fisso in basso con dissolvenza superiore progressiva (`-webkit-mask-image: linear-gradient(to top, black 25%, transparent 100%)`). La parallasse lenta in scroll è aggiornata tramite trasformazione diretta sul riferimento DOM (`style.transform`), garantendo zero ri-rendering e zero layout shift.
+- **Isolamento:** Rigorosamente nascosto nella stampa cartacea (`@media print`) e nella lettura canti a schermo intero. Disattivato con `prefers-reduced-motion: reduce`.
+
+
 ---
 
 ## 6. Il Movimento Sobrio e Vettoriale (Il Tocco Scout)
