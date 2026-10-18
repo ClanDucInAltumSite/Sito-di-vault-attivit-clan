@@ -1,9 +1,10 @@
-import { useState } from 'preact/hooks';
+import { useState, useEffect } from 'preact/hooks';
 import { BottomSheet } from '../../ui/BottomSheet';
 import { Button } from '../../ui/Button';
 import { Badge } from '../../ui/Badge';
 import { Icon } from '../../ui/Icon';
 import { ToggleSwitch } from '../../ui/ToggleSwitch';
+import { SegmentedControl } from '../../ui/SegmentedControl';
 import {
   parsePastedText,
   parseDocx,
@@ -46,6 +47,19 @@ export function CantoImportSheet({ isOpen, onClose, onSuccess }: CantoImportShee
   const [formCapo, setFormCapo] = useState<string>('');
   const [formTonalita, setFormTonalita] = useState('');
   const [formBody, setFormBody] = useState('');
+
+  useEffect(() => {
+    if (!isOpen) {
+      setErrorMessage(null);
+      setParsedResult(null);
+      setPastedContent('');
+    }
+  }, [isOpen]);
+
+  const handleTabChange = (newTab: TabType) => {
+    setActiveTab(newTab);
+    setErrorMessage(null);
+  };
 
   if (!isOpen) return null;
 
@@ -203,35 +217,19 @@ export function CantoImportSheet({ isOpen, onClose, onSuccess }: CantoImportShee
         {/* FASE 1: SELEZIONE METODO DI IMPORTAZIONE (SE NON ANCORA PARSATO) */}
         {!parsedResult ? (
           <div>
-            {/* Navigazione tra le 3 modalità */}
-            <div
-              className="ios-segmented-control"
-              style={{ display: 'flex', gap: 'var(--space-1)', marginBottom: 'var(--space-4)' }}
-            >
-              <button
-                type="button"
-                className={`ios-segmented-btn ${activeTab === 'docx' ? 'active' : ''}`}
-                style={{ flex: 1, padding: 'var(--space-2)' }}
-                onClick={() => setActiveTab('docx')}
-              >
-                1. File Word (.docx)
-              </button>
-              <button
-                type="button"
-                className={`ios-segmented-btn ${activeTab === 'paste' ? 'active' : ''}`}
-                style={{ flex: 1, padding: 'var(--space-2)' }}
-                onClick={() => setActiveTab('paste')}
-              >
-                2. Incolla Testo
-              </button>
-              <button
-                type="button"
-                className={`ios-segmented-btn ${activeTab === 'ai' ? 'active' : ''}`}
-                style={{ flex: 1, padding: 'var(--space-2)' }}
-                onClick={() => setActiveTab('ai')}
-              >
-                3. Da Foto / PDF
-              </button>
+            {/* Navigazione tra le 3 modalità con SegmentedControl del design system */}
+            <div style={{ marginBottom: 'var(--space-4)' }}>
+              <SegmentedControl<TabType>
+                className="canto-import-segmented"
+                value={activeTab}
+                onChange={handleTabChange}
+                options={[
+                  { value: 'docx', label: '1. File Word (.docx)' },
+                  { value: 'paste', label: '2. Incolla Testo' },
+                  { value: 'ai', label: '3. Da Foto / PDF' },
+                ]}
+                aria-label="Metodo di importazione canto"
+              />
             </div>
 
             {/* TAB 1: CARICA WORD (.docx) */}
@@ -512,7 +510,10 @@ export function CantoImportSheet({ isOpen, onClose, onSuccess }: CantoImportShee
             <div style={{ display: 'flex', gap: 'var(--space-2)', justifyContent: 'flex-end', marginTop: 'var(--space-2)' }}>
               <Button
                 variant="secondary"
-                onClick={() => setParsedResult(null)}
+                onClick={() => {
+                  setParsedResult(null);
+                  setErrorMessage(null);
+                }}
                 disabled={isProcessing}
               >
                 Ricomincia

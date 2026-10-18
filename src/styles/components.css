@@ -844,6 +844,36 @@
   box-shadow: var(--shadow-rest);
 }
 
+/* --- 10b. CONTROLLO SEGMENTATO IMPORTAZIONE CANTI --- */
+.canto-import-segmented {
+  background-color: var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 3px;
+  gap: 3px;
+}
+
+.canto-import-segmented .ios-segment {
+  min-height: 40px;
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  border-radius: var(--radius-md);
+  padding: var(--space-1) var(--space-2);
+  white-space: nowrap;
+}
+
+@media (min-width: 480px) {
+  .canto-import-segmented .ios-segment {
+    font-size: var(--font-size-sm);
+  }
+}
+
+.canto-import-segmented .ios-segment-selected {
+  background-color: var(--color-surface);
+  color: var(--color-ink);
+  font-weight: 600;
+  box-shadow: var(--shadow-rest);
+}
+
 /* --- 11. CHIP DEI TIPI EVENTO (CALENDARIO) --- */
 .event-type-chip {
   display: inline-flex;
