@@ -19,6 +19,7 @@ import { splitSongIntoPages } from '../../lib/stampa';
 import { CantoReadingMode } from './CantoReadingMode';
 import { CantoFormSheet } from './CantoFormSheet';
 import { DeleteConfirmModal } from '../../ui/DeleteConfirmModal';
+import { DANZA_LA_VITA_PARSED } from '../../data/parsed_songs';
 
 type SortOption = 'az' | 'za' | 'recenti' | 'vecchi';
 
@@ -60,7 +61,29 @@ export function CantiView() {
   // Caricamento dati da IndexedDB
   const loadData = async () => {
     const list = await getCanti(false);
-    setCanti(list);
+    const enriched = list.map((c) => {
+      if (c.id === DANZA_LA_VITA_PARSED.id && !c.testo_chordpro.includes('Cammina sulle [Fa]orme')) {
+        return {
+          ...c,
+          ...DANZA_LA_VITA_PARSED,
+          updated_at: c.updated_at,
+          created_at: c.created_at,
+          deleted_at: null,
+        } as Canto;
+      }
+      return c;
+    });
+
+    if (!enriched.some((c) => c.id === DANZA_LA_VITA_PARSED.id)) {
+      enriched.push({
+        ...DANZA_LA_VITA_PARSED,
+        created_at: '2026-10-19T18:21:42.924Z',
+        updated_at: new Date().toISOString(),
+        deleted_at: null,
+      } as Canto);
+    }
+
+    setCanti(enriched);
   };
 
   useEffect(() => {

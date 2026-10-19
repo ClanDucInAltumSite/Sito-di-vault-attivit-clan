@@ -20,6 +20,7 @@ import {
   Evento,
   OdgPunto,
 } from '../../lib/db';
+import { DANZA_LA_VITA_PARSED } from '../../data/parsed_songs';
 import {
   StampaConfig,
   loadStampaConfig,
@@ -82,10 +83,20 @@ export function StampaView() {
           getEventi(false),
         ]);
 
+        const enrichedCanti = cList.map((c) => {
+          if (c.id === DANZA_LA_VITA_PARSED.id && !c.testo_chordpro.includes('Cammina sulle [Fa]orme')) {
+            return { ...c, ...DANZA_LA_VITA_PARSED };
+          }
+          return c;
+        });
+        if (!enrichedCanti.some((c) => c.id === DANZA_LA_VITA_PARSED.id)) {
+          enrichedCanti.push(DANZA_LA_VITA_PARSED as any);
+        }
+
         if (!mounted) return;
         setGiochi(gList);
         setBans(bList);
-        setCanti(cList);
+        setCanti(enrichedCanti);
         setEventi(eList);
 
         // Carica ODG per gli eventi
