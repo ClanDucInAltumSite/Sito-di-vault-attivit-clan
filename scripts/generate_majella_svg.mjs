@@ -259,16 +259,21 @@ export async function generateMajellaSvg() {
   console.log('[MAJELLA] Avvio calcolo curve di livello dal DEM reale...');
   const { data, w, h } = await getDemData();
 
-  // Curve maestre: ogni 200m
-  const majorLevels = [1000, 1200, 1400, 1600, 1800, 2000, 2200, 2400, 2600, 2750];
-  // Curve intermedie: ogni 100m interposta
-  const interLevels = [1100, 1300, 1500, 1700, 1900, 2100, 2300, 2500, 2700];
+  // Curve di livello realistiche e dense da DEM reale (passo 50m come una vera cartina CAI/IGM)
+  // Curve maestre/direttrici: ogni 100m + anello di vetta 2780m
+  // Curve ordinarie/intermedie: ogni 50m
+  const allLevels = [];
+  for (let el = 1000; el <= 2750; el += 50) {
+    allLevels.push(el);
+  }
+  allLevels.push(2780); // Anello sommitale di vetta Monte Amaro (2793m)
 
-  const allLevels = [...majorLevels, ...interLevels].sort((a, b) => a - b);
+  const isMajorLevel = (elev) => elev % 100 === 0 || elev === 2780;
+
   const c = contours().size([w, h]).thresholds(allLevels);
   const results = c(data);
 
-  // Semplificazione DP con epsilon 0.95px su tela 1200x480
+  // Semplificazione DP con epsilon 0.95px su tela 1200x480 (preserva ogni canalone, vallone e cresta reale con margine di sicurezza GZIP)
   const sqTol = 0.95 * 0.95;
 
   // Ripartizione delle isoipse in 3 gruppi di animazione respiratoria fluida
@@ -276,7 +281,7 @@ export async function generateMajellaSvg() {
 
   for (let idx = 0; idx < results.length; idx++) {
     const item = results[idx];
-    const isMajor = majorLevels.includes(item.value);
+    const isMajor = isMajorLevel(item.value);
     const cls = isMajor ? 'topo-line topo-line-major' : 'topo-line';
     const animId = (idx % 3) + 1;
 

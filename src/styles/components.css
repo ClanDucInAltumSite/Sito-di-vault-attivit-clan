@@ -1570,8 +1570,8 @@ select.ios-form-input option {
   inset: 0;
   background: radial-gradient(
     ellipse 95% 80% at 50% 100%,
-    oklch(0.22 0.05 305 / 0.22) 0%,
-    oklch(0.18 0.02 305 / 0.08) 50%,
+    oklch(0.22 0.05 305 / 0.10) 0%,
+    oklch(0.18 0.02 305 / 0.04) 50%,
     transparent 100%
   );
   pointer-events: none;
@@ -1581,8 +1581,8 @@ select.ios-form-input option {
   .topo-ambient-glow {
     background: radial-gradient(
       ellipse 95% 80% at 50% 100%,
-      oklch(0.94 0.02 305 / 0.35) 0%,
-      oklch(0.97 0.01 305 / 0.10) 50%,
+      oklch(0.94 0.02 305 / 0.18) 0%,
+      oklch(0.97 0.01 305 / 0.05) 50%,
       transparent 100%
     );
   }
@@ -1622,36 +1622,36 @@ select.ios-form-input option {
   overflow: visible;
 }
 
-/* Isoipse standard: tratto sottilissimo e trasparente per non disturbare il testo */
+/* Isoipse standard: tratto cartografico finissimo e tenue (filigrana su carta) */
 .topo-line {
   fill: none;
   stroke: var(--color-ink);
-  stroke-width: 0.8;
-  opacity: 0.055;
+  stroke-width: 0.55;
+  opacity: 0.035;
   stroke-linecap: round;
   vector-effect: non-scaling-stroke;
 }
 
-/* Isoipse maestre/direttrici: tratto con tinta azzurra dai token (--color-canti) */
+/* Isoipse maestre/direttrici: tratto leggermente più marcato con tinta azzurra discreta */
 .topo-line-major {
   stroke: var(--color-canti);
-  stroke-width: 1.25;
-  opacity: 0.12;
+  stroke-width: 0.85;
+  opacity: 0.065;
 }
 
-/* Sentiero escursionistico scout CAI B5 (tratteggio giallo / giochi leggero) */
+/* Sentiero escursionistico scout CAI B5 (tratteggio tenue) */
 .topo-line-accent {
   stroke: var(--color-giochi);
-  stroke-width: 1.2;
-  opacity: 0.35;
+  stroke-width: 0.9;
+  opacity: 0.16;
   stroke-dasharray: 4 6;
   fill: none;
 }
 
-/* Quote altimetriche stampate lungo le curve di livello ed etichette */
+/* Quote altimetriche stampate lungo le curve di livello ed etichette (discrete e non invadenti) */
 .topo-elevation-text {
-  opacity: 0.22;
-  font-size: 9px;
+  opacity: 0.13;
+  font-size: 8.5px;
   font-family: var(--font-sans);
   font-weight: 600;
   letter-spacing: 0.05em;
@@ -1659,49 +1659,52 @@ select.ios-form-input option {
 }
 
 .topo-peak-title {
-  opacity: 0.32;
+  opacity: 0.20;
   font-weight: 700;
-  font-size: 9.5px;
+  font-size: 9px;
 }
 
 .topo-couloir-label {
-  opacity: 0.24;
+  opacity: 0.15;
   font-style: italic;
   letter-spacing: 0.08em;
-  font-size: 8.5px;
+  font-size: 8px;
 }
 
 @media (max-width: 768px) {
   .topo-elevation-text {
-    font-size: 11px;
-    opacity: 0.30;
+    font-size: 9.5px;
+    opacity: 0.16;
   }
   .topo-peak-title {
-    font-size: 12.5px;
-    opacity: 0.45;
+    font-size: 10.5px;
+    opacity: 0.24;
   }
   .topo-couloir-label {
-    font-size: 10.5px;
-    opacity: 0.32;
+    font-size: 9px;
+    opacity: 0.18;
   }
 }
 
-/* Varianti Tema Scuro */
+/* Varianti Tema Scuro: contrasto attenuato per non rubare la scena */
 @media (prefers-color-scheme: dark) {
   .topo-line {
-    opacity: 0.08;
+    opacity: 0.045;
   }
   .topo-line-major {
-    opacity: 0.16;
+    opacity: 0.08;
   }
   .topo-line-accent {
-    opacity: 0.45;
+    opacity: 0.20;
   }
   .topo-elevation-text {
-    opacity: 0.30;
+    opacity: 0.16;
   }
   .topo-peak-title {
-    opacity: 0.42;
+    opacity: 0.24;
+  }
+  .topo-couloir-label {
+    opacity: 0.18;
   }
 }
 
