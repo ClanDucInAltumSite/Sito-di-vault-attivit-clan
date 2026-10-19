@@ -2371,13 +2371,39 @@ select.ios-form-input option {
   background-color: var(--color-surface-hover);
 }
 
-/* Card Workflow AI */
-.canto-ai-card {
-  padding: var(--space-4);
-  background-color: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  border-left: 4px solid var(--color-interactive);
+/* Schermata di Revisione Incolla Intelligente (Fase 10B) */
+.canto-review-container {
+  width: 100%;
+}
+
+.canto-review-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.canto-review-pane-desktop {
+  display: block;
+}
+
+.canto-review-mobile-switcher {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .canto-review-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .canto-review-mobile-switcher {
+    display: block !important;
+  }
+  .canto-review-pane-desktop {
+    display: none !important;
+  }
+  .canto-review-pane-active {
+    display: block !important;
+  }
 }
 
 /* Toast/Banner Notifica senza overflow orizzontale */

@@ -119,3 +119,59 @@ export function stripChords(chordproText: string): string {
     .replace(/\s+/g, ' ')
     .trim();
 }
+
+/**
+ * Restituisce gli accordi diatonici principali associati a una tonalità.
+ * Per le tonalità maggiori: I, ii, iii, IV, V, vi, V7.
+ * Per le tonalità minori: i, ii°, III, iv, v, VI, VII, V7.
+ */
+export function getDiatonicChords(keyOrChord: string): string[] {
+  if (!keyOrChord) return [];
+  const clean = keyOrChord.trim();
+  const match = clean.match(ROOT_NOTE_REGEX);
+  if (!match || !match[0]) return [];
+
+  const root = match[0];
+  const suffix = clean.slice(root.length).toLowerCase();
+  const isMinor = suffix.startsWith('m') || suffix.startsWith('min') || suffix.startsWith('-');
+
+  if (isMinor) {
+    // Tonalità minore (es. Lam, Rem, Mim, Fa#m)
+    // i, iv, v, V7, III, VI, VII, ii°
+    const i = `${root}m`;
+    const iiDim = `${transposeNote(root, 2)}dim`;
+    const III = transposeNote(root, 3);
+    const iv = `${transposeNote(root, 5)}m`;
+    const v = `${transposeNote(root, 7)}m`;
+    const VI = transposeNote(root, 8);
+    const VII = transposeNote(root, 10);
+    const V7 = `${transposeNote(root, 7)}7`;
+    return [i, iv, v, V7, III, VI, VII, iiDim];
+  } else {
+    // Tonalità maggiore (es. Do, Sol, Re, Mi, Fa, La, Si)
+    // I, ii, iii, IV, V, vi, V7
+    const I = root;
+    const ii = `${transposeNote(root, 2)}m`;
+    const iii = `${transposeNote(root, 4)}m`;
+    const IV = transposeNote(root, 5);
+    const V = transposeNote(root, 7);
+    const vi = `${transposeNote(root, 9)}m`;
+    const V7 = `${transposeNote(root, 7)}7`;
+    return [I, V, vi, IV, ii, iii, V7];
+  }
+}
+
+/**
+ * Deduce una tonalità candidata a partire dal primo accordo del canto.
+ * Utilizzata SOLO per ordinare i suggerimenti armonici nella tavolozza: non viene MAI salvata automaticamente.
+ */
+export function inferKeyFromFirstChord(firstChord: string | null | undefined): string | null {
+  if (!firstChord) return null;
+  const match = firstChord.trim().match(ROOT_NOTE_REGEX);
+  if (!match || !match[0]) return null;
+  const root = match[0];
+  const suffix = firstChord.trim().slice(root.length).toLowerCase();
+  const isMinor = suffix.startsWith('m') || suffix.startsWith('min') || suffix.startsWith('-');
+  return isMinor ? `${root}m` : root;
+}
+

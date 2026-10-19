@@ -2,14 +2,17 @@
  * ==============================================================================
  * CANZONIERE PARSER & CHORD RECOGNITION PIPELINE (FASE 9)
  * ==============================================================================
- * Pipeline unificata per i tre ingressi:
+ * Pipeline unificata per l'inserimento canti:
  * 1. Caricamento Word (.docx) con jszip (import dinamico) e tabelle a 2 colonne
- * 2. Incolla testo (formato intestazione ChordPro, accordi sopra testo, solo testo)
- * 3. Da foto o PDF (copia prompt fisso per AI esterna)
+ * 2. Incolla o scrivi (incolla intelligente, normalizzazione caratteri e revisione)
  *
- * Allineamento proporzionale Roboto, disambiguazione parole italiane e
- * nessuna perdita di testo in silenzio con raccolta diagnostica di avvisi.
+ * Allineamento proporzionale Roboto, notazioni accordi estese (es. La- per Lam, slash chords),
+ * protezione rigorosa contro trappole parole italiane e raccolta diagnostica di avvisi.
  */
+
+import { cleanPastedText, CleanTextResult, CleanerChange, reconstructWithActiveChanges } from './canzoniere_cleaner';
+export { cleanPastedText, reconstructWithActiveChanges };
+export type { CleanTextResult, CleanerChange };
 
 export interface ParsedCantoResult {
   titolo: string;
@@ -22,6 +25,7 @@ export interface ParsedCantoResult {
   tonalita: string | null;
   testo_chordpro: string;
   warnings: string[];
+  cleanResult?: CleanTextResult;
   stats: {
     totalLines: number;
     chordsCount: number;
@@ -35,105 +39,28 @@ export interface ParseOptions {
 }
 
 // ==============================================================================
-// REGEX E RICONOSCIMENTO ACCORDI (Italiani e Anglo-Sassoni)
+// REGEX E RICONOSCIMENTO ACCORDI (Italiani e Anglo-Sassoni con Notazione Minore '-')
 // ==============================================================================
-const ITALIAN_ROOTS = ['DO', 'RE', 'MI', 'FA', 'SOL', 'LA', 'SI', 'Do', 'Re', 'Mi', 'Fa', 'Sol', 'La', 'Si'];
-const ANGLO_ROOTS = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
-const ALL_ROOTS = [...ITALIAN_ROOTS, ...ANGLO_ROOTS];
+export {
+  ITALIAN_ROOTS,
+  ANGLO_ROOTS,
+  ALL_ROOTS,
+  ITALIAN_ROOT_MAP,
+  ANGLO_ROOT_MAP,
+  SINGLE_CHORD_REGEX,
+  normalizeSingleChordPart,
+  normalizeChord,
+  isChordToken,
+  isChordLine,
+} from './chord_detection';
+export type { ChordLineOptions } from './chord_detection';
 
-const ACCIDENTALS = '[#\\u266Fb\\u266D]?';
-const MODIFIERS = '(?:maj7|maj9|maj|m7b5|m7|min7|min|m|7sus4|sus4|sus2|sus|add9|add2|add4|add11|dim7|dim|aug|6|7|9|11|13|5|2|\\+)?';
-const BASS = '(?:[\\/\\\\](?:[A-Ga-g]|Do|Re|Mi|Fa|Sol|La|Si|DO|RE|MI|FA|SOL|LA|SI)[#\\u266Fb\\u266D]?)?';
-
-const SINGLE_CHORD_REGEX = new RegExp(
-  `^(?:${ALL_ROOTS.join('|')})${ACCIDENTALS}${MODIFIERS}${BASS}$`
-);
+import {
+  normalizeChord,
+  isChordLine,
+} from './chord_detection';
 
 const CHORDPRO_TOKEN_REGEX = /\[([^\]]+)\]/g;
-
-/**
- * Verifica se un token isolato è sintatticamente un accordo musicale.
- */
-export function isChordToken(token: string): boolean {
-  const clean = token.trim().replace(/[(),;.]/g, '');
-  if (!clean) return false;
-  return SINGLE_CHORD_REGEX.test(clean);
-}
-
-/**
- * Disambiguazione rigorosa per parole italiane (Do, Re, Mi, Fa, Sol, La, Si).
- * Una riga è "di accordi" solo se tutti i token sono accordi E:
- * (a) è scritta in maiuscolo, oppure
- * (b) contiene alterazioni o modificatori, oppure
- * (c) è in grassetto (isBold = true), oppure
- * (d) ha almeno due token ed è seguita da una riga di testo.
- * Nel dubbio NON indovinare: "la la la" non è mai una riga di accordi.
- */
-export function isChordLine(
-  line: string,
-  options?: { isBold?: boolean; nextLineIsText?: boolean; warnings?: string[] }
-): boolean {
-  const trimmed = line.trim();
-  if (!trimmed) return false;
-
-  // Se contiene già parentesi quadre tipo ChordPro [Do], non è riga di soli accordi
-  if (trimmed.includes('[') && trimmed.includes(']')) return false;
-
-  // Etichette RIT. non sono accordi
-  if (/^RIT[.:]?$/i.test(trimmed)) return false;
-
-  const tokens = trimmed.split(/\s+/).filter(Boolean);
-  if (tokens.length === 0) return false;
-
-  // Tutti i token devono essere accordi validi
-  const allAreChords = tokens.every((t) => isChordToken(t));
-  if (!allAreChords) return false;
-
-  // Trappola parole italiane comuni: "la la la", "si si", "fa", "do", "re"
-  const isAllSimpleItalianWordNotes = tokens.every((t) =>
-    /^(?:do|re|mi|fa|sol|la|si)$/i.test(t)
-  );
-
-  // Se è "la la la" o parole minuscole ripetute senza modificatori
-  if (isAllSimpleItalianWordNotes && tokens.every((t) => t === t.toLowerCase())) {
-    return false;
-  }
-
-  // (a) Scritta tutta in MAIUSCOLO (es. "DO FA DO SOL" o "C G AM F")
-  const isAllUpper = tokens.every((t) => t === t.toUpperCase());
-  if (isAllUpper) return true;
-
-  // (b) Accordi internazionali anglosassoni (es. C, G, Am, F, Dm, Bb, F#m)
-  const isAllAngloSaxon = tokens.every((t) => /^[A-G]/.test(t) && isChordToken(t));
-  if (isAllAngloSaxon) return true;
-
-  // (c) Contiene alterazioni o modificatori (es. "Lam", "Fa#", "Sol7", "C#m", "Re/Fa#")
-  const hasModifiersOrAccidentals = tokens.some((t) =>
-    /[#\u266Fb\u266D79]|maj|min|sus|add|dim|aug|\/|m$/i.test(t)
-  );
-  if (hasModifiersOrAccidentals) return true;
-
-  // (d) Grassetto esplicito (dal docx)
-  if (options?.isBold) return true;
-
-  // (d) Ha almeno due token diversi e la riga successiva è testo
-  if (tokens.length >= 2 && options?.nextLineIsText) {
-    // Es. "Do    Fa    Do    Sol" con maiuscole/minuscole standard
-    const uniqueTokens = new Set(tokens.map((t) => t.toLowerCase()));
-    if (uniqueTokens.size >= 2) {
-      return true;
-    }
-  }
-
-  // Nel dubbio: segnala riga ambigua e NON considerarla riga di accordi
-  if (options?.warnings && tokens.length > 0) {
-    options.warnings.push(
-      `Riga ambigua interpretata come testo: "${trimmed}" (usa maiuscole o accordi tra [parentesi] per forzarla)`
-    );
-  }
-
-  return false;
-}
 
 // ==============================================================================
 // METRICHE TIPOGRAFICHE ROBOTO PER ALLINEAMENTO PROPORZIONALE
@@ -231,7 +158,7 @@ export function alignChordsOverLyrics(
   if (!lyricsLine.trim()) {
     // Riga di soli accordi senza testo (es. intro)
     const tokens = chordLine.trim().split(/\s+/).filter(Boolean);
-    return tokens.map((t) => `[${t}]`).join(' ');
+    return tokens.map((t) => `[${normalizeChord(t)}]`).join(' ');
   }
 
   // Estrai ogni accordo con la sua posizione orizzontale
@@ -255,6 +182,16 @@ export function alignChordsOverLyrics(
 
   if (chords.length === 0) return lyricsLine;
 
+  // Rileva spaziatura persa (accordi separati solo da 1 spazio mentre il testo è sensibilmente più lungo)
+  if (_warnings && !isMonospace && chords.length >= 2) {
+    const hasWideSpacing = /\s{2,}|\t/.test(chordLine);
+    if (!hasWideSpacing && lyricsLine.trim().length > chordLine.trim().length * 1.5) {
+      if (!_warnings.some((w) => w.includes("accordi senza posizione: usa l'editor accordi"))) {
+        _warnings.push("accordi senza posizione: usa l'editor accordi");
+      }
+    }
+  }
+
   if (isMonospace) {
     // Modalità a spaziatura fissa: allineamento 1:1 per colonna carattere
     let result = '';
@@ -265,7 +202,7 @@ export function alignChordsOverLyrics(
       if (!ch) continue;
       const targetIdx = Math.min(ch.colIndex, lyricsLine.length);
       result += lyricsLine.slice(lastLyricIdx, targetIdx);
-      result += `[${ch.chord}]`;
+      result += `[${normalizeChord(ch.chord)}]`;
       lastLyricIdx = targetIdx;
     }
     result += lyricsLine.slice(lastLyricIdx);
@@ -304,7 +241,7 @@ export function alignChordsOverLyrics(
 
   // Se la riga di testo è vuota (solo accordi / intro / stacco), restituisci gli accordi spaziati
   if (!lyricsLine.trim()) {
-    return chords.map((c) => `[${c.chord}]`).join('    ');
+    return chords.map((c) => `[${normalizeChord(c.chord)}]`).join('    ');
   }
 
   // Ordina le assegnazioni per indice carattere
@@ -322,7 +259,7 @@ export function alignChordsOverLyrics(
       result += ' ';
     }
     result += lyricsLine.slice(lastChar, item.charIdx);
-    result += `[${item.chord}]`;
+    result += `[${normalizeChord(item.chord)}]`;
     lastChar = item.charIdx;
   }
   result += lyricsLine.slice(lastChar);
@@ -635,10 +572,11 @@ function extractParagraphsIntoLines(
 }
 
 // ==============================================================================
-// PARSER 2: INCOLLA TESTO
+// PARSER 2: INCOLLA TESTO (INCOLLA INTELLIGENTE CON PULIZIA E NORMALIZZAZIONE)
 // ==============================================================================
 /**
  * Parsea un testo incollato (formato intestazione ChordPro, accordi sopra testo o solo testo).
+ * Include normalizzazione caratteri, rimozione rumore web, conversione etichette e unione righe spezzate.
  */
 export function parsePastedText(rawText: string, options: ParseOptions = {}): ParsedCantoResult {
   const warnings: string[] = [];
@@ -690,13 +628,17 @@ export function parsePastedText(rawText: string, options: ParseOptions = {}): Pa
     }
   }
 
-  // 2. Parsea il corpo riga per riga
-  const bodyLines = lines.slice(bodyStartIndex);
+  // 2. Pulizia intelligente del corpo (rumore web, normalizzazione caratteri, etichette e righe spezzate)
+  const rawBodyText = lines.slice(bodyStartIndex).join('\n');
+  const cleanRes = cleanPastedText(rawBodyText);
+  warnings.push(...cleanRes.warnings);
+
+  const bodyLines = cleanRes.cleanedLines;
   const processedLines: string[] = [];
   let pendingChordLine: string | null = null;
 
   for (let i = 0; i < bodyLines.length; i++) {
-    const line = bodyLines[i];
+    let line = bodyLines[i];
     if (line === undefined) continue;
     const trimmed = line.trim();
 
@@ -708,7 +650,7 @@ export function parsePastedText(rawText: string, options: ParseOptions = {}): Pa
     // Se è vuota
     if (!trimmed) {
       if (pendingChordLine) {
-        processedLines.push(pendingChordLine.trim().split(/\s+/).map((c) => `[${c}]`).join(' '));
+        processedLines.push(pendingChordLine.trim().split(/\s+/).map((c) => `[${normalizeChord(c)}]`).join(' '));
         pendingChordLine = null;
       }
       processedLines.push('');
@@ -724,8 +666,11 @@ export function parsePastedText(rawText: string, options: ParseOptions = {}): Pa
         warnings.push(`Riga ${i + 1}: parentesi quadre sbilanciate (${openCount} '[' vs ${closeCount} ']').`);
       }
 
+      // Normalizza accordi inline (es. [La-] -> [Lam], [SI-] -> [Sim], [RE] -> [Re])
+      line = line.replace(/\[([^\]]+)\]/g, (_, c) => `[${normalizeChord(c)}]`);
+
       if (pendingChordLine) {
-        processedLines.push(pendingChordLine.trim().split(/\s+/).map((c) => `[${c}]`).join(' '));
+        processedLines.push(pendingChordLine.trim().split(/\s+/).map((c) => `[${normalizeChord(c)}]`).join(' '));
         pendingChordLine = null;
       }
       processedLines.push(line);
@@ -742,7 +687,7 @@ export function parsePastedText(rawText: string, options: ParseOptions = {}): Pa
 
     if (isChords) {
       if (pendingChordLine) {
-        processedLines.push(pendingChordLine.trim().split(/\s+/).map((c) => `[${c}]`).join(' '));
+        processedLines.push(pendingChordLine.trim().split(/\s+/).map((c) => `[${normalizeChord(c)}]`).join(' '));
       }
       pendingChordLine = line;
     } else {
@@ -757,7 +702,7 @@ export function parsePastedText(rawText: string, options: ParseOptions = {}): Pa
   }
 
   if (pendingChordLine) {
-    processedLines.push(pendingChordLine.trim().split(/\s+/).map((c) => `[${c}]`).join(' '));
+    processedLines.push(pendingChordLine.trim().split(/\s+/).map((c) => `[${normalizeChord(c)}]`).join(' '));
   }
 
   const finalBody = processedLines.join('\n').trim();
@@ -795,6 +740,7 @@ export function parsePastedText(rawText: string, options: ParseOptions = {}): Pa
     tonalita, // Non deduce la tonalità dal primo accordo
     testo_chordpro: finalBody,
     warnings,
+    cleanResult: cleanRes,
     stats: {
       totalLines,
       chordsCount: chordsMatches.length,
@@ -803,35 +749,4 @@ export function parsePastedText(rawText: string, options: ParseOptions = {}): Pa
   };
 }
 
-// ==============================================================================
-// PARSER 3: PROMPT FISSO PER AI ESTERNA (Sezione 6)
-// ==============================================================================
-export const AI_IMPORT_PROMPT = `Sto digitalizzando il canzoniere del mio gruppo scout a partire da materiale (foto, spartito, PDF, o testo grezzo).
-Il tuo compito è produrre una trascrizione perfetta, verificata e completa nel formato standard sotto indicato.
 
-REGOLE DI VERIFICA, RICERCA ED ESATTEZZA:
-1. ACCURATEZZA ARMONICA: Verifica che gli accordi siano musicalmente corretti per questa canzone. Se il testo fornito contiene accordi incompleti, palesemente errati o mancanti, correggili incrociando SOLO fonti affidabili (canzonieri scout ufficiali AGESCI, spartiti e prontuari chitarra accreditati).
-2. COMPLETAMENTO METADATI MANCANTI: Cerca e compila le informazioni mancanti con la massima affidabilità:
-   - TEMPO: la misura musicale (es. 4/4, 3/4, 6/8).
-   - BPM: velocità metronomica indicativa (es. "circa 92-94" o "100").
-   - RITMO: descrizione della pennata con le frecce obbligatorie tra parentesi, ad esempio: "Giù, Giù-Su, Su-Giù-Su (↓ ↓↑ ↑↓↑)" oppure "Valzer (↓ ↑↑)".
-   - AUTORE: autore/i del canto o evento liturgico/scout (es. "Marco Frisina", "Clan La Roccia", "Route Nazionale").
-   - CAPOTASTO: indicare il tasto numerico (es. 2) o lasciare vuoto se assente.
-3. POSIZIONAMENTO DEGLI ACCORDI:
-   - Ogni accordo deve essere inserito tra parentesi quadre prima della sillaba esatta su cui cade (es. [Do]Nel [Sol]mezzo del [Lam]cammin).
-   - Notazione italiana obbligatoria: Do, Re, Mi, Fa, Sol, La, Si con relative alterazioni (m, 7, maj7, sus4, #, b, es. Lam, Sol7, Re/Fa#).
-   - IMPORTANTE: Gli accordi NON devono mai essere attaccati insieme (MAI [Do][Sol] o [Sol][Lam]). Se più accordi si susseguono senza testo (intro, stacco o a fine verso), separali SEMPRE con spazi (es. [Do] [Sol] [Lam]).
-   - Se un accordo sta a fine verso, posizionalo a fine riga dopo la parola, separato da uno spazio.
-4. STRUTTURA DEL TESTO:
-   - Suddividi strofe e ritornelli con una riga vuota tra loro.
-   - Per i ritornelli indica la riga con "RIT." (senza parentesi graffe).
-5. FORMATO DI USCITA RIGOROSO (fornisci ESCLUSIVAMENTE questo blocco di codice senza preamboli né spiegazioni):
-
-TITOLO: ...
-AUTORE: ...
-TEMPO: ...
-BPM: ...
-RITMO: ...
-CAPOTASTO: ...
----
-(testo con gli accordi tra parentesi quadre)`;

@@ -10,9 +10,18 @@ import { Canto } from '../../lib/db';
 import { saveCanto } from '../../lib/admin_actions';
 import { findSimilarName } from '../../lib/search';
 import { validateChordPro, ChordProRenderer } from '../../lib/chordpro';
-import { parseDocx, parsePastedText, AI_IMPORT_PROMPT } from './canzoniere_parser';
+import { parseDocx, ParsedCantoResult } from './canzoniere_parser';
 import { layoutCanzoniereSong } from './canzoniere_layout';
 import { CanzonierePageRenderer } from './CanzonierePageRenderer';
+import { CantoPasteReviewView } from './CantoPasteReviewView';
+import { TouchChordEditor } from './TouchChordEditor';
+import {
+  saveCantoDraft,
+  loadCantoDraft,
+  clearCantoDraft,
+  formatDraftTime,
+  CantoDraft,
+} from './canto_draft';
 
 export interface CantoFormSheetProps {
   isOpen: boolean;
@@ -22,7 +31,7 @@ export interface CantoFormSheetProps {
   existingTitles: string[];
 }
 
-type CreationTab = 'manual' | 'docx' | 'ai';
+type CreationTab = 'paste' | 'docx';
 
 export function CantoFormSheet({
   isOpen,
@@ -31,8 +40,8 @@ export function CantoFormSheet({
   initialCanto,
   existingTitles,
 }: CantoFormSheetProps) {
-  // Modalità creazione unificata: 3 ingressi (1. Scrivi a mano, 2. Da Word, 3. Con IA)
-  const [activeCreationTab, setActiveCreationTab] = useState<CreationTab>('manual');
+  // Modalità creazione unificata: 2 ingressi (1. Incolla o scrivi con revisione, 2. Da Word)
+  const [activeCreationTab, setActiveCreationTab] = useState<CreationTab>('paste');
 
   // Campi del Canto
   const [titolo, setTitolo] = useState('');
@@ -49,16 +58,24 @@ export function CantoFormSheet({
   const [showLivePreview, setShowLivePreview] = useState(false);
   const [previewMode, setPreviewMode] = useState<'chordpro' | 'print'>('chordpro');
 
+  // Modalità editor: 'text' (textarea ChordPro) o 'touch' (Editor accordi a tocco)
+  const [editorMode, setEditorMode] = useState<'text' | 'touch'>('text');
+
+  // Bozza locale non salvata (Fase 10C)
+  const [savedDraft, setSavedDraft] = useState<CantoDraft | null>(null);
+
   // Stati operativi
   const [isSaving, setIsSaving] = useState(false);
   const [isProcessingInput, setIsProcessingInput] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
-  const [copiedPromptSuccess, setCopiedPromptSuccess] = useState(false);
 
-  // Input per importazione
+  // Input e stati per incolla intelligente e revisione (Fase 10B)
+  const [pastedRawText, setPastedRawText] = useState('');
+  const [isMonospace, setIsMonospace] = useState(false);
+  const [isReviewingPaste, setIsReviewingPaste] = useState(false);
+  const [showManualForm, setShowManualForm] = useState(false);
   const [preserveColBreak, setPreserveColBreak] = useState(true);
-  const [aiPastedInput, setAiPastedInput] = useState('');
 
   // Refs per inserimento mirato
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -80,11 +97,95 @@ export function CantoFormSheet({
       setSuccessNotice(null);
       setShowLivePreview(false);
       setPreviewMode('chordpro');
-      setCopiedPromptSuccess(false);
-      setAiPastedInput('');
-      setActiveCreationTab('manual');
+      setEditorMode('text');
+      setPastedRawText('');
+      setIsMonospace(false);
+      setIsReviewingPaste(false);
+      setShowManualForm(!!initialCanto);
+      setActiveCreationTab('paste');
+
+      // Verifica presenza bozza non salvata
+      if (!initialCanto) {
+        const draft = loadCantoDraft();
+        if (draft) {
+          setSavedDraft(draft);
+        } else {
+          setSavedDraft(null);
+        }
+      } else {
+        setSavedDraft(null);
+      }
     }
   }, [isOpen, initialCanto]);
+
+  // Salvataggio periodico bozza ogni 5 secondi (Fase 10C)
+  useEffect(() => {
+    if (!isOpen || initialCanto) return;
+    const hasContent = Boolean(titolo.trim() || testoChordpro.trim());
+    if (!hasContent) return;
+
+    const timer = setInterval(() => {
+      saveCantoDraft({
+        titolo,
+        autore,
+        misura,
+        bpm_testo: bpmTesto,
+        ritmo,
+        capotasto,
+        tonalita,
+        testo_chordpro: testoChordpro,
+        note: '',
+        settore: 'tutti',
+      });
+    }, 5000);
+
+    return () => clearInterval(timer);
+  }, [isOpen, initialCanto, titolo, autore, misura, bpmTesto, ritmo, capotasto, tonalita, testoChordpro]);
+
+  // Salvataggio immediato debounced su cambio campi
+  useEffect(() => {
+    if (!isOpen || initialCanto) return;
+    const hasContent = Boolean(titolo.trim() || testoChordpro.trim());
+    if (!hasContent) return;
+
+    const timer = setTimeout(() => {
+      saveCantoDraft({
+        titolo,
+        autore,
+        misura,
+        bpm_testo: bpmTesto,
+        ritmo,
+        capotasto,
+        tonalita,
+        testo_chordpro: testoChordpro,
+        note: '',
+        settore: 'tutti',
+      });
+    }, 800);
+
+    return () => clearTimeout(timer);
+  }, [titolo, autore, misura, bpmTesto, ritmo, capotasto, tonalita, testoChordpro]);
+
+  const handleRestoreDraft = () => {
+    if (!savedDraft) return;
+    setTitolo(savedDraft.titolo || '');
+    setAutore(savedDraft.autore || '');
+    setMisura(savedDraft.misura || '');
+    setBpmTesto(savedDraft.bpm_testo || '');
+    setTempoBpm(savedDraft.bpm_testo ? String(parseInt(savedDraft.bpm_testo, 10) || '') : '');
+    setRitmo(savedDraft.ritmo || '');
+    setCapotasto(savedDraft.capotasto || '');
+    setTonalita(savedDraft.tonalita || '');
+    setTestoChordpro(savedDraft.testo_chordpro || '');
+    setShowManualForm(true);
+    setSavedDraft(null);
+    setSuccessNotice('Bozza ripristinata con successo!');
+  };
+
+  const handleDiscardDraft = () => {
+    clearCantoDraft();
+    setSavedDraft(null);
+  };
 
   // Segnalazione duplicato "morbida" tramite Levenshtein <= 2
   const candidateTitles = existingTitles.filter(
@@ -163,7 +264,7 @@ export function CantoFormSheet({
       setCapotasto(res.capotasto !== null ? String(res.capotasto) : '');
       setTestoChordpro(res.testo_chordpro);
 
-      setActiveCreationTab('manual');
+      setShowManualForm(true);
       setSuccessNotice(`Documento Word "${file.name}" importato con successo! Controlla e rifinisci i campi prima di salvare.`);
       setTimeout(() => setSuccessNotice(null), 8000);
     } catch (err: any) {
@@ -174,66 +275,21 @@ export function CantoFormSheet({
     }
   };
 
-  // Copia prompt per AI esterna
-  const handleCopyPrompt = async () => {
-    try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(AI_IMPORT_PROMPT);
-      }
-      setCopiedPromptSuccess(true);
-      setTimeout(() => setCopiedPromptSuccess(false), 5000);
-    } catch {
-      setCopiedPromptSuccess(true);
-      setTimeout(() => setCopiedPromptSuccess(false), 5000);
-    }
-  };
-
-  // Estrazione risposta AI (da textarea o direttamente da appunti)
-  const handleAiExtract = async () => {
-    let rawText = aiPastedInput.trim();
-
-    // Se il riquadro è vuoto, tenta la lettura diretta dagli appunti
-    if (!rawText && typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.readText) {
-      try {
-        const clip = await navigator.clipboard.readText();
-        if (clip && clip.trim()) {
-          rawText = clip.trim();
-        }
-      } catch {
-        // Nessun permesso appunti
-      }
-    }
-
-    if (!rawText) {
-      setErrorMessage('Incolla la risposta fornita dall\'AI nel riquadro per estrarre il canto.');
-      return;
-    }
-
-    setIsProcessingInput(true);
-    setErrorMessage(null);
-    setSuccessNotice(null);
-
-    try {
-      const res = parsePastedText(rawText);
-      setTitolo(res.titolo);
-      setAutore(res.autore || '');
-      setTonalita(res.tonalita || '');
-      setRitmo(res.ritmo || '');
-      setTempoBpm(res.tempo_bpm ? String(res.tempo_bpm) : '');
-      setBpmTesto(res.bpm_testo || (res.tempo_bpm ? String(res.tempo_bpm) : ''));
-      setMisura(res.misura || '');
-      setCapotasto(res.capotasto !== null ? String(res.capotasto) : '');
-      setTestoChordpro(res.testo_chordpro);
-
-      setAiPastedInput('');
-      setActiveCreationTab('manual');
-      setSuccessNotice('Canto digitalizzato con IA estratto con successo! Controlla e rifinisci i campi prima di salvare.');
-      setTimeout(() => setSuccessNotice(null), 8000);
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Errore durante l\'interpretazione del testo fornito dall\'AI.');
-    } finally {
-      setIsProcessingInput(false);
-    }
+  // Conferma della revisione testo (Fase 10B)
+  const handleConfirmReview = (res: ParsedCantoResult) => {
+    setTitolo(res.titolo);
+    setAutore(res.autore || '');
+    setTonalita(res.tonalita || '');
+    setRitmo(res.ritmo || '');
+    setTempoBpm(res.tempo_bpm ? String(res.tempo_bpm) : '');
+    setBpmTesto(res.bpm_testo || (res.tempo_bpm ? String(res.tempo_bpm) : ''));
+    setMisura(res.misura || '');
+    setCapotasto(res.capotasto !== null ? String(res.capotasto) : '');
+    setTestoChordpro(res.testo_chordpro);
+    setIsReviewingPaste(false);
+    setShowManualForm(true);
+    setSuccessNotice('Canto analizzato e revisionato! Controlla e rifinisci i dati prima di salvare.');
+    setTimeout(() => setSuccessNotice(null), 8000);
   };
 
   // Salvataggio nel database / Vault
@@ -258,6 +314,8 @@ export function CantoFormSheet({
         testo_chordpro: testoChordpro.trim(),
       });
       setIsSaving(false);
+      clearCantoDraft();
+      setSavedDraft(null);
       onSaved(saved);
       onClose();
     } catch (err: any) {
@@ -299,25 +357,63 @@ export function CantoFormSheet({
       subtitle={
         initialCanto
           ? 'Modifica testo, tonalità, ritmo e accordi.'
-          : 'Crea un nuovo canto scrivendolo a mano, caricando un Word (.docx) o digitalizzandolo con IA.'
+          : 'Inserisci un nuovo canto incollando il testo o caricando un file Word (.docx).'
       }
       footer={
-        <div style={{ display: 'flex', gap: '8px', width: '100%', justifyContent: 'flex-end' }}>
-          <Button variant="ghost" onClick={onClose} disabled={isSaving || isProcessingInput}>
-            {I18N.dialogs.annulla}
-          </Button>
-          <Button
-            variant="primary"
-            onClick={handleSave}
-            isLoading={isSaving}
-            disabled={!isValid || isSaving || isProcessingInput}
-          >
-            {I18N.dialogs.salva}
-          </Button>
-        </div>
+        isReviewingPaste ? null : (
+          <div style={{ display: 'flex', gap: '8px', width: '100%', justifyContent: 'flex-end' }}>
+            <Button variant="ghost" onClick={onClose} disabled={isSaving || isProcessingInput}>
+              {I18N.dialogs.annulla}
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleSave}
+              isLoading={isSaving}
+              disabled={!isValid || isSaving || isProcessingInput || (!initialCanto && !showManualForm)}
+            >
+              {I18N.dialogs.salva}
+            </Button>
+          </div>
+        )
       }
     >
       <div style={{ overflowX: 'hidden' }}>
+        {/* Banner Bozza Locale Non Salvata (Fase 10C) */}
+        {savedDraft && !showManualForm && !initialCanto && (
+          <div
+            style={{
+              padding: '12px 14px',
+              backgroundColor: 'var(--color-giochi-subtle)',
+              borderLeft: '4px solid var(--color-giochi)',
+              borderRadius: 'var(--radius-sm)',
+              marginBottom: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '8px',
+            }}
+            role="status"
+          >
+            <div>
+              <strong style={{ color: 'var(--color-ink)', display: 'block' }}>
+                C'è una bozza non salvata ({formatDraftTime(savedDraft.updatedAt)})
+              </strong>
+              <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
+                "{savedDraft.titolo || 'Senza titolo'}"
+              </span>
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <Button variant="primary" size="sm" onClick={handleRestoreDraft}>
+                Ripristina
+              </Button>
+              <Button variant="ghost" size="sm" onClick={handleDiscardDraft}>
+                Scarta
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Notifica di errore generale */}
         {errorMessage ? (
           <div
@@ -344,14 +440,13 @@ export function CantoFormSheet({
           </div>
         ) : null}
 
-        {/* Tab switcher per creazione nuovo canto */}
-        {!initialCanto && (
+        {/* Tab switcher per creazione nuovo canto (Incolla o scrivi | Da Word) */}
+        {!initialCanto && !isReviewingPaste && (
           <div style={{ marginBottom: 'var(--space-4)' }}>
             <SegmentedControl
               options={[
-                { value: 'manual', label: '1. Scrivi a mano' },
+                { value: 'paste', label: '1. Incolla o scrivi' },
                 { value: 'docx', label: '2. Da Word (.docx)' },
-                { value: 'ai', label: '3. Con IA' },
               ]}
               value={activeCreationTab}
               onChange={(val) => {
@@ -365,7 +460,7 @@ export function CantoFormSheet({
         {/* ------------------------------------------------------------- */}
         {/* INGRESSO 2: CARICA FILE WORD (.docx)                          */}
         {/* ------------------------------------------------------------- */}
-        {!initialCanto && activeCreationTab === 'docx' && (
+        {!initialCanto && !isReviewingPaste && activeCreationTab === 'docx' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
             <div
               className="canto-import-dropzone"
@@ -402,76 +497,86 @@ export function CantoFormSheet({
         )}
 
         {/* ------------------------------------------------------------- */}
-        {/* INGRESSO 3: DIGITALIZZA CON IA (FOTO / PDF / RICERCA WEB)     */}
+        {/* INGRESSO 1: INCOLLA O SCRIVI (CON REVISIONE INTELLIGENTE)     */}
         {/* ------------------------------------------------------------- */}
-        {!initialCanto && activeCreationTab === 'ai' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-            <div className="canto-ai-card">
-              <h4 style={{ margin: '0 0 var(--space-2)', fontSize: 'var(--font-size-base)', fontWeight: 700, color: 'var(--color-ink)' }}>
-                Come digitalizzare con l'Intelligenza Artificiale
-              </h4>
-              <ol style={{ paddingLeft: 'var(--space-4)', margin: '0 0 var(--space-3)', fontSize: 'var(--font-size-sm)', lineHeight: 1.5 }}>
-                <li>Premi <strong>"Copia Prompt per l'AI"</strong> qui sotto.</li>
-                <li>Incollalo nella tua chat AI preferita (ChatGPT, Claude, Gemini).</li>
-                <li>Allega la foto dello spartito/canzoniere o chiedi il canto scout desiderato: l'AI verificherà gli accordi su fonti affidabili e ricercherà BPM, ritmo con frecce e battiti.</li>
-                <li>Copia la risposta dell'AI e premi <strong>"Estrai Canto"</strong>.</li>
-              </ol>
+        {!initialCanto && activeCreationTab === 'paste' && isReviewingPaste && (
+          <CantoPasteReviewView
+            rawText={pastedRawText}
+            isMonospace={isMonospace}
+            onConfirm={handleConfirmReview}
+            onBackToEdit={() => setIsReviewingPaste(false)}
+          />
+        )}
 
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={handleCopyPrompt}
-                style={{ width: '100%', justifyContent: 'center' }}
-              >
-                <Icon name="file-text" size={16} />
-                <span>{copiedPromptSuccess ? 'Prompt Copiato negli Appunti!' : 'Copia Prompt per l\'AI'}</span>
-              </Button>
-
-              {copiedPromptSuccess && (
-                <div className="canto-alert-banner canto-alert-banner-info" style={{ marginTop: 'var(--space-2)' }}>
-                  <Icon name="check" size={14} />
-                  <span>Prompt pronto! Ora incollalo nell'AI allegando foto/spartito o indicando la canzone.</span>
-                </div>
-              )}
+        {!initialCanto && activeCreationTab === 'paste' && !isReviewingPaste && !showManualForm && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+            <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', lineHeight: 1.4 }}>
+              Incolla o digita il testo del canto con gli accordi sopra le righe o già nel formato ChordPro <code>[Do]</code>.
+              Il sistema normalizzerà gli spazi, rimuoverà il rumore web e aprirà la schermata di revisione a due colonne.
             </div>
 
-            <div className="ios-form-group" style={{ marginBottom: 0 }}>
-              <label className="ios-form-label" htmlFor="ai-pasted-response">
-                Incolla qui la risposta dell'AI (o premi il pulsante per leggere dagli appunti):
-              </label>
-              <textarea
-                id="ai-pasted-response"
-                className="ios-form-textarea"
-                rows={6}
-                placeholder={`TITOLO: ...\nAUTORE: ...\nTEMPO: 4/4\nBPM: circa 92-94\nRITMO: Giù, Giù-Su (↓ ↓↑)\n---\n[Do]Nel mezzo del [Sol]cammin...`}
-                value={aiPastedInput}
-                onInput={(e) => setAiPastedInput((e.target as HTMLTextAreaElement).value)}
-                style={{ fontFamily: 'monospace', fontSize: 'var(--font-size-xs)' }}
+            <textarea
+              className="ios-form-textarea"
+              rows={8}
+              placeholder={`Incolla qui il testo...\n\nEsempio con accordi sopra:\nDo              Sol\nNel mezzo del cammin...\n\nOppure ChordPro:\n[Do]Nel mezzo del [Sol]cammin...`}
+              value={pastedRawText}
+              onInput={(e) => setPastedRawText((e.target as HTMLTextAreaElement).value)}
+              style={{ fontFamily: 'monospace', fontSize: '12px' }}
+            />
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 4px' }}>
+              <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text)' }}>
+                Spaziatura fissa (testo monospace da blocco di codice)
+              </span>
+              <ToggleSwitch
+                checked={isMonospace}
+                onChange={setIsMonospace}
+                aria-label="Spaziatura fissa monospace"
               />
             </div>
 
-            <Button
-              variant="primary"
-              onClick={handleAiExtract}
-              disabled={isProcessingInput}
-              style={{ justifyContent: 'center' }}
-            >
-              <Icon name="check" size={16} />
-              <span>{isProcessingInput ? 'Elaborazione in corso...' : 'Estrai Canto e Modifica'}</span>
-            </Button>
+            <div style={{ display: 'flex', gap: '8px', marginTop: 'var(--space-2)' }}>
+              <Button
+                variant="primary"
+                disabled={!pastedRawText.trim()}
+                onClick={() => setIsReviewingPaste(true)}
+                style={{ flex: 1, justifyContent: 'center' }}
+              >
+                <Icon name="check" size={16} />
+                <span style={{ marginLeft: '6px' }}>Analizza e Rivedi</span>
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => setShowManualForm(true)}
+              >
+                Compila modulo vuoto
+              </Button>
+            </div>
           </div>
         )}
 
         {/* ------------------------------------------------------------- */}
-        {/* INGRESSO 1: SCRIVI A MANO / MODIFICA GUIDATA (DEFAULT)        */}
+        {/* COMPILAZIONE MODULO (DOPO REVISIONE O MODIFICA ESISTENTE)     */}
         {/* ------------------------------------------------------------- */}
-        {(initialCanto || activeCreationTab === 'manual') && (
+        {(initialCanto || showManualForm) && !isReviewingPaste && (
           <form
             onSubmit={(e) => {
               e.preventDefault();
               handleSave();
             }}
           >
+            {!initialCanto && (
+              <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 'var(--space-3)' }}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowManualForm(false)}
+                >
+                  <Icon name="chevron-left" size={14} />
+                  <span style={{ marginLeft: '4px' }}>Torna a incolla testo</span>
+                </Button>
+              </div>
+            )}
             {similarTitle ? (
               <div
                 style={{
@@ -657,103 +762,140 @@ export function CantoFormSheet({
               </div>
             </div>
 
-            {/* Editor Testo ChordPro con Pulsanti Rapidi */}
+            {/* Editor Testo ChordPro con Switcher Editor a Tocco / ChordPro Testuale */}
             <div className="ios-form-group">
               <div
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: '8px',
                   marginBottom: 'var(--space-2)',
                 }}
               >
                 <label className="ios-form-label" htmlFor="canto-testo-chordpro" style={{ margin: 0 }}>
                   {I18N.canti.testoChordpro} *
                 </label>
-                <button
-                  type="button"
-                  className="ios-btn ios-btn-ghost"
-                  style={{
-                    fontSize: 'var(--font-size-xs)',
-                    padding: '4px 8px',
-                    color: 'var(--color-interactive)',
-                    fontWeight: 600,
-                  }}
-                  onClick={() => setShowLivePreview(!showLivePreview)}
-                >
-                  <Icon name="eye" size={14} />
-                  <span style={{ marginLeft: '4px' }}>
-                    {showLivePreview ? 'Nascondi anteprima' : I18N.canti.editorPreview}
-                  </span>
-                </button>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {/* Switcher Modalità Editor: A tocco vs Testo grezzo */}
+                  <SegmentedControl
+                    options={[
+                      { value: 'touch', label: 'Editor a tocco' },
+                      { value: 'text', label: 'ChordPro testuale' },
+                    ]}
+                    value={editorMode}
+                    onChange={(val) => setEditorMode(val as 'text' | 'touch')}
+                  />
+
+                  <button
+                    type="button"
+                    className="ios-btn ios-btn-ghost"
+                    style={{
+                      fontSize: 'var(--font-size-xs)',
+                      padding: '4px 8px',
+                      color: 'var(--color-interactive)',
+                      fontWeight: 600,
+                    }}
+                    onClick={() => setShowLivePreview(!showLivePreview)}
+                  >
+                    <Icon name="eye" size={14} />
+                    <span style={{ marginLeft: '4px' }}>
+                      {showLivePreview ? 'Nascondi anteprima' : I18N.canti.editorPreview}
+                    </span>
+                  </button>
+                </div>
               </div>
 
-              {/* Barra strumenti per inserimento rapido accordi (senza graffe criptiche) */}
-              <div
-                style={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  gap: '6px',
-                  marginBottom: 'var(--space-2)',
-                  padding: '6px',
-                  backgroundColor: 'var(--color-border-subtle)',
-                  borderRadius: 'var(--radius-md)',
-                }}
-              >
-                <button
-                  type="button"
-                  className="ios-btn ios-btn-secondary"
-                  style={{ fontSize: 'var(--font-size-xs)', padding: '4px 8px', height: '28px' }}
-                  onClick={() => insertAtCursor('[Do]', -1)}
-                >
-                  + [Accordo]
-                </button>
-                <button
-                  type="button"
-                  className="ios-btn ios-btn-ghost"
-                  style={{ fontSize: 'var(--font-size-xs)', padding: '4px 8px', height: '28px', fontWeight: 700 }}
-                  onClick={() => insertAtCursor('\nRIT.\n', 0)}
-                  title="Inserisce etichetta ritornello standard"
-                >
-                  + RIT.
-                </button>
-                <button
-                  type="button"
-                  className="ios-btn ios-btn-ghost"
-                  style={{ fontSize: 'var(--font-size-xs)', padding: '4px 8px', height: '28px' }}
-                  onClick={() => insertAtCursor('\n{nuova_colonna}\n', 0)}
-                  title="Interrompe la colonna e passa alla colonna di destra"
-                >
-                  + Nuova colonna
-                </button>
-                <button
-                  type="button"
-                  className="ios-btn ios-btn-ghost"
-                  style={{ fontSize: 'var(--font-size-xs)', padding: '4px 8px', height: '28px' }}
-                  onClick={() => insertAtCursor('\n{nuova_pagina}\n', 0)}
-                  title="Interrompe la pagina e passa al foglio successivo"
-                >
-                  + Nuova pagina
-                </button>
-              </div>
+              {editorMode === 'touch' ? (
+                <TouchChordEditor
+                  chordproText={testoChordpro}
+                  tonalita={tonalita}
+                  onChange={(newCp) => setTestoChordpro(newCp)}
+                  onClose={() => setEditorMode('text')}
+                />
+              ) : (
+                <>
+                  {/* Barra strumenti per inserimento rapido accordi (senza graffe criptiche) */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: '6px',
+                      marginBottom: 'var(--space-2)',
+                      padding: '6px',
+                      backgroundColor: 'var(--color-border-subtle)',
+                      borderRadius: 'var(--radius-md)',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setEditorMode('touch')}
+                      style={{ fontWeight: 700 }}
+                    >
+                      <Icon name="edit" size={13} />
+                      <span style={{ marginLeft: '4px' }}>Aggiungi accordi a tocco</span>
+                    </Button>
 
-              <textarea
-                ref={textareaRef}
-                id="canto-testo-chordpro"
-                className="ios-form-textarea"
-                required
-                rows={10}
-                style={{
-                  fontFamily: 'monospace',
-                  fontSize: 'var(--font-size-sm)',
-                  lineHeight: 1.5,
-                  whiteSpace: 'pre',
-                }}
-                placeholder="[Do]Sai da dove viene, [Sol]sai dove ti porta&#10;[Lam]questo camminare, [Fa]questa strada aperta...&#10;&#10;RIT.&#10;[Do]Canta con noi, [Sol]batti le mani"
-                value={testoChordpro}
-                onInput={(e) => setTestoChordpro((e.target as HTMLTextAreaElement).value)}
-                disabled={isSaving}
-              />
+                    <button
+                      type="button"
+                      className="ios-btn ios-btn-secondary"
+                      style={{ fontSize: 'var(--font-size-xs)', padding: '4px 8px', height: '28px' }}
+                      onClick={() => insertAtCursor('[Do]', -1)}
+                    >
+                      + [Accordo]
+                    </button>
+                    <button
+                      type="button"
+                      className="ios-btn ios-btn-ghost"
+                      style={{ fontSize: 'var(--font-size-xs)', padding: '4px 8px', height: '28px', fontWeight: 700 }}
+                      onClick={() => insertAtCursor('\nRIT.\n', 0)}
+                      title="Inserisce etichetta ritornello standard"
+                    >
+                      + RIT.
+                    </button>
+                    <button
+                      type="button"
+                      className="ios-btn ios-btn-ghost"
+                      style={{ fontSize: 'var(--font-size-xs)', padding: '4px 8px', height: '28px' }}
+                      onClick={() => insertAtCursor('\n{nuova_colonna}\n', 0)}
+                      title="Interrompe la colonna e passa alla colonna di destra"
+                    >
+                      + Nuova colonna
+                    </button>
+                    <button
+                      type="button"
+                      className="ios-btn ios-btn-ghost"
+                      style={{ fontSize: 'var(--font-size-xs)', padding: '4px 8px', height: '28px' }}
+                      onClick={() => insertAtCursor('\n{nuova_pagina}\n', 0)}
+                      title="Interrompe la pagina e passa al foglio successivo"
+                    >
+                      + Nuova pagina
+                    </button>
+                  </div>
+
+                  <textarea
+                    ref={textareaRef}
+                    id="canto-testo-chordpro"
+                    className="ios-form-textarea"
+                    required
+                    rows={10}
+                    style={{
+                      fontFamily: 'monospace',
+                      fontSize: 'var(--font-size-sm)',
+                      lineHeight: 1.5,
+                      whiteSpace: 'pre',
+                    }}
+                    placeholder="[Do]Sai da dove viene, [Sol]sai dove ti porta&#10;[Lam]questo camminare, [Fa]questa strada aperta...&#10;&#10;RIT.&#10;[Do]Canta con noi, [Sol]batti le mani"
+                    value={testoChordpro}
+                    onInput={(e) => setTestoChordpro((e.target as HTMLTextAreaElement).value)}
+                    disabled={isSaving}
+                  />
+                </>
+              )}
             </div>
 
             {/* Box Avvisi Validazione Morbida ChordPro */}

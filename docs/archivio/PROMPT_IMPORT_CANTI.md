@@ -1,8 +1,10 @@
-# Prompt per l'AI Esterna (Importazione Canti Canzoniere)
+# Prompt per l'Importazione Canti (ARCHIVIATO — NON USATO)
 
-Copia e incolla questo prompt nella tua chat AI di fiducia (ChatGPT, Claude, Gemini, ecc.) allegando la foto, il PDF o il testo grezzo del canto.
+> [!NOTE]
+> **DOCUMENTO ARCHIVIATO — NON USATO**
+> A partire dalla Fase 10, l'inserimento e l'importazione dei canti nel Vault non dipendono né utilizzano intelligenza artificiale o prompt esterni. I canti si inseriscono direttamente nell'area admin con incolla intelligente e editor accordi a tocco.
 
-L'AI convertirà il materiale esattamente nel formato pronto per essere incollato nell'app, senza cercare né inventare accordi o parole.
+Copia e incolla questo testo storico per consultazione archivistica.
 
 ---
 

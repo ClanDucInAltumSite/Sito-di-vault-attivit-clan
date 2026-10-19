@@ -55,8 +55,8 @@ L'applicazione è progettata secondo il paradigma **Local-First PWA (Progressive
 │   │   ├── bans/                 # Lista, dettaglio con vista lettura ad alto contrasto, Wake Lock
 │   │   ├── canti/                # Modulo Canti e Canzoniere A4
 │   │   │   ├── CantiView.tsx             # Lista canti, ricerca pulita sul testo e modale importazione admin
-│   │   │   ├── CantoFormSheet.tsx        # Modale creazione/modifica canto (con bpm_testo)
-│   │   │   ├── CantoImportSheet.tsx      # Importazione a 3 vie (Word .docx via jszip, testo, AI prompt)
+│   │   │   ├── CantoFormSheet.tsx        # Modale creazione/modifica canto (incolla intelligente e Word)
+│   │   │   ├── rumore.config.ts          # Configurazione filtri rumore web per incolla intelligente
 │   │   │   ├── CanzonierePageRenderer.tsx # Rendering fedele A4 su 2 colonne con accordi sovrapposti
 │   │   │   ├── canzoniere_config.ts      # Geometria e costanti canzoniere (margini A4, 11/9pt, 81mm)
 │   │   │   ├── canzoniere_parser.ts      # Parser metadati, accordi ChordPro e blocchi strofa/ritornello

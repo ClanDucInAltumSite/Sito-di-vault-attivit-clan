@@ -617,4 +617,30 @@ In precedenza lo sfondo topografico conteneva curve di livello dimostrative. La 
    - Maschera gradiente verticale per dissolvenza graduale verso l'alto.
    - Nascosto in stampa (`@media print`) e nella lettura canti a schermo intero.
    - Disattivato con `prefers-reduced-motion: reduce`.
+---
 
+## ADR-0018 (Fase 10): Inserimento Canti a Mano, Pulizia e Rimozione Totale della Dipendenza da AI
+
+### Data
+2026-10-19
+
+### Contesto
+Nelle fasi precedenti era stata ipotizzata una modalità di digitalizzazione basata su intelligenza artificiale esterna con prompt guidato.
+Nell'uso reale sul campo:
+1. **Assenza di archivio massivo:** I canti del repertorio del Clan vengono inseriti manualmente dai capi e dagli animatori liturgici/musicali, prevalentemente da smartphone.
+2. **Rischi critici dell'AI:** I modelli linguistici commerciali generano allucinazioni armoniche (accordi inventati non conformi alla tonalità scout), possono rifiutare brani protetti da copyright per filtri di sicurezza automatizzati, e non offrono alcuna garanzia deterministica sulla sillaba di caduta dell'accordo.
+3. **Obiettivo:** Rendere l'inserimento manuale rapido, intuitivo e a prova di errore direttamente dall'interfaccia dell'applicazione, senza alcuna dipendenza da servizi di terze parti o intelligenze artificiali.
+
+### Decisioni Adottate
+1. **Rimozione Completa dell'AI dall'Applicazione:**
+   - Rimossa la scheda "Con IA / Prompt" dal form di inserimento del canto.
+   - Eliminato il prompt fisso incorporato e il pulsante "Copia Prompt AI".
+   - Spostato `docs/PROMPT_IMPORT_CANTI.md` in `docs/archivio/` con apposita nota di non utilizzo.
+   - Nessun testo di aiuto, documentazione attiva o componente cita "IA", "AI" o "prompt" per l'inserimento.
+2. **Schede di Creazione e Importazione:**
+   - Scheda 1: **"Incolla o scrivi"** (con incolla intelligente, rimozione automatica rumore web, normalizzazione caratteri e schermata di revisione visiva prima del salvataggio).
+   - Scheda 2: **"Da Word (.docx)"** (parser con supporto tabelle a 2 colonne, conservato senza modifiche funzionali).
+3. **Flessibilità delle Notazioni Armoniche e Rifiuto delle Trappole Italiane:**
+   - Accettazione della notazione con trattino per accordi minori tipica dei canzonieri scout cartacei (`La-`, `SI-`, `Re-`, `Do#-` normalizzati in `Lam`, `Sim`, `Rem`, `Do#m`).
+   - Tolleranza maiuscolo/minuscolo e slash chords (`Re/Fa#`, `Sol/Si`).
+   - Rigorosa protezione contro parole italiane omonime a note musicali (`Do`, `Re`, `Mi`, `Fa`, `Sol`, `La`, `Si`): una frase o riga di testo comune non viene mai interpretata come riga di accordi.

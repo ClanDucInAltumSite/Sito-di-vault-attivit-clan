@@ -6,7 +6,6 @@ import {
   alignChordsOverLyrics,
   parsePastedText,
   parseDocx,
-  AI_IMPORT_PROMPT,
 } from '../src/features/canti/canzoniere_parser';
 
 describe('FASE 9 - Canzoniere Parser & Chord Alignment Pipeline', () => {
@@ -225,15 +224,10 @@ AUTORE: Clan & Reparto
     });
   });
 
-  describe('5. Prompt Fisso per AI Esterna', () => {
-    it('include verifica armonica, ricerca metadati mancanti, accordi spaziati e formato di uscita rigoroso', () => {
-      expect(AI_IMPORT_PROMPT).toContain('ACCURATEZZA ARMONICA');
-      expect(AI_IMPORT_PROMPT).toContain('COMPLETAMENTO METADATI MANCANTI');
-      expect(AI_IMPORT_PROMPT).toContain('parentesi quadre');
-      expect(AI_IMPORT_PROMPT).toContain('Gli accordi NON devono mai essere attaccati insieme');
-      expect(AI_IMPORT_PROMPT).toContain('FORMATO DI USCITA');
-      expect(AI_IMPORT_PROMPT).toContain('BPM:');
-      expect(AI_IMPORT_PROMPT).toContain('RITMO:');
+  describe('5. Rimozione Dipendenza AI (Fase 10A)', () => {
+    it('non esporta né incorpora prompt AI nel modulo canzoniere', async () => {
+      const module = await import('../src/features/canti/canzoniere_parser');
+      expect((module as Record<string, unknown>).AI_IMPORT_PROMPT).toBeUndefined();
     });
   });
 });

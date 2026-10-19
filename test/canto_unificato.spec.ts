@@ -26,77 +26,63 @@ test.describe('Verifica Sistema Unificato Canti (Fase 9)', () => {
     await nuovoCantoBtn.click();
     await expect(page.getByRole('heading', { name: 'Nuovo Canto' })).toBeVisible();
 
-    // Verifica la presenza del SegmentedControl con i 3 ingressi
-    await expect(page.getByRole('tab', { name: '1. Scrivi a mano' })).toBeVisible();
+    // Verifica la presenza del SegmentedControl con SOLO i 2 ingressi: Incolla e Word (Zero AI)
+    await expect(page.getByRole('tab', { name: '1. Incolla o scrivi' })).toBeVisible();
     await expect(page.getByRole('tab', { name: '2. Da Word (.docx)' })).toBeVisible();
-    await expect(page.getByRole('tab', { name: '3. Con IA' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: /IA/i })).toHaveCount(0);
 
-    // Screenshot Tab 1 iniziale (apertura Nuovo Canto con SegmentedControl e campi)
     const artifactDir = 'C:\\Users\\Utente\\.gemini\\antigravity\\brain\\adc46dfe-e4e7-4d5e-af33-63b1b4f2a5b7';
-    await page.screenshot({ path: path.join(artifactDir, 'screenshot_canto_tab1_editor.png') });
+    await page.screenshot({ path: path.join(artifactDir, 'screenshot_canto_tab1_paste.png') });
 
-    // 5. Test Tab 1: Keypad frecce ritmo e pulsanti rapidi accordi
-    const ritmoInput = page.locator('#canto-ritmo');
-    await expect(ritmoInput).toBeVisible();
+    // 5. Test Tab 1: Incolla Intelligente con Revisione (Fase 10B)
+    const pasteInput = page.locator('#canto-paste-input');
+    await expect(pasteInput).toBeVisible();
 
-    await page.getByRole('button', { name: '↓ Giù' }).click();
-    await page.getByRole('button', { name: '↑ Su' }).click();
-    await page.getByRole('button', { name: '↓↑ Giù-Su' }).click();
-    await expect(ritmoInput).toHaveValue('↓ ↑ ↓↑');
-
-    // Test pulsanti rapidi textarea: + [Accordo] e + RIT.
-    const chordproArea = page.locator('#canto-testo-chordpro');
-    await chordproArea.fill('');
-    await page.getByRole('button', { name: '+ [Accordo]' }).click();
-    expect(await chordproArea.inputValue()).toContain('[Do]');
-
-    await chordproArea.fill('');
-    await page.getByRole('button', { name: '+ RIT.' }).click();
-    expect(await chordproArea.inputValue()).toContain('RIT.');
-
-    // 6. Test Tab 2: Da Word (.docx)
-    await page.getByRole('tab', { name: '2. Da Word (.docx)' }).click();
-    await expect(page.getByText('Tocca per selezionare il file Word (.docx)')).toBeVisible();
-    await page.screenshot({ path: path.join(artifactDir, 'screenshot_canto_tab2_word.png') });
-
-    // 7. Test Tab 3: Con IA
-    await page.getByRole('tab', { name: '3. Con IA' }).click();
-    await expect(page.getByText('Come digitalizzare con l\'Intelligenza Artificiale')).toBeVisible();
-
-    // Copia prompt
-    const copyPromptBtn = page.getByRole('button', { name: /Copia Prompt per l'AI/i });
-    await copyPromptBtn.click();
-    await expect(page.getByText('Prompt pronto! Ora incollalo nell\'AI')).toBeVisible();
-
-    // Simula risposta formattata fornita dall'IA
-    const mockAiResponse = `TITOLO: CANTO DEL FALÒ SINTETICO
+    const syntheticPasteText = `TITOLO: CANTO DEL FALÒ SINTETICO
 AUTORE: Clan Duc In Altum
 TEMPO: 4/4
 BPM: circa 96-98
 RITMO: Giù, Giù-Su (↓ ↓↑)
 CAPOTASTO: 2
 ---
-[Do]Nel mezzo della notte [Sol]si alza una fiamma
-[Fa]che riscalda il nostro [Sol]cammino.
+www.canzonierionline.it/download
+Condividi su Facebook
+DO             FA          DO          SOL
+Sento nel profondo un desiderio nascere
+LAm            FA          DO          SOL
+verso l'orizzonte possiam camminare
 
-RIT.
-[Do]Canta con gioia, [Sol]scout della strada
-[Fa]verso la meta [Sol]proseguiamo [Do]insieme.`;
+[Ritornello]
+Canta con gioia scout della strada
+verso la meta proseguiamo insieme`;
 
-    await page.locator('#ai-pasted-response').fill(mockAiResponse);
-    await page.screenshot({ path: path.join(artifactDir, 'screenshot_canto_tab3_ai.png') });
+    await pasteInput.fill(syntheticPasteText);
+    await page.getByRole('button', { name: /Analizza e Rivedi/i }).click();
 
-    // Clicca "Estrai Canto e Modifica"
-    await page.getByRole('button', { name: 'Estrai Canto e Modifica' }).click();
+    // Verifica schermata di revisione intelligente
+    await expect(page.getByText('Revisione Intelligente del Canto')).toBeVisible();
+    await expect(page.getByText('Modifiche automatiche')).toBeVisible();
+    await page.screenshot({ path: path.join(artifactDir, 'screenshot_canto_paste_review.png') });
 
-    // Deve tornare a Tab 1 con tutti i campi compilati!
+    // Conferma e compila scheda
+    await page.getByRole('button', { name: /Conferma e compila scheda/i }).click();
+
+    // Deve aprire la compilazione manuale con tutti i campi estratti e puliti
     await expect(page.locator('#canto-titolo')).toHaveValue('CANTO DEL FALÒ SINTETICO');
     await expect(page.locator('#canto-autore')).toHaveValue('Clan Duc In Altum');
     await expect(page.locator('#canto-misura')).toHaveValue('4/4');
     await expect(page.locator('#canto-bpm-testo')).toHaveValue('circa 96-98');
     await expect(page.locator('#canto-ritmo')).toHaveValue('Giù, Giù-Su (↓ ↓↑)');
     await expect(page.locator('#canto-capotasto')).toHaveValue('2');
-    await expect(page.getByText('Canto digitalizzato con IA estratto con successo!')).toBeVisible();
+
+    // Test pulsante "Torna a incolla testo"
+    await page.getByRole('button', { name: /Torna a incolla testo/i }).click();
+    await expect(page.locator('#canto-paste-input')).toBeVisible();
+
+    // 6. Test Tab 2: Da Word (.docx)
+    await page.getByRole('tab', { name: '2. Da Word (.docx)' }).click();
+    await expect(page.getByText('Tocca per selezionare il file Word (.docx)')).toBeVisible();
+    await page.screenshot({ path: path.join(artifactDir, 'screenshot_canto_tab2_word.png') });
 
     // Chiudi il form di creazione
     await page.getByRole('button', { name: 'Annulla' }).click();

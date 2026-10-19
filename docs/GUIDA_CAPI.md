@@ -60,27 +60,20 @@ Tocca il tasto `+` in basso a destra. I canti utilizzano il formato standard **C
   ```
   Nel testo comparirà evidenziato da una barra verticale dorata laterale.
 
-### Importazione Automatica di un Canto (Word, Testo o con AI Esterna):
-Per evitare di digitare manualmente accordi e testi lunghi, tocca il pulsante **"Importa"** (icona con freccia in giù) visibile nella barra della sezione Canti quando sei autenticato come admin.
+### Inserimento Rapido e Importazione di un Canto:
+Quando sei autenticato come admin, tocca il pulsante **"+ Nuovo Canto"** nella sezione Canti.
 
-Sono disponibili tre modalità:
-1. **Documento Word (.docx):**
-   - Trascina o seleziona un file Word (`.docx`) del tuo canzoniere parrocchiale o di gruppo.
-   - Il sistema estrae automaticamente il titolo, l'autore o evento, la tonalità, l'andamento ritmico con le frecce (`↓ ↑`) e converte la struttura a colonne e accordi nel formato ChordPro ottimizzato per il Vault.
-2. **Incolla Testo Diretto:**
+Sono disponibili due modalità rapide:
+1. **Incolla o scrivi (Incolla Intelligente con Revisione):**
    - Incolla il testo del canto con gli accordi sopra le righe o già formattato tra parentesi quadre (`[Do]`).
-   - L'elaboratore converte automaticamente gli accordi sovrapposti e struttura il testo pronto per la revisione.
-3. **Con l'Aiuto di un'AI Esterna (ChatGPT, Claude, Google Gemini):**
-   - Tocca **"Copia Prompt AI"** per copiare negli appunti le istruzioni pronte (disponibili anche nel documento [`docs/PROMPT_IMPORT_CANTI.md`](./PROMPT_IMPORT_CANTI.md)).
-   - Apri ChatGPT, Claude o Gemini sul browser del tuo smartphone o computer, incolla il prompt e aggiungi il testo della canzone (o carica la foto dello spartito).
-   - Incolla il codice generato dall'AI nel Vault e tocca **"Elabora Testo"**.
-   - **Cosa fare se l'AI si rifiuta per copyright:** I filtri di sicurezza di OpenAI o Claude a volte rifiutano di trascrivere testi di canzoni coperte da copyright (*"I cannot reproduce copyrighted lyrics"*). In questo caso:
-     - Chiedi all'AI: *"Non scrivere il testo, mostrami solo la sequenza degli accordi e la struttura strofe/ritornello"*;
-     - Oppure usa l'opzione 1 caricando direttamente il file `.docx`;
-     - Oppure inserisci le sole parole essenziali o usa l'editor diretto.
+   - Il sistema normalizza caratteri e spazi, rimuove automaticamente il rumore tipico dei testi copiati dal web (pubblicità, menu, diciture di copyright) e converte le etichette di strofe e ritornelli.
+   - Prima di confermare, una schermata di revisione visiva a due colonne ti mostra il confronto con l'originale, segnala eventuali righe ambigue e consente di verificare o annullare singolarmente ogni modifica.
+2. **Documento Word (.docx):**
+   - Trascina o seleziona un file Word (`.docx`) del tuo canzoniere di gruppo o parrocchiale.
+   - Il sistema estrae automaticamente titolo, autore, tonalità, andamento ritmico con le frecce (`↓ ↑`), tabelle a colonne e accordi nel formato standard del Vault.
 
 **Anteprima e Salvataggio:**
-Prima di salvare, visualizzerai l'anteprima esatta del canto con tutti i campi compilati (titolo, autore, tonalità, ritmo, testo formattato). Modifica pure qualsiasi valore e tocca **"Salva Canto"**: il brano sarà immediatamente sincronizzato nel Vault e impaginato nel canzoniere cartaceo.
+Prima di salvare, puoi visualizzare in tempo reale l'anteprima esatta del canto a schermo o impaginato in formato A4 per il canzoniere cartaceo. Compila o rifinisci i campi desiderati e tocca **"Salva"**: il brano sarà immediatamente sincronizzato nel Vault.
 
 ---
 
