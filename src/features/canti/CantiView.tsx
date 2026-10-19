@@ -16,6 +16,7 @@ import { softDeleteRecord } from '../../lib/admin_actions';
 import { subscribeSyncState } from '../../lib/sync';
 import { stripChords } from '../../lib/chordpro';
 import { splitSongIntoPages } from '../../lib/stampa';
+import { CantoDetailSheet } from './CantoDetailSheet';
 import { CantoReadingMode } from './CantoReadingMode';
 import { CantoFormSheet } from './CantoFormSheet';
 import { DeleteConfirmModal } from '../../ui/DeleteConfirmModal';
@@ -49,6 +50,7 @@ export function CantiView() {
 
   // Modali e Sheet
   const [selectedCanto, setSelectedCanto] = useState<Canto | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isReadingModeOpen, setIsReadingModeOpen] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingCanto, setEditingCanto] = useState<Canto | null>(null);
@@ -91,7 +93,14 @@ export function CantiView() {
     const unsubscribe = subscribeSyncState(() => {
       loadData();
     });
-    return () => unsubscribe();
+    (window as any).__openCantoDetail = (canto: Canto) => {
+      setSelectedCanto(canto);
+      setIsDetailOpen(true);
+    };
+    return () => {
+      unsubscribe();
+      delete (window as any).__openCantoDetail;
+    };
   }, []);
 
   // Gestione ricerca con debounce ~200 ms e persistenza in sessionStorage
@@ -343,6 +352,32 @@ export function CantiView() {
           </GroupedList>
         )}
       </div>
+
+      {/* Sheet Dettaglio Canto */}
+      <CantoDetailSheet
+        canto={selectedCanto}
+        isOpen={isDetailOpen}
+        onClose={() => {
+          setIsDetailOpen(false);
+          setSelectedCanto(null);
+        }}
+        onOpenReadingMode={(c) => {
+          setIsDetailOpen(false);
+          setSelectedCanto(c);
+          setIsReadingModeOpen(true);
+        }}
+        onEdit={(c) => {
+          setIsDetailOpen(false);
+          setEditingCanto(c);
+          setIsFormOpen(true);
+        }}
+        onDelete={(c) => {
+          setIsDetailOpen(false);
+          setDeletingCanto(c);
+          setIsDeleteOpen(true);
+        }}
+        onUpdated={loadData}
+      />
 
       {/* Modalità Lettura a Tutto Schermo (Accordi, Metronomo, Wake Lock e Allegati) */}
       <CantoReadingMode

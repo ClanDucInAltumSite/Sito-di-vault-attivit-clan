@@ -684,7 +684,10 @@
 }
 
 /* ==============================================================================
-   FASE 9 - REGOLE CANZONIERE BASE (Valide per Schermo e Stampa)
+   FASE 9 / FASE 11A - REGOLE CANZONIERE BASE (Scansione A4 Stampa & Anteprima)
+   Tutte le regole di layout e inchiostro sono RIGOROSAMENTE racchiuse dentro
+   .canzoniere-page o .stampa-measure-host per impedire qualsiasi color bleed
+   o alterazione di stile sulle viste a schermo (CantoReadingMode, CantoDetailSheet, ecc.).
    ============================================================================== */
 .canzoniere-page {
   box-sizing: border-box;
@@ -700,14 +703,16 @@
   padding: 10mm 20mm 20mm 20mm;
 }
 
-.canzoniere-header {
+.canzoniere-page .canzoniere-header,
+.stampa-measure-host .canzoniere-header {
   display: block;
   width: 100%;
   max-width: 100%;
   margin: 0;
 }
 
-.canzoniere-header-title {
+.canzoniere-page .canzoniere-header-title,
+.stampa-measure-host .canzoniere-header-title {
   font-family: 'Roboto', sans-serif;
   font-size: 22pt;
   font-weight: 700;
@@ -719,7 +724,8 @@
   letter-spacing: -0.01em;
 }
 
-.canzoniere-header-author {
+.canzoniere-page .canzoniere-header-author,
+.stampa-measure-host .canzoniere-header-author {
   font-family: 'Roboto', sans-serif;
   font-size: 11pt;
   font-style: italic;
@@ -728,7 +734,8 @@
   line-height: 1.2;
 }
 
-.canzoniere-header-params {
+.canzoniere-page .canzoniere-header-params,
+.stampa-measure-host .canzoniere-header-params {
   font-family: 'Roboto', sans-serif;
   font-size: 11pt;
   color: oklch(0.33 0.02 255);
@@ -739,7 +746,8 @@
   gap: 16pt;
 }
 
-.canzoniere-arrow-glyph {
+.canzoniere-page .canzoniere-arrow-glyph,
+.stampa-measure-host .canzoniere-arrow-glyph {
   font-family: 'Nova Mono', monospace;
   font-size: 17pt;
   font-weight: 700;
@@ -748,7 +756,8 @@
   display: inline-block;
 }
 
-.canzoniere-header-divider {
+.canzoniere-page .canzoniere-header-divider,
+.stampa-measure-host .canzoniere-header-divider {
   border: none;
   border-bottom: 1pt solid oklch(0.7 0 0);
   margin-top: 4pt;
@@ -756,7 +765,8 @@
   width: 100%;
 }
 
-.canzoniere-page2-header {
+.canzoniere-page .canzoniere-page2-header,
+.stampa-measure-host .canzoniere-page2-header {
   font-family: 'Roboto', sans-serif;
   font-size: 11pt;
   font-weight: 700;
@@ -771,7 +781,8 @@
   justify-content: space-between;
 }
 
-.canzoniere-columns-container {
+.canzoniere-page .canzoniere-columns-container,
+.stampa-measure-host .canzoniere-columns-container {
   display: flex;
   flex-direction: row;
   justify-content: space-between;
@@ -783,19 +794,22 @@
   gap: 8mm;
 }
 
-.canzoniere-column {
+.canzoniere-page .canzoniere-column,
+.stampa-measure-host .canzoniere-column {
   width: 81mm;
   max-width: 81mm;
   box-sizing: border-box;
   overflow: hidden;
 }
 
-.canzoniere-column-left {
+.canzoniere-page .canzoniere-column-left,
+.stampa-measure-host .canzoniere-column-left {
   border-right: 0.75pt solid oklch(0.7 0 0);
   padding-right: 4mm;
 }
 
-.canzoniere-column-right {
+.canzoniere-page .canzoniere-column-right,
+.stampa-measure-host .canzoniere-column-right {
   padding-left: 4mm;
 }
 
@@ -809,11 +823,13 @@
   color: oklch(0.33 0.02 255);
 }
 
-.canzoniere-block {
+.canzoniere-page .canzoniere-block,
+.stampa-measure-host .canzoniere-block {
   margin-bottom: 1.5em;
 }
 
-.canzoniere-line-item {
+.canzoniere-page .canzoniere-line-item,
+.stampa-measure-host .canzoniere-line-item {
   font-family: 'Roboto', system-ui, -apple-system, sans-serif;
   font-weight: 400;
   color: oklch(0.33 0.02 255);
@@ -825,22 +841,26 @@
   margin-bottom: 0;
 }
 
-.canzoniere-line-item.has-chords {
+.canzoniere-page .canzoniere-line-item.has-chords,
+.stampa-measure-host .canzoniere-line-item.has-chords {
   margin-top: 1.5em;
 }
 
-.canzoniere-line-item.is-chord-only {
+.canzoniere-page .canzoniere-line-item.is-chord-only,
+.stampa-measure-host .canzoniere-line-item.is-chord-only {
   white-space: pre;
 }
 
-.canzoniere-chord-anchor {
+.canzoniere-page .canzoniere-chord-anchor,
+.stampa-measure-host .canzoniere-chord-anchor {
   display: inline-block;
   width: 0;
   position: relative;
   vertical-align: baseline;
 }
 
-.canzoniere-chord-badge {
+.canzoniere-page .canzoniere-chord-badge,
+.stampa-measure-host .canzoniere-chord-badge {
   position: absolute;
   bottom: 1.35em;
   left: 0;
@@ -851,19 +871,22 @@
   line-height: 1.2;
 }
 
-.canzoniere-chord-only-item {
+.canzoniere-page .canzoniere-chord-only-item,
+.stampa-measure-host .canzoniere-chord-only-item {
   font-family: 'Roboto', sans-serif;
   font-weight: 700;
   color: oklch(0.33 0.02 255);
   white-space: pre;
 }
 
-.canzoniere-line-empty {
+.canzoniere-page .canzoniere-line-empty,
+.stampa-measure-host .canzoniere-line-empty {
   line-height: 1.5;
   height: 1.5em;
 }
 
-.canzoniere-rit-label {
+.canzoniere-page .canzoniere-rit-label,
+.stampa-measure-host .canzoniere-rit-label {
   font-family: 'Roboto', sans-serif;
   font-weight: 700;
   color: oklch(0.33 0.02 255);
@@ -871,5 +894,6 @@
   margin-top: 0;
   margin-bottom: 0;
 }
+
 
 
