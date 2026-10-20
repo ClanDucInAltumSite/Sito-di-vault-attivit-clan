@@ -60,7 +60,7 @@ jobs:
           echo "Esito ultimo keepalive: $STATUS"
 
       - name: Apertura Issue Segnalazione Manutenzione
-        if: ${{ fromJSON(steps.audit.outputs.vuln_count || '0') > 0 || fromJSON(steps.outdated.outputs.outdated_count || '0') > 5 || steps.keepalive.outputs.keepalive_status == 'failure' }}
+        if: (steps.audit.outputs.vuln_count != '' && steps.audit.outputs.vuln_count != '0') || (steps.outdated.outputs.outdated_count != '' && steps.outdated.outputs.outdated_count > 5) || steps.keepalive.outputs.keepalive_status == 'failure'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
