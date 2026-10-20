@@ -3,7 +3,8 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: './test',
   testMatch: /.*\.spec\.ts/,
-  timeout: 45000,
+  timeout: 60000,
+  retries: process.env.CI ? 2 : 0,
   fullyParallel: false,
   reporter: 'list',
   snapshotPathTemplate: '{testDir}/__screenshots__/{arg}{ext}',

@@ -18,13 +18,23 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build-and-deploy:
-    name: Pubblicazione Controllata in Produzione
+  gate:
+    name: Approvazione Rilascio Produzione
     # Il deploy parte solo se CI è verde su main o se avviato manualmente
     if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main') }}
     runs-on: ubuntu-latest
     environment:
       name: production
+    steps:
+      - name: Gate di Controllo Approvazione
+        run: echo "Rilascio verificato ed autorizzato per la produzione."
+
+  build-and-deploy:
+    name: Pubblicazione su GitHub Pages
+    needs: gate
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout del codice

@@ -2,7 +2,7 @@ name: Manutenzione Automatica Settimanale
 
 on:
   schedule:
-    # Ogni lunedì alle 06:00 UTC
+    # Ogni lunedi alle 06:00 UTC
     - cron: '0 6 * * 1'
   workflow_dispatch:
 
@@ -25,69 +25,10 @@ jobs:
           node-version: 22
           cache: 'npm'
 
-      - name: Installazione dipendenze
+      - name: Installazione dipendenze minime
         run: npm ci
 
-      - name: Controllo Vulnerabilità (npm audit)
-        id: audit
-        continue-on-error: true
-        run: |
-          echo "Esecuzione npm audit per vulnerabilità high e critical..."
-          npm audit --audit-level=high --json > audit-report.json || true
-          VULN_COUNT=$(node -e "try { const r = JSON.parse(require('fs').readFileSync('audit-report.json','utf8')); console.log(r.metadata?.vulnerabilities?.high + r.metadata?.vulnerabilities?.critical || 0); } catch { console.log(0); }")
-          echo "vuln_count=$VULN_COUNT" >> $GITHUB_OUTPUT
-          echo "Vulnerabilità High/Critical rilevate: $VULN_COUNT"
-
-      - name: Controllo Dipendenze Obsolete (npm outdated)
-        id: outdated
-        continue-on-error: true
-        run: |
-          echo "Esecuzione npm outdated..."
-          npm outdated --json > outdated-report.json || true
-          OUTDATED_COUNT=$(node -e "try { const r = JSON.parse(require('fs').readFileSync('outdated-report.json','utf8')); console.log(Object.keys(r).length || 0); } catch { console.log(0); }")
-          echo "outdated_count=$OUTDATED_COUNT" >> $GITHUB_OUTPUT
-          echo "Pacchetti obsoleti rilevati: $OUTDATED_COUNT"
-
-      - name: Controllo Stato Ultima Esecuzione Keepalive
-        id: keepalive
-        continue-on-error: true
+      - name: Esecuzione Controllo Manutenzione
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          echo "Verifica stato ultimo run del workflow Keepalive..."
-          STATUS=$(gh run list --workflow=keepalive.yml --limit=1 --json conclusion -q '.[0].conclusion' 2>/dev/null || echo "unknown")
-          echo "keepalive_status=$STATUS" >> $GITHUB_OUTPUT
-          echo "Esito ultimo keepalive: $STATUS"
-
-      - name: Apertura Issue Segnalazione Manutenzione
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VULN_COUNT: ${{ steps.audit.outputs.vuln_count }}
-          OUTDATED_COUNT: ${{ steps.outdated.outputs.outdated_count }}
-          KEEPALIVE_STATUS: ${{ steps.keepalive.outputs.keepalive_status }}
-        run: |
-          SHOULD_ALERT=false
-          if [ "${VULN_COUNT:-0}" != "0" ]; then SHOULD_ALERT=true; fi
-          if [ "${OUTDATED_COUNT:-0}" -gt 5 ]; then SHOULD_ALERT=true; fi
-          if [ "${KEEPALIVE_STATUS}" = "failure" ]; then SHOULD_ALERT=true; fi
-
-          if [ "$SHOULD_ALERT" = "true" ]; then
-            REPORT_BODY="### Riepilogo Manutenzione Settimanale Automatica
-
-- **Vulnerabilità di sicurezza (High/Critical):** ${VULN_COUNT:-0}
-- **Dipendenze con aggiornamenti disponibili:** ${OUTDATED_COUNT:-0}
-- **Stato Keepalive Supabase/GitHub:** \`${KEEPALIVE_STATUS}\`
-
-#### Azioni Consigliate:
-1. Se sono presenti vulnerabilità, eseguire \`npm audit fix\` in un ramo dedicato e validare con CI.
-2. Esaminare le dipendenze segnalate ed aggiornare quelle con fix minori.
-3. Se il Keepalive è fallito, verificare che il database Supabase sia raggiungibile e non in pausa."
-
-            gh issue create \
-              --title "🔧 Segnalazione Manutenzione: vulnerabilità o dipendenze da verificare" \
-              --body "$REPORT_BODY" \
-              --label "maintenance" \
-              --label "automated"
-          else
-            echo "Nessuna anomalia riscontrata durante il controllo di manutenzione settimanale."
-          fi
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/run_maintenance.mjs

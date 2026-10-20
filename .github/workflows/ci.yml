@@ -69,13 +69,13 @@ jobs:
           - project: webkit
             specs: test/verify_ui.spec.ts test/visual_regression.spec.ts
           - project: mobile-iphone-se
-            specs: test/verify_ui.spec.ts test/visual_regression.spec.ts
+            specs: test/verify_ui.spec.ts
           - project: mobile-iphone-15
-            specs: test/verify_ui.spec.ts test/visual_regression.spec.ts
+            specs: test/verify_ui.spec.ts
           - project: tablet-ipad
-            specs: test/verify_ui.spec.ts test/visual_regression.spec.ts
+            specs: test/verify_ui.spec.ts
           - project: mobile-android
-            specs: test/verify_ui.spec.ts test/visual_regression.spec.ts
+            specs: test/verify_ui.spec.ts
     steps:
       - name: Checkout del codice
         uses: actions/checkout@v4

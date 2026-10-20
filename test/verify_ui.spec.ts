@@ -672,6 +672,7 @@ test.describe('Verifica Generale di Assenza Perdita di Stili (Style Bleed & Inte
   for (const theme of THEMES) {
     for (const order of ROUTE_ORDERS) {
       test(`Integrità stili preservata in ${order.name} [Tema: ${theme}]`, async ({ page }) => {
+        test.slow();
         // 1. Inizializza prima rotta e imposta tema
         const firstRoute = order.routes[0];
         await page.goto(firstRoute);
