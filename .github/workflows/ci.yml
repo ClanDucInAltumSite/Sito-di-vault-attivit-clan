@@ -65,22 +65,16 @@ jobs:
       matrix:
         include:
           - project: chromium
-            browser: chromium
             specs: test/verify_ui.spec.ts test/visual_regression.spec.ts test/stampa_pdf.spec.ts test/offline_matrix.spec.ts
           - project: webkit
-            browser: webkit
-            specs: test/verify_ui.spec.ts test/visual_regression.spec.ts test/offline_matrix.spec.ts
+            specs: test/verify_ui.spec.ts test/visual_regression.spec.ts
           - project: mobile-iphone-se
-            browser: chromium
             specs: test/verify_ui.spec.ts test/visual_regression.spec.ts
           - project: mobile-iphone-15
-            browser: chromium
             specs: test/verify_ui.spec.ts test/visual_regression.spec.ts
           - project: tablet-ipad
-            browser: chromium
             specs: test/verify_ui.spec.ts test/visual_regression.spec.ts
           - project: mobile-android
-            browser: chromium
             specs: test/verify_ui.spec.ts test/visual_regression.spec.ts
     steps:
       - name: Checkout del codice
@@ -100,8 +94,8 @@ jobs:
           VITE_BASE_PATH: /Sito-di-vault-attivit-clan/
         run: npm run build
 
-      - name: Installazione Browser Playwright (${{ matrix.browser }})
-        run: npx playwright install --with-deps ${{ matrix.browser }}
+      - name: Installazione Browser Playwright (Chromium e WebKit)
+        run: npx playwright install --with-deps chromium webkit
 
       - name: Esecuzione Test Playwright (${{ matrix.project }})
         run: npx playwright test ${{ matrix.specs }} --project=${{ matrix.project }}

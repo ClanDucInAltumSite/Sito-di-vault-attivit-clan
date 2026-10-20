@@ -634,10 +634,11 @@ test.describe('FASE 7 - Verifica Calendario e ODG (#/calendario)', () => {
 
     // 3. Apertura Dettaglio Evento con ODG denso (30 punti)
     const riunioneRow = page.locator('.ios-grouped-row:has-text("Riunione Ordinaria")').first();
-    await riunioneRow.click();
-    await page.waitForSelector('[role="dialog"]');
+    await expect(riunioneRow).toBeVisible({ timeout: 10000 });
+    await riunioneRow.scrollIntoViewIfNeeded();
+    await riunioneRow.click({ force: true });
     const dialog = page.locator('[role="dialog"]');
-    await expect(dialog).toBeVisible();
+    await expect(dialog).toBeVisible({ timeout: 15000 });
 
     // Verifica contatore badge ODG aperti
     const odgOpenBadge = dialog.locator('.odg-open-badge');

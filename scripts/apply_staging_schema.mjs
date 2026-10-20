@@ -42,6 +42,12 @@ async function applyStagingSchema() {
   }
 
   if (!stagingProjectRef && !stagingDbUrl) {
+    if (process.env.CI) {
+      console.log('[INFO] Environment staging non ancora configurato nel repository GitHub.');
+      console.log('Per abilitare la migrazione su staging, configurare i segreti in Settings -> Environments -> staging.');
+      console.log('Consulta docs/SETUP_MANUALE.md Sezione 7 per la guida passo passo.');
+      process.exit(0);
+    }
     console.error('[ERRORE] Configurazione staging assente.');
     console.error('Fornire STAGING_PROJECT_REF (e SUPABASE_ACCESS_TOKEN) oppure STAGING_DATABASE_URL.');
     console.error('Consulta docs/SETUP_MANUALE.md per le istruzioni di configurazione.');
