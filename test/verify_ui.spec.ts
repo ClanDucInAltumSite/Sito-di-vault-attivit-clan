@@ -368,8 +368,7 @@ test.describe('CORREZIONE 2 - Verifica Stress UI con Dati Sporchi, Viewport Rist
     // 4. Test ordinamento 4-way
     const sortZtoA = page.locator('button:has-text("Z → A")');
     if ((await sortZtoA.count()) > 0) {
-      await sortZtoA.scrollIntoViewIfNeeded();
-      await sortZtoA.click();
+      await sortZtoA.evaluate((el: any) => (el as HTMLElement).click());
       await page.waitForTimeout(200);
     }
     await searchInput.blur();
@@ -377,16 +376,13 @@ test.describe('CORREZIONE 2 - Verifica Stress UI con Dati Sporchi, Viewport Rist
 
     // 5. Apertura foglio dettaglio
     const firstRow = page.locator('.ios-grouped-row').first();
-    await firstRow.scrollIntoViewIfNeeded();
-    await page.waitForTimeout(100);
-    await firstRow.click({ force: true });
+    await firstRow.evaluate((el: any) => (el as HTMLElement).click());
     await page.waitForSelector('[role="dialog"]');
     expect(await page.locator('[role="dialog"]').isVisible()).toBe(true);
 
     // Chiusura foglio dettaglio tramite close button superiore
     const closeBtn = page.locator('.ios-sheet-close-btn').first();
-    await closeBtn.scrollIntoViewIfNeeded();
-    await closeBtn.click({ force: true });
+    await closeBtn.evaluate((el: any) => (el as HTMLElement).click());
     await page.waitForTimeout(200);
 
     // 6. Test con tastiera a schermo simulata (altezza ridotta 400px e input a fuoco)
@@ -429,26 +425,22 @@ test.describe('CORREZIONE 2 - Verifica Stress UI con Dati Sporchi, Viewport Rist
     await page.goto('/#/bans');
     await page.waitForSelector('.ios-grouped-row');
     const firstBanRow = page.locator('.ios-grouped-row').first();
-    await firstBanRow.scrollIntoViewIfNeeded();
-    await firstBanRow.click({ force: true });
+    await firstBanRow.evaluate((el: any) => (el as HTMLElement).click());
     await page.waitForSelector('[role="dialog"]');
     expect(await page.locator('[role="dialog"]').isVisible()).toBe(true);
     const closeBanBtn = page.locator('.ios-sheet-close-btn').first();
-    await closeBanBtn.scrollIntoViewIfNeeded();
-    await closeBanBtn.click({ force: true });
+    await closeBanBtn.evaluate((el: any) => (el as HTMLElement).click());
     await page.waitForTimeout(200);
 
     // Test su Canti
     await page.goto('/#/canti');
     await page.waitForSelector('.ios-grouped-row');
     const firstCantoRow = page.locator('.ios-grouped-row').first();
-    await firstCantoRow.scrollIntoViewIfNeeded();
-    await firstCantoRow.click({ force: true });
+    await firstCantoRow.evaluate((el: any) => (el as HTMLElement).click());
     await page.waitForSelector('[role="dialog"]');
     expect(await page.locator('[role="dialog"]').isVisible()).toBe(true);
     const closeCantoBtn = page.locator('.ios-sheet-close-btn').first();
-    await closeCantoBtn.scrollIntoViewIfNeeded();
-    await closeCantoBtn.click({ force: true });
+    await closeCantoBtn.evaluate((el: any) => (el as HTMLElement).click());
   });
 });
 
