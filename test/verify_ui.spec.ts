@@ -344,8 +344,14 @@ test.describe('CORREZIONE 2 - Verifica Stress UI con Dati Sporchi, Viewport Rist
             });
           }
 
-          tx.oncomplete = () => resolve();
-          tx.onerror = () => reject(tx.error);
+          tx.oncomplete = () => {
+            db.close();
+            resolve();
+          };
+          tx.onerror = () => {
+            db.close();
+            reject(tx.error);
+          };
         };
         req.onerror = () => reject(req.error);
       });
@@ -579,8 +585,14 @@ test.describe('FASE 7 - Verifica Calendario e ODG (#/calendario)', () => {
             });
           }
 
-          tx.oncomplete = () => resolve();
-          tx.onerror = () => reject(tx.error);
+          tx.oncomplete = () => {
+            db.close();
+            resolve();
+          };
+          tx.onerror = () => {
+            db.close();
+            reject(tx.error);
+          };
         };
         req.onerror = () => reject(req.error);
       });

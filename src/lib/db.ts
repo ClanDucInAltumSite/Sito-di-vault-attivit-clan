@@ -308,7 +308,16 @@ export async function getOdgPunti(eventoId?: string, includeDeleted = false): Pr
     if (!parent || (!includeDeleted && parent.deleted_at !== null)) {
       return []; // Genitore eliminato -> figli nascosti
     }
-    const all = (await db.getAllFromIndex('odg_punti', 'evento_id', eventoId)) as OdgPunto[];
+    let all: OdgPunto[] = [];
+    try {
+      all = (await db.getAllFromIndex('odg_punti', 'evento_id', eventoId)) as OdgPunto[];
+    } catch {
+      all = [];
+    }
+    if (!all || all.length === 0) {
+      const allRows = (await db.getAll('odg_punti')) as OdgPunto[];
+      all = allRows.filter((p) => p.evento_id === eventoId);
+    }
     const filtered = includeDeleted ? all : all.filter((p) => p.deleted_at === null);
     return filtered.sort((a, b) => a.ordine - b.ordine);
   }
@@ -356,7 +365,16 @@ export async function getAllegati(
     }
 
     const indexName = `${parentType}_id`;
-    const all = (await db.getAllFromIndex('allegati', indexName, parentId)) as Allegato[];
+    let all: Allegato[] = [];
+    try {
+      all = (await db.getAllFromIndex('allegati', indexName, parentId)) as Allegato[];
+    } catch {
+      all = [];
+    }
+    if (!all || all.length === 0) {
+      const allRows = (await db.getAll('allegati')) as Allegato[];
+      all = allRows.filter((a) => (a as any)[indexName] === parentId);
+    }
     return includeDeleted ? all : all.filter((a) => a.deleted_at === null);
   }
 
