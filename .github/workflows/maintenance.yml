@@ -60,22 +60,34 @@ jobs:
           echo "Esito ultimo keepalive: $STATUS"
 
       - name: Apertura Issue Segnalazione Manutenzione
-        if: (steps.audit.outputs.vuln_count != '' && steps.audit.outputs.vuln_count != '0') || (steps.outdated.outputs.outdated_count != '' && steps.outdated.outputs.outdated_count > 5) || steps.keepalive.outputs.keepalive_status == 'failure'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VULN_COUNT: ${{ steps.audit.outputs.vuln_count }}
+          OUTDATED_COUNT: ${{ steps.outdated.outputs.outdated_count }}
+          KEEPALIVE_STATUS: ${{ steps.keepalive.outputs.keepalive_status }}
         run: |
-          REPORT_BODY="### Riepilogo Manutenzione Settimanale Automatica
+          SHOULD_ALERT=false
+          if [ "${VULN_COUNT:-0}" != "0" ]; then SHOULD_ALERT=true; fi
+          if [ "${OUTDATED_COUNT:-0}" -gt 5 ]; then SHOULD_ALERT=true; fi
+          if [ "${KEEPALIVE_STATUS}" = "failure" ]; then SHOULD_ALERT=true; fi
 
-- **Vulnerabilità di sicurezza (High/Critical):** ${{ steps.audit.outputs.vuln_count }}
-- **Dipendenze con aggiornamenti disponibili:** ${{ steps.outdated.outputs.outdated_count }}
-- **Stato Keepalive Supabase/GitHub:** \`${{ steps.keepalive.outputs.keepalive_status }}\`
+          if [ "$SHOULD_ALERT" = "true" ]; then
+            REPORT_BODY="### Riepilogo Manutenzione Settimanale Automatica
+
+- **Vulnerabilità di sicurezza (High/Critical):** ${VULN_COUNT:-0}
+- **Dipendenze con aggiornamenti disponibili:** ${OUTDATED_COUNT:-0}
+- **Stato Keepalive Supabase/GitHub:** \`${KEEPALIVE_STATUS}\`
 
 #### Azioni Consigliate:
 1. Se sono presenti vulnerabilità, eseguire \`npm audit fix\` in un ramo dedicato e validare con CI.
 2. Esaminare le dipendenze segnalate ed aggiornare quelle con fix minori.
 3. Se il Keepalive è fallito, verificare che il database Supabase sia raggiungibile e non in pausa."
 
-          gh issue create \
-            --title "🔧 Segnalazione Manutenzione: vulnerabilità o dipendenze da verificare" \
-            --body "$REPORT_BODY" \
-            --label "maintenance,automated"
+            gh issue create \
+              --title "🔧 Segnalazione Manutenzione: vulnerabilità o dipendenze da verificare" \
+              --body "$REPORT_BODY" \
+              --label "maintenance" \
+              --label "automated"
+          else
+            echo "Nessuna anomalia riscontrata durante il controllo di manutenzione settimanale."
+          fi

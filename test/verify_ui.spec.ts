@@ -378,19 +378,20 @@ test.describe('CORREZIONE 2 - Verifica Stress UI con Dati Sporchi, Viewport Rist
     const sortZtoA = page.locator('button:has-text("Z → A")');
     if ((await sortZtoA.count()) > 0) {
       await sortZtoA.click();
-      await page.waitForTimeout(100);
+      await page.waitForTimeout(200);
     }
+    await searchInput.blur();
+    await page.waitForTimeout(100);
 
     // 5. Apertura foglio dettaglio
     const firstRow = page.locator('.ios-grouped-row').first();
-    await firstRow.scrollIntoViewIfNeeded();
-    await firstRow.click({ force: true });
+    await firstRow.click();
     await page.waitForSelector('[role="dialog"]');
     expect(await page.locator('[role="dialog"]').isVisible()).toBe(true);
 
     // Chiusura foglio dettaglio tramite close button superiore
     const closeBtn = page.locator('.ios-sheet-close-btn').first();
-    await closeBtn.click({ force: true });
+    await closeBtn.click();
     await page.waitForTimeout(200);
 
     // 6. Test con tastiera a schermo simulata (altezza ridotta 400px e input a fuoco)
@@ -433,24 +434,22 @@ test.describe('CORREZIONE 2 - Verifica Stress UI con Dati Sporchi, Viewport Rist
     await page.goto('/#/bans');
     await page.waitForSelector('.ios-grouped-row');
     const firstBanRow = page.locator('.ios-grouped-row').first();
-    await firstBanRow.scrollIntoViewIfNeeded();
-    await firstBanRow.click({ force: true });
+    await firstBanRow.click();
     await page.waitForSelector('[role="dialog"]');
     expect(await page.locator('[role="dialog"]').isVisible()).toBe(true);
     const closeBanBtn = page.locator('.ios-sheet-close-btn').first();
-    await closeBanBtn.click({ force: true });
+    await closeBanBtn.click();
     await page.waitForTimeout(200);
 
     // Test su Canti
     await page.goto('/#/canti');
     await page.waitForSelector('.ios-grouped-row');
     const firstCantoRow = page.locator('.ios-grouped-row').first();
-    await firstCantoRow.scrollIntoViewIfNeeded();
-    await firstCantoRow.click({ force: true });
+    await firstCantoRow.click();
     await page.waitForSelector('[role="dialog"]');
     expect(await page.locator('[role="dialog"]').isVisible()).toBe(true);
     const closeCantoBtn = page.locator('.ios-sheet-close-btn').first();
-    await closeCantoBtn.click({ force: true });
+    await closeCantoBtn.click();
   });
 });
 
@@ -638,10 +637,10 @@ test.describe('FASE 7 - Verifica Calendario e ODG (#/calendario)', () => {
     // 3. Apertura Dettaglio Evento con ODG denso (30 punti)
     const riunioneRow = page.locator('.ios-grouped-row:has-text("Riunione Ordinaria")').first();
     await expect(riunioneRow).toBeVisible({ timeout: 15000 });
-    await riunioneRow.scrollIntoViewIfNeeded();
-    await riunioneRow.click({ force: true });
+    await riunioneRow.click();
     const dialog = page.locator('[role="dialog"]');
     await expect(dialog).toBeVisible({ timeout: 15000 });
+    await page.waitForTimeout(400);
 
     // Verifica contatore badge ODG aperti
     const odgOpenBadge = dialog.locator('.odg-open-badge');
