@@ -618,7 +618,7 @@ test.describe('FASE 7 - Verifica Calendario e ODG (#/calendario)', () => {
     // 3. Apertura Dettaglio Evento con ODG denso (30 punti)
     const riunioneRow = page.locator('.ios-grouped-row:has-text("Riunione Ordinaria")').first();
     await expect(riunioneRow).toBeVisible({ timeout: 15000 });
-    await riunioneRow.click();
+    await riunioneRow.evaluate((el: any) => (el as HTMLElement).click());
     const dialog = page.locator('[role="dialog"]');
     await expect(dialog).toBeVisible({ timeout: 15000 });
     await page.waitForTimeout(400);
