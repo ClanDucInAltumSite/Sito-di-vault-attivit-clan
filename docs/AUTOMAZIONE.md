@@ -31,14 +31,36 @@ Per garantire che nessuna modifica possa rompere la produzione, il ramo `main` d
    - **Require a pull request before merging**: impedisce il push diretto su `main`.
    - **Require status checks to pass before merging**:
      - Spunta **Require branches to be up to date before merging**.
-     - Nella casella di ricerca dei check, seleziona i job di `ci.yml`:
+     - Nella casella di ricerca dei check, seleziona gli 8 job paralleli di `ci.yml`:
        - `Controlli Statici, Tipi, Vitest e Budget di Peso`
-       - `Test E2E, Accessibilità Axe e Regressione Visiva (Playwright)`
+       - `Playwright (chromium)`
+       - `Playwright (webkit)`
+       - `Playwright (mobile-iphone-se)`
+       - `Playwright (mobile-iphone-15)`
+       - `Playwright (tablet-ipad)`
+       - `Playwright (mobile-android)`
        - `Audit Lighthouse CI (3 Esecuzioni, Mediana e JSON)`
    - **Do not allow bypassing the above settings**: la regola si applica anche agli amministratori.
 6. Clicca su **Create** / **Save changes** in fondo alla pagina.
 
-Da questo momento, nessun commit può entrare in `main` se la pipeline `ci.yml` non è al 100% verde.
+Da questo momento, nessun commit può entrare in `main` se la pipeline `ci.yml` non è al 100% verde su tutti i browser e device.
+
+### 2.1 Compatibilità con l'Heartbeat dei 60 Giorni (Ramo Dedicato `keepalive-heartbeat`)
+
+Secondo la documentazione ufficiale di GitHub Actions:
+> *"Workflows are not triggered automatically if the repository has had no activity in 60 days."*
+
+Per GitHub, **qualsiasi push o commit su qualunque ramo del repository conta come attività** che azzera il timer dei 60 giorni.
+
+Se il workflow di keepalive tentasse di scrivere direttamente su `main`, il push verrebbe categoricamente **rifiutato da GitHub** a causa della regola di protezione appena impostata (che vieta i push diretti senza PR approvata e CI verde).
+
+**Soluzione adottata:**
+Il workflow `.github/workflows/keepalive.yml` spinge il micro-commit automatico di heartbeat (`docs/keepalive_heartbeat.txt`) **esclusivamente su un ramo dedicato chiamato `keepalive-heartbeat`** (`git push origin keepalive-heartbeat --force`). In questo modo:
+1. L'attività del repository viene registrata e il timer dei 60 giorni viene azzerato con successo;
+2. Il ramo `main` rimane intonso e rigorosamente protetto;
+3. I commit di heartbeat non inquinano la cronologia di produzione di `main`.
+
+Per verificare o forzare l'heartbeat in qualsiasi momento senza attendere i 40 giorni, è possibile avviare manualmente il workflow `Keepalive Supabase & Repository` via `workflow_dispatch` impostando il parametro `force_heartbeat: true`.
 
 ---
 
