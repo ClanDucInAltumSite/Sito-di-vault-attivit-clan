@@ -667,4 +667,96 @@ test.describe('FASE 7 - Verifica Calendario e ODG (#/calendario)', () => {
   });
 });
 
+test.describe('Verifica Generale di Assenza Perdita di Stili (Style Bleed & Integrity Multi-Rotta)', () => {
+  const ROUTE_ORDERS = [
+    {
+      name: 'Ordine 1: Standard (Home -> Giochi -> Bans -> Canti -> Calendario -> Stampa -> Admin -> Design -> StatoDati)',
+      routes: ['#/', '#/giochi', '#/bans', '#/canti', '#/calendario', '#/stampa', '#/admin', '#/design', '#/statodati'],
+    },
+    {
+      name: 'Ordine 2: Canti e Stampa prioritari (Canti -> Stampa -> Admin -> StatoDati -> Design -> Calendario -> Bans -> Giochi -> Home)',
+      routes: ['#/canti', '#/stampa', '#/admin', '#/statodati', '#/design', '#/calendario', '#/bans', '#/giochi', '#/'],
+    },
+    {
+      name: 'Ordine 3: Interlacciato (Giochi -> Stampa -> Calendario -> Admin -> Canti -> Bans -> Design -> StatoDati -> Home)',
+      routes: ['#/giochi', '#/stampa', '#/calendario', '#/admin', '#/canti', '#/bans', '#/design', '#/statodati', '#/'],
+    },
+  ];
+
+  const THEMES = ['light', 'dark'] as const;
+
+  for (const theme of THEMES) {
+    for (const order of ROUTE_ORDERS) {
+      test(`Integrità stili preservata in ${order.name} [Tema: ${theme}]`, async ({ page }) => {
+        // 1. Inizializza prima rotta e imposta tema
+        const firstRoute = order.routes[0];
+        await page.goto(firstRoute);
+        await page.waitForSelector('#app', { state: 'attached' });
+
+        await page.evaluate((th) => {
+          document.documentElement.setAttribute('data-theme', th);
+          localStorage.setItem('theme', th);
+        }, theme);
+
+        await page.waitForTimeout(200);
+
+        // Funzione helper per catturare metriche di stile calcolate della vista
+        const captureMetrics = async () => {
+          return await page.evaluate(() => {
+            const body = document.body;
+            const heading = document.querySelector('h1, h2, .header-banner-title') as HTMLElement | null;
+            const item = document.querySelector('.ios-grouped-row-title, p, main') as HTMLElement | null;
+
+            const bodyStyle = window.getComputedStyle(body);
+            const headingStyle = heading ? window.getComputedStyle(heading) : null;
+            const itemStyle = item ? window.getComputedStyle(item) : null;
+
+            return {
+              bodyBg: bodyStyle.backgroundColor,
+              bodyColor: bodyStyle.color,
+              headingColor: headingStyle?.color || '',
+              headingFontFamily: headingStyle?.fontFamily || '',
+              headingFontSize: headingStyle?.fontSize || '',
+              headingFontWeight: headingStyle?.fontWeight || '',
+              itemColor: itemStyle?.color || '',
+              itemFontFamily: itemStyle?.fontFamily || '',
+              itemFontSize: itemStyle?.fontSize || '',
+            };
+          });
+        };
+
+        const beforeMetrics = await captureMetrics();
+        expect(beforeMetrics.bodyBg).not.toBe('');
+
+        // 2. Visita tutte le altre rotte nella sequenza dell'ordine specificato
+        for (let i = 1; i < order.routes.length; i++) {
+          const route = order.routes[i];
+          await page.evaluate((r) => { window.location.hash = r; }, route);
+          await page.waitForTimeout(150);
+          await page.waitForSelector('#app', { state: 'attached' });
+        }
+
+        // 3. Ritorna alla prima rotta visitata
+        await page.evaluate((r) => { window.location.hash = r; }, firstRoute);
+        await page.waitForTimeout(250);
+
+        // 4. Rileva nuovamente le metriche di stile calcolate
+        const afterMetrics = await captureMetrics();
+
+        // 5. Asserzioni di assoluta identità (Zero style bleed / zero perdita stili)
+        expect(afterMetrics.bodyBg, 'Il colore di sfondo della pagina deve rimanere identico').toBe(beforeMetrics.bodyBg);
+        expect(afterMetrics.bodyColor, 'Il colore del testo del body deve rimanere identico').toBe(beforeMetrics.bodyColor);
+        expect(afterMetrics.headingColor, 'Il colore dei titoli deve rimanere identico').toBe(beforeMetrics.headingColor);
+        expect(afterMetrics.headingFontFamily, 'Il font dei titoli deve rimanere identico').toBe(beforeMetrics.headingFontFamily);
+        expect(afterMetrics.headingFontSize, 'La dimensione dei titoli deve rimanere identica').toBe(beforeMetrics.headingFontSize);
+        expect(afterMetrics.headingFontWeight, 'Il peso dei titoli deve rimanere identico').toBe(beforeMetrics.headingFontWeight);
+        expect(afterMetrics.itemColor, 'Il colore degli elementi di testo deve rimanere identico').toBe(beforeMetrics.itemColor);
+        expect(afterMetrics.itemFontFamily, 'Il font degli elementi di testo deve rimanere identico').toBe(beforeMetrics.itemFontFamily);
+        expect(afterMetrics.itemFontSize, 'La dimensione del testo deve rimanere identica').toBe(beforeMetrics.itemFontSize);
+      });
+    }
+  }
+});
+
+
 
