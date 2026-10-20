@@ -262,13 +262,24 @@ export async function saveCanto(input: {
 
   let { data, error } = await executeSupabaseSave(true);
 
-  // Se la colonna bpm_testo non esiste sul server Supabase (migrazione 0006 mancante),
-  // NON salvare in silenzio perdendo dati: segnala esplicitamente all'amministratore.
-  if (error && (error.message?.includes('bpm_testo') || (error as any).code === 'PGRST204')) {
-    throw new Error('Migrazione 0006 non applicata: salvataggio annullato. Esegui la migrazione SQL nel database Supabase per abilitare la colonna bpm_testo.');
+  // Se una colonna non esiste sul server Supabase (migrazione SQL mancante),
+  // NON salvare in silenzio perdendo dati: segnala esplicitamente all'amministratore la migrazione da eseguire.
+  if (error) {
+    const msg = error.message || '';
+    if (msg.includes('categoria')) {
+      throw new Error("Migrazione 0007 non applicata: la colonna 'categoria' non esiste nel database Supabase. Esegui 0007_canti_categoria.sql nel SQL Editor di Supabase.");
+    }
+    if (msg.includes('origine') || msg.includes('nota_fonte')) {
+      throw new Error("Migrazione 0008 non applicata: la colonna 'origine' o 'nota_fonte' non esiste nel database Supabase. Esegui 0008_canti_origine_fonte.sql nel SQL Editor di Supabase.");
+    }
+    if (msg.includes('bpm_testo')) {
+      throw new Error('Migrazione 0006 non applicata: salvataggio annullato. Esegui la migrazione SQL nel database Supabase per abilitare la colonna bpm_testo.');
+    }
+    if ((error as any).code === 'PGRST204') {
+      throw new Error(`Migrazione SQL non applicata nel database Supabase (${msg || 'colonna mancante'}). Esegui le migrazioni in supabase/migrations/ nel SQL Editor.`);
+    }
+    throw new Error(error.message);
   }
-
-  if (error) throw new Error(error.message);
   savedRecord = data;
 
   // Nel record locale IndexedDB preserviamo bpm_testo se passato, garantendo la reattività dell'interfaccia
