@@ -8,7 +8,7 @@ test.describe('FASE 9B — Verifica Finale Stampa PDF, Font Incorporati e Geomet
   }) => {
     // 1. Inizializza contesto
     await page.goto('#/');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // 2. Inserimento Canto Sintetico di Prova con frecce ritmo, accordi su sillaba e direttive
     await page.evaluate(async () => {
@@ -88,7 +88,7 @@ test.describe('FASE 9B — Verifica Finale Stampa PDF, Font Incorporati e Geomet
 
     // 4. Naviga a #/stampa
     await page.goto('#/stampa');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Attendi che il contenitore di stampa e la pagina del canzoniere siano montati nel DOM
     const printContainer = page.locator('.stampa-print-container');

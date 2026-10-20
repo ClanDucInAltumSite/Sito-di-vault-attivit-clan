@@ -36,5 +36,10 @@ playwright-report/
 # Riferimenti privati e protetti (canzoni reali, mai committare)
 _riferimenti/
 
+# Scratch & Python cache
+__pycache__/
+*.pyc
+scratch/
+
 # Archivi esportati
 *.zip

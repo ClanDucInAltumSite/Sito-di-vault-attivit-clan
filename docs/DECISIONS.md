@@ -644,3 +644,73 @@ Nell'uso reale sul campo:
    - Accettazione della notazione con trattino per accordi minori tipica dei canzonieri scout cartacei (`La-`, `SI-`, `Re-`, `Do#-` normalizzati in `Lam`, `Sim`, `Rem`, `Do#m`).
    - Tolleranza maiuscolo/minuscolo e slash chords (`Re/Fa#`, `Sol/Si`).
    - Rigorosa protezione contro parole italiane omonime a note musicali (`Do`, `Re`, `Mi`, `Fa`, `Sol`, `La`, `Si`): una frase o riga di testo comune non viene mai interpretata come riga di accordi.
+
+---
+
+## ADR-0019 (Fase 11): Unificazione Ingressi Canti (PDF e DOCX), Editor di Revisione Unificato, Categorie Canti e Isolamento Stili di Stampa
+
+### Data
+2026-10-20
+
+### Contesto
+L'esperienza d'uso ha evidenziato che la moltiplicazione di modalità di inserimento (incolla testo, scrivi a mano, scheda con IA, prompt, import in blocco) generava confusione e manutenzione ridondante. Inoltre, l'apertura della vista Stampa causava un bug grafico globale in cui le regole non isolate di `print.css` sovrascrivevano il testo dell'app rendendolo scuro e illeggibile in tema scuro. Infine, era necessaria una categorizzazione chiara del repertorio musicale del Clan ('scout', 'chiesa', 'esterni') senza default arbitrari.
+
+### Decisioni Adottate
+1. **Isolamento Rigoroso di `print.css` (11A):**
+   - Tutte le regole di layout del canzoniere cartaceo sono state incapsulate dentro `.canzoniere-page`, `.stampa-measure-host` e blocchi `@media print`.
+   - Nessun selettore globale non circoscritto in moduli caricati a richiesta. Risolto definitivamente il bug del testo scuro nelle viste di dettaglio e lettura.
+   - Creato test Playwright di verifica stili multi-rotta per prevenire future regressioni da CSS dinamici.
+2. **Due Soli Ingressi Unificati: PDF e DOCX (11B):**
+   - Rimossi definitivamente e dismessi: "Scrivi a mano", "Incolla testo", "Con IA", il prompt fisso e l'importazione in blocco.
+   - Rimasto un unico pulsante discreto "Nuovo canto vuoto" che apre la stessa identica schermata di revisione.
+3. **Parser PDF a 2 Colonne e Importazione Dinamica (11C):**
+   - Integrazione di `pdfjs-dist` caricato **esclusivamente con import dinamico** nell'area admin al caricamento del file.
+   - Algoritmo di rilevamento a 2 colonne basato sulla distribuzione statistica (bimodale) delle coordinate X dei blocchi di testo.
+   - Esclusione garantita di `pdfjs-dist` e del worker da Workbox Precache per non appesantire il primo avvio del sito per gli utenti normali.
+4. **Schermata di Revisione a Due Riquadri (11D):**
+   - Riquadro sinistro con textarea a grandezza naturale con numeri di riga e inserimento rapido accordi.
+   - Riquadro destro con anteprima live conforme alla stampa A4.
+   - Riquadro inferiore a scomparsa per metadati aggiuntivi (tonalità, bpm, misura, capotasto, autore, note).
+5. **Classificazione Categoria Canti (`0007_canti_categoria.sql`):**
+   - Valori ammessi: `'scout'`, `'chiesa'`, `'esterni'`.
+   - Colonna nullable senza default (i canti storici restano senza categoria finché non riassegnati).
+   - Scelta obbligatoria in sede di salvataggio da form/revisione.
+   - Aggiornati schemi, indici parziali, tipi TypeScript e logica di backup/ripristino JSON.
+
+---
+
+## ADR-0020 (Fase 12): Automazione CI/CD, Ambiente Staging, Regressioni Visive e Pubblicazione Controllata
+
+### Data
+2026-10-20
+
+### Contesto
+Il mantenimento manuale e i controlli visivi/funzionali ripetitivi sottraggono tempo prezioso alla gestione del Clan. Era necessario creare un'architettura completa di automazione in background su GitHub Actions a costo zero (100% Free Tier), che esegua tutti i controlli (tipi, test, budget di peso, regressioni visive, controlli schema e sicurezza) bloccando qualsiasi pubblicazione difettosa o regressione grafica prima che arrivi agli utenti.
+
+### Decisioni Adottate
+1. **Pipeline CI Multifase (`.github/workflows/ci.yml`):**
+   - Trigger su ogni push e PR con cancellazione automatica delle esecuzioni precedenti (`cancel-in-progress`).
+   - Typecheck TypeScript (`tsc --noEmit`), suite Vitest (184 test), Build PWA.
+   - Matrice Playwright estesa su Chromium, WebKit (Desktop Safari) ed emulazioni mobile (iPhone SE, iPhone 15, iPad, Pixel 7).
+   - Lighthouse CI con 3 esecuzioni mediane e soglie di blocco prestazionali/accessibilità.
+2. **Budget di Peso Automatizzato (`scripts/check_weight_budget.mjs`):**
+   - Soglie stringenti su bundle iniziale (JS gzip < 80 KiB, CSS gzip < 20 KiB), precache totale (< 5500 KiB) e foto di testata (< 700 KiB).
+   - Controllo vincolante che `pdfjs-dist` e `pdf.worker` siano al 100% esclusi dal precache del service worker.
+3. **Ambiente di Staging Dedicato e Protezione Hardware della Produzione:**
+   - Utilizzo del secondo progetto gratuito Supabase come Staging.
+   - Workflow `staging-schema.yml` per provare le nuove migrazioni in staging prima della produzione.
+   - `scripts/run_admin_test.mjs`: hard block immediato con codice d'uscita 1 se l'URL del database corrisponde al progetto di produzione (`lpeiyzwccedtqjbficjo`).
+4. **Verifica Schema di Produzione in Sola Lettura (`scripts/check_prod_schema.mjs`):**
+   - Interroga le tabelle tramite REST API anonime in sola lettura (`limit=0`).
+   - Se mancano colonne (migrazioni non applicate dal proprietario), apre automaticamente una Issue su GitHub con l'SQL da eseguire.
+5. **Regressioni Visive Deterministica (`test/visual_regression.spec.ts`):**
+   - Cattura e verifica pixel-per-pixel delle schermate principali (Home, Canti, Lettura a schermo intero, Revisione modale con avvisi, Anteprima Stampa) a 390px e 1440px in tema chiaro e scuro.
+   - Tolleranza differenziale massima $\le 2\%$.
+6. **Pubblicazione Controllata in Produzione (`.github/workflows/deploy.yml`):**
+   - Esecuzione non più su semplice push su `main`, ma agganciata al completamento con esito positivo della CI (`workflow_run`).
+   - Richiede approvazione manuale (Required Reviewer) tramite l'Environment protetto `production` di GitHub.
+   - Post-deploy smoke test automatico (`test/smoke_deploy.spec.ts`) per verificare HTTP 200, assenza di risorse 404, registrazione Service Worker e CSP valida.
+7. **Regole di Autopilot e Nessun Costo Aggiuntivo:**
+   - Configurazione di Dependabot e workflow settimanale di manutenzione per audit dipendenze.
+   - Rispetto di tutte le quote gratuite (GitHub Actions < 2000 min/mese, Supabase 2 progetti 0€/mese).
+

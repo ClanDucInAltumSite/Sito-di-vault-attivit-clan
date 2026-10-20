@@ -23,10 +23,11 @@ export interface OdgManagerProps {
   isAdmin: boolean;
   onCreateMeeting?: () => void;
   onChanged?: () => void;
+  initialPoints?: OdgPunto[];
 }
 
-export function OdgManager({ evento, isAdmin, onCreateMeeting, onChanged }: OdgManagerProps) {
-  const [punti, setPunti] = useState<OdgPunto[]>([]);
+export function OdgManager({ evento, isAdmin, onCreateMeeting, onChanged, initialPoints }: OdgManagerProps) {
+  const [punti, setPunti] = useState<OdgPunto[]>(() => initialPoints || []);
   const [newPointText, setNewPointText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isForwarding, setIsForwarding] = useState(false);

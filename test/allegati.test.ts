@@ -298,6 +298,11 @@ describe('FASE 5 - Allegati: Validazione, Storage, Cache e Resilienza', () => {
       }),
     };
 
+    const origFrom = supabase.from;
+    (supabase as any).from = () => ({
+      select: async () => ({ data: [], error: null }),
+    });
+
     try {
       const orphans = await findOrphanStorageFiles();
       // Solo il file 3 (vecchio >24h e senza riga) deve essere segnalato
@@ -307,6 +312,7 @@ describe('FASE 5 - Allegati: Validazione, Storage, Cache e Resilienza', () => {
       expect(orphans[0].ageHours).toBeGreaterThanOrEqual(24);
     } finally {
       (supabase as any).storage = origStorage;
+      (supabase as any).from = origFrom;
     }
   });
 
@@ -395,9 +401,22 @@ describe('FASE 5 - Allegati: Validazione, Storage, Cache e Resilienza', () => {
       open: async () => mockCache,
     };
 
-    const removed = await removeAttachmentFromCache('giochi/g-1/test_photo.webp');
-    expect(removed).toBe(true);
-    expect(deletedUrl).toContain('giochi/g-1/test_photo.webp');
+    const origStorage = supabase.storage;
+    (supabase as any).storage = {
+      from: () => ({
+        getPublicUrl: (path: string) => ({
+          data: { publicUrl: `https://mock.supabase.co/storage/v1/object/public/allegati/${path}` },
+        }),
+      }),
+    };
+
+    try {
+      const removed = await removeAttachmentFromCache('giochi/g-1/test_photo.webp');
+      expect(removed).toBe(true);
+      expect(deletedUrl).toContain('giochi/g-1/test_photo.webp');
+    } finally {
+      (supabase as any).storage = origStorage;
+    }
   });
 
   // 12. CORREZIONE 3: Tetto 150 MB Cache API con rimozione elementi meno recenti e listener quota

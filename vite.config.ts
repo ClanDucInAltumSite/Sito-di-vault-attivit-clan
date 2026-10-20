@@ -62,6 +62,7 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,webp}'],
+        globIgnores: ['**/pdf.worker*.*', '**/pdf-*.js', '**/pdfjs*.*'],
         cleanupOutdatedCaches: true,
         navigateFallback: `${basePath}index.html`,
         navigateFallbackAllowlist: [/^(?!\/__).*/],
@@ -74,6 +75,20 @@ export default defineConfig({
               expiration: {
                 maxEntries: 150,
                 maxAgeSeconds: 60 * 24 * 60 * 60, // 60 giorni
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
+          },
+          {
+            urlPattern: /.*(?:pdf\.worker|pdfjs-dist|pdf-).*\.(?:js|mjs)/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'admin-pdf-cache',
+              expiration: {
+                maxEntries: 10,
+                maxAgeSeconds: 30 * 24 * 60 * 60, // 30 giorni
               },
               cacheableResponse: {
                 statuses: [0, 200],
@@ -93,6 +108,9 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (id.includes('node_modules')) {
+            if (id.includes('pdfjs-dist')) {
+              return 'pdfjs-dist';
+            }
             if (id.includes('@supabase')) {
               return 'vendor-supabase';
             }

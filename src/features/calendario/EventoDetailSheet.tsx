@@ -10,7 +10,7 @@ import { Icon } from '../../ui/Icon';
 import { AttachmentGallery } from '../allegati/AttachmentGallery';
 import { AttachmentUploadManager } from '../allegati/AttachmentUploadManager';
 import { OdgManager } from './OdgManager';
-import { Evento } from '../../lib/db';
+import { Evento, OdgPunto } from '../../lib/db';
 import { I18N } from '../../lib/i18n';
 import { useAdmin } from '../../lib/auth';
 import {
@@ -28,6 +28,7 @@ export interface EventoDetailSheetProps {
   onDelete?: (evento: Evento) => void;
   onCreateMeeting?: () => void;
   onChanged?: () => void;
+  initialOdgPoints?: OdgPunto[];
 }
 
 export function EventoDetailSheet({
@@ -38,6 +39,7 @@ export function EventoDetailSheet({
   onDelete,
   onCreateMeeting,
   onChanged,
+  initialOdgPoints,
 }: EventoDetailSheetProps) {
   const { isAdmin } = useAdmin();
   const [attachmentKey, setAttachmentKey] = useState(0);
@@ -213,6 +215,7 @@ export function EventoDetailSheet({
             isAdmin={isAdmin}
             onCreateMeeting={onCreateMeeting}
             onChanged={onChanged}
+            initialPoints={initialOdgPoints}
           />
         )}
 

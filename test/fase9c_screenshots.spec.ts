@@ -25,7 +25,7 @@ test.describe('FASE 9C — Screenshot e Verifica Visiva Sfondo Majella', () => {
           await page.emulateMedia({ colorScheme: theme });
 
           await page.goto(route.hash);
-          await page.waitForLoadState('networkidle');
+          await page.waitForLoadState('domcontentloaded');
           await page.waitForTimeout(300);
 
           // Verifica che lo sfondo topografico sia presente
@@ -52,7 +52,7 @@ test.describe('FASE 9C — Screenshot e Verifica Visiva Sfondo Majella', () => {
       await page.setViewportSize({ width, height: 800 });
       for (const r of routes) {
         await page.goto(r.hash);
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('domcontentloaded');
         const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
         const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
         expect(scrollWidth).toBeLessThanOrEqual(clientWidth + 1);
@@ -64,7 +64,7 @@ test.describe('FASE 9C — Screenshot e Verifica Visiva Sfondo Majella', () => {
   test('Verifica isolamento e assenza interferenze nella modalità lettura', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('#/canti');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Seleziona o crea un canto sintetico
     const cantoRow = page.locator('.canto-row-item, .ios-card, [role="button"]').first();
@@ -93,7 +93,7 @@ test.describe('FASE 9C — Screenshot e Verifica Visiva Sfondo Majella', () => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.emulateMedia({ colorScheme: 'dark' });
     await page.goto('#/');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     await page.waitForTimeout(400);
 
     // Scorri completamente fino in fondo

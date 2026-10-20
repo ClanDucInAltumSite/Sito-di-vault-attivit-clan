@@ -332,6 +332,9 @@ export function measureSongPageOverflow(
   // Se l'ambiente DOM non ha un motore di layout attivo (es. Happy-DOM in Vitest dove scrollHeight === 0),
   // ripiega sull'algoritmo di stima deterministico
   if (!host.scrollHeight || host.scrollHeight === 0) {
+    if (pageContainer.parentNode === host) {
+      host.removeChild(pageContainer);
+    }
     const est = estimatePageOverflow(chordproPageText, isFirstPage);
     return {
       fontSizePt: est.fontSizePt,
@@ -340,28 +343,34 @@ export function measureSongPageOverflow(
     };
   }
 
-  const targetHeight = host.clientHeight || 1009;
-  const FONT_STEPS = [12, 11, 10.2, 9.5];
+  try {
+    const targetHeight = host.clientHeight || 1009;
+    const FONT_STEPS = [12, 11, 10.2, 9.5];
 
-  for (const stepPt of FONT_STEPS) {
-    pageContainer.style.fontSize = `${stepPt}pt`;
-    const currentScrollH = host.scrollHeight;
-    if (currentScrollH <= targetHeight + 2) {
-      return {
-        fontSizePt: stepPt,
-        hasOverflow: false,
-        measuredHeightPx: currentScrollH,
-      };
+    for (const stepPt of FONT_STEPS) {
+      pageContainer.style.fontSize = `${stepPt}pt`;
+      const currentScrollH = host.scrollHeight;
+      if (currentScrollH <= targetHeight + 2) {
+        return {
+          fontSizePt: stepPt,
+          hasOverflow: false,
+          measuredHeightPx: currentScrollH,
+        };
+      }
+    }
+
+    pageContainer.style.fontSize = '9.5pt';
+    const finalScrollH = host.scrollHeight;
+    return {
+      fontSizePt: 9.5,
+      hasOverflow: true,
+      measuredHeightPx: finalScrollH,
+    };
+  } finally {
+    if (pageContainer.parentNode === host) {
+      host.removeChild(pageContainer);
     }
   }
-
-  pageContainer.style.fontSize = '9.5pt';
-  const finalScrollH = host.scrollHeight;
-  return {
-    fontSizePt: 9.5,
-    hasOverflow: true,
-    measuredHeightPx: finalScrollH,
-  };
 }
 
 /**

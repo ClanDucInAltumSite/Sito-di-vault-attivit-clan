@@ -1,0 +1,186 @@
+name: CI Pipeline
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static-and-unit:
+    name: Controlli Statici, Tipi, Vitest e Budget di Peso
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del codice
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Installazione dipendenze
+        run: npm ci
+
+      - name: Controllo dei Tipi (TypeScript Typecheck)
+        run: npx tsc --noEmit
+
+      - name: Controlli Statici di Sicurezza e Assenza Segreti
+        run: |
+          echo "Verifica assenza service_role nel repository (controllo vietato)..."
+          if grep -rn "service_role" src/ supabase/migrations/ 2>/dev/null; then # controllo vietato
+            echo "::error::Rilevata stringa vietata 'service_role' nel codice sorgente!"
+            exit 1
+          fi
+          echo "Verifica assenza innerHTML insicuro..."
+          if grep -rn "dangerouslySetInnerHTML" src/ 2>/dev/null; then
+            echo "::error::Rilevato dangerouslySetInnerHTML nel codice sorgente!"
+            exit 1
+          fi
+          echo "Controlli statici superati con successo."
+
+      - name: Esecuzione Suite di Test Unitari e Golden (Vitest)
+        run: npm test
+
+      - name: Build di Produzione PWA
+        env:
+          VITE_BASE_PATH: /Sito-di-vault-attivit-clan/
+        run: npm run build
+
+      - name: Verifica Budget di Peso (Bundle, Precache, Foto)
+        run: node scripts/check_weight_budget.mjs
+
+  playwright-e2e:
+    name: Playwright (${{ matrix.project }})
+    needs: static-and-unit
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - project: chromium
+            specs: test/verify_ui.spec.ts test/visual_regression.spec.ts test/stampa_pdf.spec.ts test/offline_matrix.spec.ts
+          - project: webkit
+            specs: test/verify_ui.spec.ts test/visual_regression.spec.ts
+          - project: mobile-iphone-se
+            specs: test/verify_ui.spec.ts test/visual_regression.spec.ts
+          - project: mobile-iphone-15
+            specs: test/verify_ui.spec.ts test/visual_regression.spec.ts
+          - project: tablet-ipad
+            specs: test/verify_ui.spec.ts test/visual_regression.spec.ts
+          - project: mobile-android
+            specs: test/verify_ui.spec.ts test/visual_regression.spec.ts
+    steps:
+      - name: Checkout del codice
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Installazione dipendenze
+        run: npm ci
+
+      - name: Build preliminare PWA per preview
+        env:
+          VITE_BASE_PATH: /Sito-di-vault-attivit-clan/
+        run: npm run build
+
+      - name: Installazione Browser Playwright (Chromium e WebKit)
+        run: npx playwright install --with-deps chromium webkit
+
+      - name: Esecuzione Test Playwright (${{ matrix.project }})
+        run: npx playwright test ${{ matrix.specs }} --project=${{ matrix.project }}
+
+      - name: Caricamento Tracce e Screenshot su Fallimento
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-failure-${{ matrix.project }}-${{ github.run_id }}
+          path: |
+            test-results/
+            test/__screenshots__/
+          retention-days: 7
+
+  lighthouse-ci:
+    name: Audit Lighthouse CI (3 Esecuzioni, Mediana e JSON)
+    needs: static-and-unit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del codice
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Installazione dipendenze
+        run: npm ci
+
+      - name: Build dell'applicazione
+        env:
+          VITE_BASE_PATH: /Sito-di-vault-attivit-clan/
+        run: npm run build
+
+      - name: Installazione Lighthouse CI CLI
+        run: npm install -g @lhci/cli@0.14.x
+
+      - name: Esecuzione Raccolta ed Assert Lighthouse CI (3 run)
+        run: |
+          lhci collect
+          lhci assert
+
+      - name: Calcolo e Visualizzazione Risultati Grezzi e Mediana
+        if: always()
+        run: |
+          node -e '
+          import fs from "fs";
+          import path from "path";
+          const dir = ".lighthouseci";
+          if (fs.existsSync(dir)) {
+            const files = fs.readdirSync(dir).filter(f => f.startsWith("lhr-") && f.endsWith(".json"));
+            console.log("\n======================================================================");
+            console.log("RISULTATI AUDIT LIGHTHOUSE CI (3 ESECUZIONI E MEDIANA)");
+            console.log("======================================================================");
+            const scores = { perf: [], a11y: [], bp: [] };
+            files.forEach((f, idx) => {
+              try {
+                const data = JSON.parse(fs.readFileSync(path.join(dir, f), "utf8"));
+                const perf = Math.round((data.categories.performance?.score || 0) * 100);
+                const a11y = Math.round((data.categories.accessibility?.score || 0) * 100);
+                const bp = Math.round((data.categories["best-practices"]?.score || 0) * 100);
+                scores.perf.push(perf);
+                scores.a11y.push(a11y);
+                scores.bp.push(bp);
+                console.log(`Run ${idx + 1}: Performance=${perf}, Accessibilità=${a11y}, Best Practices=${bp}`);
+              } catch (e) {}
+            });
+            const median = arr => {
+              if (arr.length === 0) return 0;
+              const s = [...arr].sort((a,b) => a - b);
+              const mid = Math.floor(s.length / 2);
+              return s.length % 2 !== 0 ? s[mid] : Math.round((s[mid - 1] + s[mid]) / 2);
+            };
+            console.log("----------------------------------------------------------------------");
+            console.log(`MEDIANA FINALE: Performance=${median(scores.perf)}, Accessibilità=${median(scores.a11y)}, Best Practices=${median(scores.bp)}`);
+            console.log("======================================================================\n");
+          }
+          '
+
+      - name: Caricamento Report e JSON Grezzi Lighthouse
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-results-${{ github.run_id }}
+          path: .lighthouseci/
+          retention-days: 14

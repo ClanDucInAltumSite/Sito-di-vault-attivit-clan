@@ -17,6 +17,7 @@ export type { CleanTextResult, CleanerChange };
 export interface ParsedCantoResult {
   titolo: string;
   autore: string | null;
+  categoria?: 'scout' | 'chiesa' | 'esterni' | null;
   misura: string | null; // es. "4/4"
   bpm_testo: string | null; // es. "circa 92-94"
   tempo_bpm: number | null; // es. 92
@@ -346,6 +347,7 @@ export async function parseDocx(
   let capotasto: number | null = null;
   let misura: string | null = null;
   let tonalita: string | null = null;
+  let categoria: 'scout' | 'chiesa' | 'esterni' | null = null;
 
   // 1. Estrazione metadati da paragrafi dell'intestazione (prima della tabella)
   const paragraphs = Array.from(doc.getElementsByTagName('w:p'));
@@ -421,6 +423,15 @@ export async function parseDocx(
       if (tonMatch && tonMatch[1]) {
         tonalita = tonMatch[1].trim();
       }
+
+      // Estrai eventuale Categoria esplicita (es. "Categoria: Scout | Chiesa | Esterni")
+      const catMatch = text.match(/categoria:\s*([^\t,;.]+)/i);
+      if (catMatch && catMatch[1]) {
+        const val = catMatch[1].trim().toLowerCase();
+        if (val.includes('scout')) categoria = 'scout';
+        else if (val.includes('chiesa') || val.includes('liturgic')) categoria = 'chiesa';
+        else if (val.includes('estern') || val.includes('altr')) categoria = 'esterni';
+      }
     }
   }
 
@@ -489,6 +500,7 @@ export async function parseDocx(
   return {
     titolo: titolo || 'Canto Senza Titolo',
     autore,
+    categoria,
     misura,
     bpm_testo,
     tempo_bpm,

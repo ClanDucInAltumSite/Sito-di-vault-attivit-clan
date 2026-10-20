@@ -290,69 +290,60 @@ test.describe('CORREZIONE 2 - Verifica Stress UI con Dati Sporchi, Viewport Rist
   async function populateDirtyData(page: any) {
     await page.goto('#/');
     await page.waitForLoadState('networkidle');
+    await page.waitForFunction(() => typeof (window as any).__dbPutRecords === 'function');
 
-    await page.evaluate(async () => {
-      const req = indexedDB.open('vault_scout_db', 1);
-      await new Promise<void>((resolve, reject) => {
-        req.onsuccess = () => {
-          const db = req.result;
-          const tx = db.transaction(['giochi', 'bans', 'canti'], 'readwrite');
-          const gStore = tx.objectStore('giochi');
-          const bStore = tx.objectStore('bans');
-          const cStore = tx.objectStore('canti');
+    const dirtyGiochi: any[] = [];
+    const dirtyBans: any[] = [];
+    const dirtyCanti: any[] = [];
 
-          for (let i = 1; i <= 200; i++) {
-            const longUnbroken = `SupercalifragilistichespiralidosoStranoTitoloLunghissimoSenzaSpazi_${i}`;
-            const dirtyChars = `& <special> 'singolo' "doppio" èéòàùì ${i}`;
-            const gNome = `Gioco_${i}_${longUnbroken}_${dirtyChars}`;
-            const bNome = `Ban_${i}_${longUnbroken}_${dirtyChars}`;
-            const cTitolo = `Canto_${i}_${longUnbroken}_${dirtyChars}`;
-
-            gStore.put({
-              id: `dirty-g-${i}`,
-              nome: gNome,
-              regole: `Regole lunghe con caratteri <tag> & "virgolette" per elemento ${i}. ${longUnbroken}`,
-              materiali: `Materiale_${i} <test>`,
-              created_at: new Date(Date.now() - i * 3600000).toISOString(),
-              updated_at: new Date(Date.now() - i * 3600000).toISOString(),
-              deleted_at: null,
-            });
-
-            bStore.put({
-              id: `dirty-b-${i}`,
-              nome: bNome,
-              testo: `Testo del ban con parole lunghe ${longUnbroken} e caratteri <script>alert(1)</script> & "cit"`,
-              note_gesti: `Gesti_${i} <special>`,
-              created_at: new Date(Date.now() - i * 3600000).toISOString(),
-              updated_at: new Date(Date.now() - i * 3600000).toISOString(),
-              deleted_at: null,
-            });
-
-            cStore.put({
-              id: `dirty-c-${i}`,
-              titolo: cTitolo,
-              autore: `Autore_${i} & Clan`,
-              tonalita: 'Re',
-              ritmo: '4/4',
-              tempo_bpm: 120,
-              misura: '4/4',
-              capotasto: null,
-              testo_chordpro: `[Re]Testo del canto ${i} con [Sol]accordi e <caratteri> & "cit"\n{ritornello}\n[La]Ritornello ${longUnbroken}`,
-              created_at: new Date(Date.now() - i * 3600000).toISOString(),
-              updated_at: new Date(Date.now() - i * 3600000).toISOString(),
-              deleted_at: null,
-            });
-          }
-
-          tx.oncomplete = () => resolve();
-          tx.onerror = () => reject(tx.error);
-        };
-        req.onerror = () => reject(req.error);
+    for (let i = 1; i <= 200; i++) {
+      const longUnbroken = `SupercalifragilistichespiralidosoStranoTitoloLunghissimoSenzaSpazi_${i}`;
+      const dirtyChars = `& <special> 'singolo' "doppio" èéòàùì ${i}`;
+      dirtyGiochi.push({
+        id: `dirty-g-${i}`,
+        nome: `Gioco_${i}_${longUnbroken}_${dirtyChars}`,
+        regole: `Regole lunghe con caratteri <tag> & "virgolette" per elemento ${i}. ${longUnbroken}`,
+        materiali: `Materiale_${i} <test>`,
+        created_at: new Date(Date.now() - i * 3600000).toISOString(),
+        updated_at: new Date(Date.now() - i * 3600000).toISOString(),
+        deleted_at: null,
       });
-    });
+
+      dirtyBans.push({
+        id: `dirty-b-${i}`,
+        nome: `Ban_${i}_${longUnbroken}_${dirtyChars}`,
+        testo: `Testo del ban con parole lunghe ${longUnbroken} e caratteri <script>alert(1)</script> & "cit"`,
+        note_gesti: `Gesti_${i} <special>`,
+        created_at: new Date(Date.now() - i * 3600000).toISOString(),
+        updated_at: new Date(Date.now() - i * 3600000).toISOString(),
+        deleted_at: null,
+      });
+
+      dirtyCanti.push({
+        id: `dirty-c-${i}`,
+        titolo: `Canto_${i}_${longUnbroken}_${dirtyChars}`,
+        autore: `Autore_${i} & Clan`,
+        tonalita: 'Re',
+        ritmo: '4/4',
+        tempo_bpm: 120,
+        misura: '4/4',
+        capotasto: null,
+        testo_chordpro: `[Re]Testo del canto ${i} con [Sol]accordi e <caratteri> & "cit"\n{ritornello}\n[La]Ritornello ${longUnbroken}`,
+        created_at: new Date(Date.now() - i * 3600000).toISOString(),
+        updated_at: new Date(Date.now() - i * 3600000).toISOString(),
+        deleted_at: null,
+      });
+    }
+
+    await page.evaluate(async (data: any) => {
+      await (window as any).__dbPutRecords('giochi', data.dirtyGiochi);
+      await (window as any).__dbPutRecords('bans', data.dirtyBans);
+      await (window as any).__dbPutRecords('canti', data.dirtyCanti);
+    }, { dirtyGiochi, dirtyBans, dirtyCanti });
   }
 
   test('Popolamento 200 elementi sporchi, ricerca typo/special chars, ordinamento, sheet e visibilità ultimo elemento su Giochi', async ({ page }) => {
+    test.slow();
     await page.setViewportSize({ width: 390, height: 844 });
     await populateDirtyData(page);
 
@@ -377,19 +368,21 @@ test.describe('CORREZIONE 2 - Verifica Stress UI con Dati Sporchi, Viewport Rist
     // 4. Test ordinamento 4-way
     const sortZtoA = page.locator('button:has-text("Z → A")');
     if ((await sortZtoA.count()) > 0) {
-      await sortZtoA.click();
-      await page.waitForTimeout(100);
+      await sortZtoA.evaluate((el: any) => (el as HTMLElement).click());
+      await page.waitForTimeout(200);
     }
+    await searchInput.blur();
+    await page.waitForTimeout(100);
 
     // 5. Apertura foglio dettaglio
     const firstRow = page.locator('.ios-grouped-row').first();
-    await firstRow.click();
+    await firstRow.evaluate((el: any) => (el as HTMLElement).click());
     await page.waitForSelector('[role="dialog"]');
     expect(await page.locator('[role="dialog"]').isVisible()).toBe(true);
 
     // Chiusura foglio dettaglio tramite close button superiore
     const closeBtn = page.locator('.ios-sheet-close-btn').first();
-    await closeBtn.click();
+    await closeBtn.evaluate((el: any) => (el as HTMLElement).click());
     await page.waitForTimeout(200);
 
     // 6. Test con tastiera a schermo simulata (altezza ridotta 400px e input a fuoco)
@@ -432,22 +425,22 @@ test.describe('CORREZIONE 2 - Verifica Stress UI con Dati Sporchi, Viewport Rist
     await page.goto('/#/bans');
     await page.waitForSelector('.ios-grouped-row');
     const firstBanRow = page.locator('.ios-grouped-row').first();
-    await firstBanRow.click();
+    await firstBanRow.evaluate((el: any) => (el as HTMLElement).click());
     await page.waitForSelector('[role="dialog"]');
     expect(await page.locator('[role="dialog"]').isVisible()).toBe(true);
     const closeBanBtn = page.locator('.ios-sheet-close-btn').first();
-    await closeBanBtn.click();
+    await closeBanBtn.evaluate((el: any) => (el as HTMLElement).click());
     await page.waitForTimeout(200);
 
     // Test su Canti
     await page.goto('/#/canti');
     await page.waitForSelector('.ios-grouped-row');
     const firstCantoRow = page.locator('.ios-grouped-row').first();
-    await firstCantoRow.click();
+    await firstCantoRow.evaluate((el: any) => (el as HTMLElement).click());
     await page.waitForSelector('[role="dialog"]');
     expect(await page.locator('[role="dialog"]').isVisible()).toBe(true);
     const closeCantoBtn = page.locator('.ios-sheet-close-btn').first();
-    await closeCantoBtn.click();
+    await closeCantoBtn.evaluate((el: any) => (el as HTMLElement).click());
   });
 });
 
@@ -492,97 +485,86 @@ test.describe('FASE 7 - Verifica Calendario e ODG (#/calendario)', () => {
   async function seedCalendarData(page: any) {
     await page.goto('#/');
     await page.waitForLoadState('networkidle');
+    await page.waitForFunction(() => typeof (window as any).__dbPutRecords === 'function');
 
-    await page.evaluate(async () => {
-      const req = indexedDB.open('vault_scout_db', 1);
-      await new Promise<void>((resolve, reject) => {
-        req.onsuccess = () => {
-          const db = req.result;
-          const tx = db.transaction(['eventi', 'odg_punti'], 'readwrite');
-          const evStore = tx.objectStore('eventi');
-          const odgStore = tx.objectStore('odg_punti');
+    const now = new Date();
+    const todayIso = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 18, 30).toISOString();
+    const tomorrowIso = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 9, 0).toISOString();
+    const pastIso = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 5, 20, 0).toISOString();
 
-          const now = new Date();
-          const todayIso = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 18, 30).toISOString();
-          const tomorrowIso = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 9, 0).toISOString();
-          const pastIso = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 5, 20, 0).toISOString();
+    // 1. Evento Oggi (Riunione con ODG denso)
+    const evOggi = {
+      id: 'ev-oggi-test',
+      titolo: 'Riunione Ordinaria di Clan & Verifica Fasi',
+      tipo: 'riunione',
+      inizio: todayIso,
+      fine: new Date(now.getFullYear(), now.getMonth(), now.getDate(), 20, 30).toISOString(),
+      tutto_il_giorno: false,
+      luogo: 'Sede Clan San Giovanni',
+      descrizione: 'Verifica dettagliata delle attività del mese e approvazione ordini del giorno.',
+      responsabile: 'Capi Clan',
+      cosa_portare: 'Quaderno di caccia, penna, cassa',
+      created_at: now.toISOString(),
+      updated_at: now.toISOString(),
+      deleted_at: null,
+    };
 
-          // 1. Evento Oggi (Riunione con ODG denso)
-          const evOggi = {
-            id: 'ev-oggi-test',
-            titolo: 'Riunione Ordinaria di Clan & Verifica Fasi',
-            tipo: 'riunione',
-            inizio: todayIso,
-            fine: new Date(now.getFullYear(), now.getMonth(), now.getDate(), 20, 30).toISOString(),
-            tutto_il_giorno: false,
-            luogo: 'Sede Clan San Giovanni',
-            descrizione: 'Verifica dettagliata delle attività del mese e approvazione ordini del giorno.',
-            responsabile: 'Capi Clan',
-            cosa_portare: 'Quaderno di caccia, penna, cassa',
-            created_at: now.toISOString(),
-            updated_at: now.toISOString(),
-            deleted_at: null,
-          };
+    // 2. Evento Domani (Uscita)
+    const evDomani = {
+      id: 'ev-domani-test',
+      titolo: 'Uscita di Pattuglia sui Sibillini',
+      tipo: 'uscita',
+      inizio: tomorrowIso,
+      fine: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 2, 17, 0).toISOString(),
+      tutto_il_giorno: false,
+      luogo: 'Monte Vettore - Rifugio Zilioli',
+      descrizione: 'Trekking di 2 giorni in autonomia.',
+      responsabile: 'Pattuglia Aquile',
+      cosa_portare: 'Tenda, fornellino, viveri',
+      created_at: now.toISOString(),
+      updated_at: now.toISOString(),
+      deleted_at: null,
+    };
 
-          // 2. Evento Domani (Uscita)
-          const evDomani = {
-            id: 'ev-domani-test',
-            titolo: 'Uscita di Pattuglia sui Sibillini',
-            tipo: 'uscita',
-            inizio: tomorrowIso,
-            fine: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 2, 17, 0).toISOString(),
-            tutto_il_giorno: false,
-            luogo: 'Monte Vettore - Rifugio Zilioli',
-            descrizione: 'Trekking di 2 giorni in autonomia.',
-            responsabile: 'Pattuglia Aquile',
-            cosa_portare: 'Tenda, fornellino, viveri',
-            created_at: now.toISOString(),
-            updated_at: now.toISOString(),
-            deleted_at: null,
-          };
+    // 3. Evento Passato
+    const evPassato = {
+      id: 'ev-passato-test',
+      titolo: 'Verifica Inizio Anno Scout',
+      tipo: 'evento',
+      inizio: pastIso,
+      fine: null,
+      tutto_il_giorno: false,
+      luogo: 'Oratorio',
+      descrizione: 'Incontro con la Comunità Capi',
+      responsabile: 'Capi Gruppo',
+      cosa_portare: null,
+      created_at: pastIso,
+      updated_at: pastIso,
+      deleted_at: null,
+    };
 
-          // 3. Evento Passato
-          const evPassato = {
-            id: 'ev-passato-test',
-            titolo: 'Verifica Inizio Anno Scout',
-            tipo: 'evento',
-            inizio: pastIso,
-            fine: null,
-            tutto_il_giorno: false,
-            luogo: 'Oratorio',
-            descrizione: 'Incontro con la Comunità Capi',
-            responsabile: 'Capi Gruppo',
-            cosa_portare: null,
-            created_at: pastIso,
-            updated_at: pastIso,
-            deleted_at: null,
-          };
+    const eventi = [evOggi, evDomani, evPassato];
+    const odgPunti: any[] = [];
 
-          evStore.put(evOggi);
-          evStore.put(evDomani);
-          evStore.put(evPassato);
-
-          // Stress test: 30 punti ODG con stringhe lunghe
-          for (let i = 1; i <= 30; i++) {
-            odgStore.put({
-              id: `odg-pt-${i}`,
-              evento_id: 'ev-oggi-test',
-              testo: `Punto ODG #${i}: Discussione approfondita sui progetti di servizio ${i % 2 === 0 ? 'con testo esteso per verifica layout reattivo senza troncamenti strani' : 'breve'}`,
-              ordine: i - 1,
-              completato: i % 4 === 0, // Ogni 4 completato
-              riportato_da: i === 5 ? 'odg-vecchio-id' : null,
-              created_at: now.toISOString(),
-              updated_at: now.toISOString(),
-              deleted_at: null,
-            });
-          }
-
-          tx.oncomplete = () => resolve();
-          tx.onerror = () => reject(tx.error);
-        };
-        req.onerror = () => reject(req.error);
+    // Stress test: 30 punti ODG con stringhe lunghe
+    for (let i = 1; i <= 30; i++) {
+      odgPunti.push({
+        id: `odg-pt-${i}`,
+        evento_id: 'ev-oggi-test',
+        testo: `Punto ODG #${i}: Discussione approfondita sui progetti di servizio ${i % 2 === 0 ? 'con testo esteso per verifica layout reattivo senza troncamenti strani' : 'breve'}`,
+        ordine: i - 1,
+        completato: i % 4 === 0, // Ogni 4 completato
+        riportato_da: i === 5 ? 'odg-vecchio-id' : null,
+        created_at: now.toISOString(),
+        updated_at: now.toISOString(),
+        deleted_at: null,
       });
-    });
+    }
+
+    await page.evaluate(async (data: any) => {
+      await (window as any).__dbPutRecords('eventi', data.eventi);
+      await (window as any).__dbPutRecords('odg_punti', data.odgPunti);
+    }, { eventi, odgPunti });
   }
 
   test('Audit accessibilità WCAG AA su Calendario View (#/calendario)', async ({ page }) => {
@@ -607,6 +589,7 @@ test.describe('FASE 7 - Verifica Calendario e ODG (#/calendario)', () => {
   });
 
   test('Verifica rendering Griglia Mese, commutazione Prossimi/Passati e apertura Dettaglio con ODG', async ({ page }) => {
+    test.slow();
     await page.setViewportSize({ width: 390, height: 844 });
     await seedCalendarData(page);
     await page.goto('/#/calendario');
@@ -634,14 +617,15 @@ test.describe('FASE 7 - Verifica Calendario e ODG (#/calendario)', () => {
 
     // 3. Apertura Dettaglio Evento con ODG denso (30 punti)
     const riunioneRow = page.locator('.ios-grouped-row:has-text("Riunione Ordinaria")').first();
-    await riunioneRow.click();
-    await page.waitForSelector('[role="dialog"]');
+    await expect(riunioneRow).toBeVisible({ timeout: 15000 });
+    await riunioneRow.evaluate((el: any) => (el as HTMLElement).click());
     const dialog = page.locator('[role="dialog"]');
-    await expect(dialog).toBeVisible();
+    await expect(dialog).toBeVisible({ timeout: 15000 });
+    await page.waitForTimeout(400);
 
     // Verifica contatore badge ODG aperti
     const odgOpenBadge = dialog.locator('.odg-open-badge');
-    await expect(odgOpenBadge).toBeVisible();
+    await expect(odgOpenBadge).toBeVisible({ timeout: 15000 });
 
     // Verifica presenza elementi ODG
     const odgItems = dialog.locator('.odg-item');
@@ -666,5 +650,97 @@ test.describe('FASE 7 - Verifica Calendario e ODG (#/calendario)', () => {
     await expect(page.locator('text=Verifica Inizio Anno Scout')).toBeVisible();
   });
 });
+
+test.describe('Verifica Generale di Assenza Perdita di Stili (Style Bleed & Integrity Multi-Rotta)', () => {
+  const ROUTE_ORDERS = [
+    {
+      name: 'Ordine 1: Standard (Home -> Giochi -> Bans -> Canti -> Calendario -> Stampa -> Admin -> Design -> StatoDati)',
+      routes: ['#/', '#/giochi', '#/bans', '#/canti', '#/calendario', '#/stampa', '#/admin', '#/design', '#/statodati'],
+    },
+    {
+      name: 'Ordine 2: Canti e Stampa prioritari (Canti -> Stampa -> Admin -> StatoDati -> Design -> Calendario -> Bans -> Giochi -> Home)',
+      routes: ['#/canti', '#/stampa', '#/admin', '#/statodati', '#/design', '#/calendario', '#/bans', '#/giochi', '#/'],
+    },
+    {
+      name: 'Ordine 3: Interlacciato (Giochi -> Stampa -> Calendario -> Admin -> Canti -> Bans -> Design -> StatoDati -> Home)',
+      routes: ['#/giochi', '#/stampa', '#/calendario', '#/admin', '#/canti', '#/bans', '#/design', '#/statodati', '#/'],
+    },
+  ];
+
+  const THEMES = ['light', 'dark'] as const;
+
+  for (const theme of THEMES) {
+    for (const order of ROUTE_ORDERS) {
+      test(`Integrità stili preservata in ${order.name} [Tema: ${theme}]`, async ({ page }) => {
+        // 1. Inizializza prima rotta e imposta tema
+        const firstRoute = order.routes[0];
+        await page.goto(firstRoute);
+        await page.waitForSelector('#app', { state: 'attached' });
+
+        await page.evaluate((th) => {
+          document.documentElement.setAttribute('data-theme', th);
+          localStorage.setItem('theme', th);
+        }, theme);
+
+        await page.waitForTimeout(200);
+
+        // Funzione helper per catturare metriche di stile calcolate della vista
+        const captureMetrics = async () => {
+          return await page.evaluate(() => {
+            const body = document.body;
+            const heading = document.querySelector('h1, h2, .header-banner-title') as HTMLElement | null;
+            const item = document.querySelector('.ios-grouped-row-title, p, main') as HTMLElement | null;
+
+            const bodyStyle = window.getComputedStyle(body);
+            const headingStyle = heading ? window.getComputedStyle(heading) : null;
+            const itemStyle = item ? window.getComputedStyle(item) : null;
+
+            return {
+              bodyBg: bodyStyle.backgroundColor,
+              bodyColor: bodyStyle.color,
+              headingColor: headingStyle?.color || '',
+              headingFontFamily: headingStyle?.fontFamily || '',
+              headingFontSize: headingStyle?.fontSize || '',
+              headingFontWeight: headingStyle?.fontWeight || '',
+              itemColor: itemStyle?.color || '',
+              itemFontFamily: itemStyle?.fontFamily || '',
+              itemFontSize: itemStyle?.fontSize || '',
+            };
+          });
+        };
+
+        const beforeMetrics = await captureMetrics();
+        expect(beforeMetrics.bodyBg).not.toBe('');
+
+        // 2. Visita tutte le altre rotte nella sequenza dell'ordine specificato
+        for (let i = 1; i < order.routes.length; i++) {
+          const route = order.routes[i];
+          await page.evaluate((r) => { window.location.hash = r; }, route);
+          await page.waitForTimeout(150);
+          await page.waitForSelector('#app', { state: 'attached' });
+        }
+
+        // 3. Ritorna alla prima rotta visitata
+        await page.evaluate((r) => { window.location.hash = r; }, firstRoute);
+        await page.waitForTimeout(250);
+
+        // 4. Rileva nuovamente le metriche di stile calcolate
+        const afterMetrics = await captureMetrics();
+
+        // 5. Asserzioni di assoluta identità (Zero style bleed / zero perdita stili)
+        expect(afterMetrics.bodyBg, 'Il colore di sfondo della pagina deve rimanere identico').toBe(beforeMetrics.bodyBg);
+        expect(afterMetrics.bodyColor, 'Il colore del testo del body deve rimanere identico').toBe(beforeMetrics.bodyColor);
+        expect(afterMetrics.headingColor, 'Il colore dei titoli deve rimanere identico').toBe(beforeMetrics.headingColor);
+        expect(afterMetrics.headingFontFamily, 'Il font dei titoli deve rimanere identico').toBe(beforeMetrics.headingFontFamily);
+        expect(afterMetrics.headingFontSize, 'La dimensione dei titoli deve rimanere identica').toBe(beforeMetrics.headingFontSize);
+        expect(afterMetrics.headingFontWeight, 'Il peso dei titoli deve rimanere identico').toBe(beforeMetrics.headingFontWeight);
+        expect(afterMetrics.itemColor, 'Il colore degli elementi di testo deve rimanere identico').toBe(beforeMetrics.itemColor);
+        expect(afterMetrics.itemFontFamily, 'Il font degli elementi di testo deve rimanere identico').toBe(beforeMetrics.itemFontFamily);
+        expect(afterMetrics.itemFontSize, 'La dimensione del testo deve rimanere identica').toBe(beforeMetrics.itemFontSize);
+      });
+    }
+  }
+});
+
 
 

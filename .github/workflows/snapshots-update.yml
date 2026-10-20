@@ -1,0 +1,64 @@
+name: Aggiornamento Baseline Snapshot (Linux CI)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Digita "aggiorna" per confermare la rigenerazione delle baseline screenshot su Linux Ubuntu'
+        required: true
+        default: 'aggiorna'
+
+permissions:
+  contents: write
+
+jobs:
+  update-snapshots:
+    name: Rigenera Baseline Screenshot su Ubuntu Linux
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.confirm == 'aggiorna' }}
+    steps:
+      - name: Checkout del codice
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Installazione dipendenze
+        run: npm ci
+
+      - name: Build preliminare PWA
+        env:
+          VITE_BASE_PATH: /Sito-di-vault-attivit-clan/
+        run: npm run build
+
+      - name: Installazione Chromium Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Rigenerazione Snapshot Playwright
+        env:
+          UPDATE_SNAPSHOTS: 'true'
+        run: npx playwright test test/visual_regression.spec.ts --update-snapshots --project=chromium
+
+      - name: Commit e Push Baseline su Ramo Attuale
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add test/__screenshots__/*.png
+          if git diff --staged --quiet; then
+            echo "Nessuna variazione negli screenshot di baseline."
+          else
+            git commit -m "chore(visual): aggiornamento baseline screenshot Linux da workflow CI [skip ci]"
+            git push
+            echo "Nuove baseline caricate con successo sul ramo."
+          fi
+
+      - name: Caricamento Artefatti Screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-baseline-screenshots-${{ github.run_id }}
+          path: test/__screenshots__/
+          retention-days: 14

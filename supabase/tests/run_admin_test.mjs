@@ -6,8 +6,19 @@
 import { createClient } from '@supabase/supabase-js';
 import readline from 'readline';
 
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://lpeiyzwccedtqjbficjo.supabase.co';
-const ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxwZWl5endjY2VkdHFqYmZpY2pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5MTgzNTQsImV4cCI6MjEwNzQ5NDM1NH0.9eIZRUNLPlJn1l4DMs46DNauFdi_32X2y6YBZ1ytZSQ';
+const PROD_PROJECT_REF = 'lpeiyzwccedtqjbficjo';
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.STAGING_SUPABASE_URL || 'https://lpeiyzwccedtqjbficjo.supabase.co';
+const ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || process.env.STAGING_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxwZWl5endjY2VkdHFqYmZpY2pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5MTgzNTQsImV4cCI6MjEwNzQ5NDM1NH0.9eIZRUNLPlJn1l4DMs46DNauFdi_32X2y6YBZ1ytZSQ';
+
+// CONTROLLO DI SICUREZZA BLOCCANTE SULL'URL DI PRODUZIONE
+if (SUPABASE_URL.includes(PROD_PROJECT_REF) && process.env.ALLOW_PROD_ADMIN_TEST !== 'true') {
+  console.error('\n======================================================================');
+  console.error('ERRORE BLOCCANTE DI SICUREZZA:');
+  console.error(`Tentativo di esecuzione test di scrittura Admin sul database di PRODUZIONE (${PROD_PROJECT_REF})!`);
+  console.error('I test che effettuano scritture devono essere eseguiti solo su STAGING.');
+  console.error('======================================================================\n');
+  process.exit(1);
+}
 
 // Client anonimo isolato (nessuna sessione)
 const anonClient = createClient(SUPABASE_URL, ANON_KEY, {

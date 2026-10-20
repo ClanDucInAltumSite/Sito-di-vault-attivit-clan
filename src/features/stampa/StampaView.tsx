@@ -38,12 +38,14 @@ import { CanzonierePageRenderer } from '../canti/CanzonierePageRenderer';
 import { ensureCanzoniereFontsLoaded } from '../canti/canzoniere_fonts';
 
 type SectionTab = 'tutti' | 'giochi' | 'bans' | 'canti' | 'odg';
+type CantiCategoryTab = 'tutti' | 'scout' | 'chiesa' | 'esterni';
 
 export function StampaView() {
   const [config, setConfig] = useState<StampaConfig>(() => loadStampaConfig());
   const [giochi, setGiochi] = useState<Gioco[]>([]);
   const [bans, setBans] = useState<Ban[]>([]);
   const [canti, setCanti] = useState<Canto[]>([]);
+  const [cantiCategoryTab, setCantiCategoryTab] = useState<CantiCategoryTab>('tutti');
   const [eventi, setEventi] = useState<Evento[]>([]);
   const [odgPuntiMap, setOdgPuntiMap] = useState<Record<string, OdgPunto[]>>({});
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
@@ -195,6 +197,13 @@ export function StampaView() {
     }
   };
 
+  // Seleziona canti per categoria (Fase 11F)
+  const selectCantiByCategory = (cat: 'scout' | 'chiesa' | 'esterni') => {
+    const idsToAdd = canti.filter((c) => c.categoria === cat).map((c) => c.id);
+    const combined = Array.from(new Set([...config.selectedCantiIds, ...idsToAdd]));
+    updateConfig({ ...config, selectedCantiIds: combined });
+  };
+
   // Riordino su / giù
   const handleReorder = (
     section: 'giochi' | 'bans' | 'canti',
@@ -274,12 +283,16 @@ export function StampaView() {
   }, [bans, searchQuery]);
 
   const filteredCanti = useMemo(() => {
-    if (!searchQuery.trim()) return canti;
-    return canti.filter((c) => {
+    let list = canti;
+    if (cantiCategoryTab !== 'tutti') {
+      list = list.filter((c) => c.categoria === cantiCategoryTab);
+    }
+    if (!searchQuery.trim()) return list;
+    return list.filter((c) => {
       const clean = stripChords(c.testo_chordpro);
       return matchesQuery(searchQuery, c.titolo, c.autore || '', clean);
     });
-  }, [canti, searchQuery]);
+  }, [canti, cantiCategoryTab, searchQuery]);
 
   const filteredEventi = useMemo(() => {
     if (!searchQuery.trim()) return eventi;
@@ -821,6 +834,46 @@ export function StampaView() {
 
             {isCantiOpen && (
               <div style={{ marginTop: 'var(--space-3)' }}>
+                {/* Filtro e Azioni Rapide Categoria Stampa (Fase 11F) */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
+                  <SegmentedControl
+                    options={[
+                      { value: 'tutti', label: `Tutti (${canti.length})` },
+                      { value: 'scout', label: `Scout (${canti.filter((c) => c.categoria === 'scout').length})` },
+                      { value: 'chiesa', label: `Chiesa (${canti.filter((c) => c.categoria === 'chiesa').length})` },
+                      { value: 'esterni', label: `Esterni (${canti.filter((c) => c.categoria === 'esterni').length})` },
+                    ]}
+                    value={cantiCategoryTab}
+                    onChange={(val) => setCantiCategoryTab(val as CantiCategoryTab)}
+                  />
+                  <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className="ios-btn ios-btn-secondary"
+                      style={{ minHeight: '26px', padding: '0 8px', fontSize: '0.75rem' }}
+                      onClick={() => selectCantiByCategory('scout')}
+                    >
+                      + Tutti Scout
+                    </button>
+                    <button
+                      type="button"
+                      className="ios-btn ios-btn-secondary"
+                      style={{ minHeight: '26px', padding: '0 8px', fontSize: '0.75rem' }}
+                      onClick={() => selectCantiByCategory('chiesa')}
+                    >
+                      + Tutti Chiesa
+                    </button>
+                    <button
+                      type="button"
+                      className="ios-btn ios-btn-secondary"
+                      style={{ minHeight: '26px', padding: '0 8px', fontSize: '0.75rem' }}
+                      onClick={() => selectCantiByCategory('esterni')}
+                    >
+                      + Tutti Esterni
+                    </button>
+                  </div>
+                </div>
+
                 {filteredCanti.length === 0 ? (
                   <div style={{ color: 'var(--color-text-secondary)', padding: 'var(--space-3) 0', fontSize: 'var(--font-size-sm)' }}>
                     {searchQuery.trim() ? 'Nessun canto corrispondente alla ricerca.' : 'Nessun canto presente nel vault.'}
@@ -863,8 +916,28 @@ export function StampaView() {
                               aria-label={`Seleziona ${c.titolo}`}
                             />
                             <div>
-                              <div style={{ fontWeight: 600, fontSize: 'var(--font-size-sm)' }}>
-                                {c.titolo}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                                <div style={{ fontWeight: 600, fontSize: 'var(--font-size-sm)' }}>
+                                  {c.titolo}
+                                </div>
+                                {c.categoria && (
+                                  <Badge
+                                    variant={
+                                      c.categoria === 'scout'
+                                        ? 'azzurro'
+                                        : c.categoria === 'chiesa'
+                                        ? 'giallo'
+                                        : 'neutral'
+                                    }
+                                    size="sm"
+                                  >
+                                    {c.categoria === 'scout'
+                                      ? 'Scout'
+                                      : c.categoria === 'chiesa'
+                                      ? 'Chiesa'
+                                      : 'Esterni'}
+                                  </Badge>
+                                )}
                               </div>
                               <div
                                 style={{

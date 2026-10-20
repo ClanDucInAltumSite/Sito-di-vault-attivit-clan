@@ -1,31 +1,31 @@
 name: Deploy su GitHub Pages
 
 on:
-  push:
-    branches:
-      - main
-    paths-ignore:
-      - 'docs/**'
-      - '.github/workflows/keepalive.yml'
+  workflow_run:
+    workflows: ['CI Pipeline']
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
 
-# Permessi minimi richiesti per GitHub Pages deployment
 permissions:
   contents: read
   pages: write
   id-token: write
+  issues: write
 
-# Permette una sola esecuzione di deploy concorrente
 concurrency:
-  group: 'pages'
-  cancel-in-progress: true
+  group: 'pages-production'
+  cancel-in-progress: false
 
 jobs:
   build-and-deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    name: Pubblicazione Controllata in Produzione
+    # Il deploy parte solo se CI è verde su main o se avviato manualmente
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main') }}
     runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout del codice
         uses: actions/checkout@v4
@@ -39,7 +39,7 @@ jobs:
       - name: Installazione dipendenze
         run: npm ci
 
-      - name: Build dell'applicazione PWA
+      - name: Build dell'applicazione PWA per Produzione
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || vars.VITE_SUPABASE_URL || 'https://lpeiyzwccedtqjbficjo.supabase.co' }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || vars.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxwZWl5endjY2VkdHFqYmZpY2pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5MTgzNTQsImV4cCI6MjEwNzQ5NDM1NH0.9eIZRUNLPlJn1l4DMs46DNauFdi_32X2y6YBZ1ytZSQ' }}
@@ -57,3 +57,19 @@ jobs:
       - name: Pubblicazione su GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: Installazione browser Chromium per Smoke Test
+        run: npx playwright install --with-deps chromium
+
+      - name: Smoke Test Post-Deploy e Verifica Risorse (HTTP 200)
+        env:
+          DEPLOY_SMOKE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: npx playwright test test/smoke_deploy.spec.ts --project=chromium
+
+      - name: Controllo Schema di Produzione Post-Deploy (Sola Lettura)
+        continue-on-error: true
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || vars.VITE_SUPABASE_URL || 'https://lpeiyzwccedtqjbficjo.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || vars.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxwZWl5endjY2VkdHFqYmZpY2pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5MTgzNTQsImV4cCI6MjEwNzQ5NDM1NH0.9eIZRUNLPlJn1l4DMs46DNauFdi_32X2y6YBZ1ytZSQ' }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/check_prod_schema.mjs

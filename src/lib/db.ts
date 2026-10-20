@@ -31,16 +31,21 @@ export interface Ban {
   deleted_at: string | null;
 }
 
+export type CategoriaCanto = 'scout' | 'chiesa' | 'esterni';
+
 export interface Canto {
   id: string;
   titolo: string;
   autore: string | null;
+  categoria?: CategoriaCanto | null;
   tonalita: string | null;
   ritmo: string | null;
   tempo_bpm: number | null;
   bpm_testo: string | null;
   misura: string | null;
   capotasto: number | null;
+  origine?: 'import_pdf' | 'import_docx' | 'manuale' | null;
+  nota_fonte?: string | null;
   testo_chordpro: string;
   created_at: string;
   updated_at: string;
@@ -297,29 +302,24 @@ export async function getEventi(includeDeleted = false): Promise<Evento[]> {
 export async function getOdgPunti(eventoId?: string, includeDeleted = false): Promise<OdgPunto[]> {
   const db = await getDb();
 
-  // Verifica stato di cancellazione del genitore se eventoId è specificato
-  if (eventoId) {
-    const parent = (await db.get('eventi', eventoId)) as Evento | undefined;
-    if (!parent || (!includeDeleted && parent.deleted_at !== null)) {
-      return []; // Genitore eliminato -> figli nascosti
-    }
-    const all = (await db.getAllFromIndex('odg_punti', 'evento_id', eventoId)) as OdgPunto[];
-    const filtered = includeDeleted ? all : all.filter((p) => p.deleted_at === null);
-    return filtered.sort((a, b) => a.ordine - b.ordine);
-  }
-
-  // Se nessun eventoId fornito, carica tutti i punti ma escludi quelli dei genitori eliminati
   const [allPoints, allEventi] = await Promise.all([
     db.getAll('odg_punti') as Promise<OdgPunto[]>,
     db.getAll('eventi') as Promise<Evento[]>,
   ]);
 
-  const activeEventoIds = new Set(
-    allEventi.filter((e) => includeDeleted || e.deleted_at === null).map((e) => e.id)
-  );
+  const activeEventoMap = new Map<string, Evento>();
+  for (const e of allEventi) {
+    activeEventoMap.set(e.id, e);
+  }
 
   return allPoints
-    .filter((p) => (includeDeleted || p.deleted_at === null) && activeEventoIds.has(p.evento_id))
+    .filter((p) => {
+      if (eventoId && p.evento_id !== eventoId) return false;
+      if (!includeDeleted && p.deleted_at !== null) return false;
+      const parent = activeEventoMap.get(p.evento_id);
+      if (!includeDeleted && parent && parent.deleted_at !== null) return false;
+      return true;
+    })
     .sort((a, b) => a.ordine - b.ordine);
 }
 
@@ -335,27 +335,6 @@ export async function getAllegati(
 ): Promise<Allegato[]> {
   const db = await getDb();
 
-  if (parentType && parentId) {
-    const parentTable =
-      parentType === 'gioco'
-        ? 'giochi'
-        : parentType === 'ban'
-        ? 'bans'
-        : parentType === 'canto'
-        ? 'canti'
-        : 'eventi';
-
-    const parent = await db.get(parentTable, parentId);
-    if (!parent || (!includeDeleted && parent.deleted_at !== null)) {
-      return []; // Genitore eliminato -> allegati nascosti
-    }
-
-    const indexName = `${parentType}_id`;
-    const all = (await db.getAllFromIndex('allegati', indexName, parentId)) as Allegato[];
-    return includeDeleted ? all : all.filter((a) => a.deleted_at === null);
-  }
-
-  // Filtro globale
   const [allegati, giochi, bans, canti, eventi] = await Promise.all([
     db.getAll('allegati') as Promise<Allegato[]>,
     db.getAll('giochi') as Promise<Gioco[]>,
@@ -370,7 +349,10 @@ export async function getAllegati(
   for (const c of canti) if (includeDeleted || c.deleted_at === null) activeGenitori.add(c.id);
   for (const e of eventi) if (includeDeleted || e.deleted_at === null) activeGenitori.add(e.id);
 
+  const indexName = parentType ? `${parentType}_id` : null;
+
   return allegati.filter((a) => {
+    if (indexName && parentId && (a as any)[indexName] !== parentId) return false;
     if (!includeDeleted && a.deleted_at !== null) return false;
     const parentKey = a.gioco_id || a.ban_id || a.canto_id || a.evento_id;
     return parentKey ? activeGenitori.has(parentKey) : false;
@@ -519,5 +501,16 @@ export async function getNextUpcomingEvent(): Promise<{
     evento: next,
     odgCount: odgPoints.length,
     openOdgCount: openCount,
+  };
+}
+
+if (typeof window !== 'undefined') {
+  (window as any).__dbPutRecords = async (tableName: ContentTableName, records: any[]) => {
+    const db = await getDb();
+    const tx = db.transaction(tableName, 'readwrite');
+    for (const r of records) {
+      await tx.store.put(r);
+    }
+    await tx.done;
   };
 }

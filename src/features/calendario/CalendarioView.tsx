@@ -230,6 +230,7 @@ export function CalendarioView() {
         onDelete={handleDeleteEvento}
         onCreateMeeting={handleCreateNewMeeting}
         onChanged={loadData}
+        initialOdgPoints={selectedEvento ? odgMap[selectedEvento.id] : undefined}
       />
 
       {/* 5. MODALE FORM CREAZIONE / MODIFICA EVENTO (ADMIN ONLY) */}
