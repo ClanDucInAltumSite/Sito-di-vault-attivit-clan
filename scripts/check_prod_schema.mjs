@@ -194,29 +194,55 @@ async function checkProductionSchema() {
       console.error(`  - ${e}`);
     }
 
-    // Se in ambiente GitHub Actions con permessi di issue, crea notifica issue
+    // Se in ambiente GitHub Actions con permessi di issue, crea o aggiorna issue non duplicata
     if (process.env.GITHUB_TOKEN && process.env.GITHUB_REPOSITORY) {
-      console.log('\nApertura Issue automatica su GitHub per allarme schema...');
+      console.log('\nGestione Issue GitHub per allarme schema (anti-duplicati)...');
       try {
-        const issueUrl = `https://api.github.com/repos/${process.env.GITHUB_REPOSITORY}/issues`;
-        await fetch(issueUrl, {
-          method: 'POST',
-          headers: {
-            'Authorization': `token ${process.env.GITHUB_TOKEN}`,
-            'Accept': 'application/vnd.github.v3+json',
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            title: `⚠️ Allarme Schema Produzione: ${missingErrors.length} migrazioni non applicate`,
-            body: `Il controllo automatico pianificato di sola lettura (\`check_prod_schema.mjs\`) ha rilevato anomalie nello schema di produzione:\n\n` +
-              missingErrors.map(m => `- ${m}`).join('\n') +
-              `\n\n**Azione richiesta:** Eseguire l'SQL della migrazione nel SQL Editor della dashboard Supabase.`,
-            labels: ['schema-alert', 'automated'],
-          }),
-        });
-        console.log('Issue di segnalazione creata con successo.');
+        const repo = process.env.GITHUB_REPOSITORY;
+        const headers = {
+          'Authorization': `token ${process.env.GITHUB_TOKEN}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json',
+          'User-Agent': 'vault-scout-ci',
+        };
+
+        // 1. Cerca se esiste già un'issue aperta con etichetta schema-alert
+        const searchUrl = `https://api.github.com/repos/${repo}/issues?state=open&labels=schema-alert`;
+        const existingRes = await fetch(searchUrl, { headers });
+        const existingIssues = existingRes.ok ? await existingRes.json() : [];
+
+        const issueBody = `Il controllo automatico pianificato di sola lettura (\`check_prod_schema.mjs\`) ha rilevato anomalie nello schema di produzione:\n\n` +
+          missingErrors.map(m => `- ${m}`).join('\n') +
+          `\n\n**Data ultima rilevazione:** ${new Date().toISOString()}\n` +
+          `**Azione richiesta:** Eseguire l'SQL delle migrazioni mancanti nel SQL Editor della dashboard Supabase (es. \`0007_canti_categoria.sql\`, \`0008_canti_origine_fonte.sql\`).`;
+
+        if (Array.isArray(existingIssues) && existingIssues.length > 0) {
+          const issueNum = existingIssues[0].number;
+          console.log(`Trovata issue aperta esistente #${issueNum}. Aggiornamento senza duplicazione...`);
+          await fetch(`https://api.github.com/repos/${repo}/issues/${issueNum}`, {
+            method: 'PATCH',
+            headers,
+            body: JSON.stringify({
+              title: `⚠️ Allarme Schema Produzione: ${missingErrors.length} migrazioni pendenti`,
+              body: issueBody,
+            }),
+          });
+          console.log(`Issue #${issueNum} aggiornata con successo.`);
+        } else {
+          console.log('Nessuna issue aperta trovata. Creazione nuova issue...');
+          await fetch(`https://api.github.com/repos/${repo}/issues`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              title: `⚠️ Allarme Schema Produzione: ${missingErrors.length} migrazioni pendenti`,
+              body: issueBody,
+              labels: ['schema-alert', 'automated'],
+            }),
+          });
+          console.log('Nuova issue creata con successo.');
+        }
       } catch (issueErr) {
-        console.warn('Impossibile aprire Issue automatica:', issueErr.message);
+        console.warn('Impossibile gestire Issue automatica:', issueErr.message);
       }
     }
 
@@ -225,6 +251,45 @@ async function checkProductionSchema() {
   } else {
     console.log('ESITO: SCHEMA DI PRODUZIONE COMPLETAMENTE ALLINEATO E VERIFICATO.');
     console.log('Tutte le tabelle, colonne e funzioni RPC richieste dall\'app sono attive.');
+
+    // Se esiste un'issue aperta per schema-alert, chiudila automaticamente
+    if (process.env.GITHUB_TOKEN && process.env.GITHUB_REPOSITORY) {
+      try {
+        const repo = process.env.GITHUB_REPOSITORY;
+        const headers = {
+          'Authorization': `token ${process.env.GITHUB_TOKEN}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json',
+          'User-Agent': 'vault-scout-ci',
+        };
+        const searchUrl = `https://api.github.com/repos/${repo}/issues?state=open&labels=schema-alert`;
+        const existingRes = await fetch(searchUrl, { headers });
+        const existingIssues = existingRes.ok ? await existingRes.json() : [];
+        if (Array.isArray(existingIssues) && existingIssues.length > 0) {
+          for (const iss of existingIssues) {
+            console.log(`Chiusura automatica issue #${iss.number} (schema ora risolto)...`);
+            await fetch(`https://api.github.com/repos/${repo}/issues/${iss.number}`, {
+              method: 'PATCH',
+              headers,
+              body: JSON.stringify({
+                state: 'closed',
+                state_reason: 'completed',
+              }),
+            });
+            await fetch(`https://api.github.com/repos/${repo}/issues/${iss.number}/comments`, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({
+                body: `✅ Controllo schema completato: tutte le colonne e tabelle sono state allineate con successo in produzione in data ${new Date().toISOString()}.`,
+              }),
+            });
+          }
+        }
+      } catch (e) {
+        // Silenzioso
+      }
+    }
+
     console.log('======================================================================\n');
     process.exit(0);
   }

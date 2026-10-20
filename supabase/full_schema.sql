@@ -65,6 +65,16 @@ CREATE TABLE IF NOT EXISTS public.canti (
   CONSTRAINT canti_origine_check CHECK (origine IS NULL OR origine IN ('import_pdf', 'import_docx', 'manuale'))
 );
 
+-- Migrazioni idempotenti per database preesistenti
+ALTER TABLE public.canti ADD COLUMN IF NOT EXISTS bpm_testo text;
+ALTER TABLE public.canti ADD COLUMN IF NOT EXISTS categoria text;
+ALTER TABLE public.canti ADD COLUMN IF NOT EXISTS origine text;
+ALTER TABLE public.canti ADD COLUMN IF NOT EXISTS nota_fonte text;
+ALTER TABLE public.canti DROP CONSTRAINT IF EXISTS canti_categoria_check;
+ALTER TABLE public.canti ADD CONSTRAINT canti_categoria_check CHECK (categoria IS NULL OR categoria IN ('scout', 'chiesa', 'esterni'));
+ALTER TABLE public.canti DROP CONSTRAINT IF EXISTS canti_origine_check;
+ALTER TABLE public.canti ADD CONSTRAINT canti_origine_check CHECK (origine IS NULL OR origine IN ('import_pdf', 'import_docx', 'manuale'));
+
 -- Tabella Eventi Calendario
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'tipo_evento') THEN

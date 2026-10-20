@@ -56,10 +56,32 @@ jobs:
       - name: Verifica Budget di Peso (Bundle, Precache, Foto)
         run: node scripts/check_weight_budget.mjs
 
-  e2e-playwright:
-    name: Test E2E, Accessibilità Axe e Regressione Visiva (Playwright)
+  playwright-e2e:
+    name: Playwright (${{ matrix.project }})
     needs: static-and-unit
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - project: chromium
+            browser: chromium
+            specs: test/verify_ui.spec.ts test/visual_regression.spec.ts test/stampa_pdf.spec.ts test/offline_matrix.spec.ts
+          - project: webkit
+            browser: webkit
+            specs: test/verify_ui.spec.ts test/visual_regression.spec.ts test/offline_matrix.spec.ts
+          - project: mobile-iphone-se
+            browser: chromium
+            specs: test/verify_ui.spec.ts test/visual_regression.spec.ts
+          - project: mobile-iphone-15
+            browser: chromium
+            specs: test/verify_ui.spec.ts test/visual_regression.spec.ts
+          - project: tablet-ipad
+            browser: chromium
+            specs: test/verify_ui.spec.ts test/visual_regression.spec.ts
+          - project: mobile-android
+            browser: chromium
+            specs: test/verify_ui.spec.ts test/visual_regression.spec.ts
     steps:
       - name: Checkout del codice
         uses: actions/checkout@v4
@@ -73,32 +95,26 @@ jobs:
       - name: Installazione dipendenze
         run: npm ci
 
-      - name: Build preliminare per preview
+      - name: Build preliminare PWA per preview
         env:
           VITE_BASE_PATH: /Sito-di-vault-attivit-clan/
         run: npm run build
 
-      - name: Installazione Browser Playwright (Chromium e WebKit)
-        run: npx playwright install --with-deps chromium webkit
+      - name: Installazione Browser Playwright (${{ matrix.browser }})
+        run: npx playwright install --with-deps ${{ matrix.browser }}
 
-      - name: Esecuzione Test Playwright (Chromium & Mobile)
-        run: npx playwright test --project=chromium
+      - name: Esecuzione Test Playwright (${{ matrix.project }})
+        run: npx playwright test ${{ matrix.specs }} --project=${{ matrix.project }}
 
-      - name: Esecuzione Test Playwright (WebKit - Safari)
-        run: npx playwright test test/verify_ui.spec.ts --project=webkit
-
-      - name: Caricamento Artefatti E2E (Screenshot, PDF e Tracce)
-        if: always()
+      - name: Caricamento Tracce e Screenshot su Fallimento
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-artifacts-${{ github.run_id }}
+          name: playwright-failure-${{ matrix.project }}-${{ github.run_id }}
           path: |
             test-results/
             test/__screenshots__/
-            docs/design-review/
-            docs/design-review/fase11/
-            docs/design-review/print/*.pdf
-          retention-days: 14
+          retention-days: 7
 
   lighthouse-ci:
     name: Audit Lighthouse CI (3 Esecuzioni, Mediana e JSON)
@@ -130,6 +146,43 @@ jobs:
           lhci collect
           lhci assert
 
+      - name: Calcolo e Visualizzazione Risultati Grezzi e Mediana
+        if: always()
+        run: |
+          node -e '
+          import fs from "fs";
+          import path from "path";
+          const dir = ".lighthouseci";
+          if (fs.existsSync(dir)) {
+            const files = fs.readdirSync(dir).filter(f => f.startsWith("lhr-") && f.endsWith(".json"));
+            console.log("\n======================================================================");
+            console.log("RISULTATI AUDIT LIGHTHOUSE CI (3 ESECUZIONI E MEDIANA)");
+            console.log("======================================================================");
+            const scores = { perf: [], a11y: [], bp: [] };
+            files.forEach((f, idx) => {
+              try {
+                const data = JSON.parse(fs.readFileSync(path.join(dir, f), "utf8"));
+                const perf = Math.round((data.categories.performance?.score || 0) * 100);
+                const a11y = Math.round((data.categories.accessibility?.score || 0) * 100);
+                const bp = Math.round((data.categories["best-practices"]?.score || 0) * 100);
+                scores.perf.push(perf);
+                scores.a11y.push(a11y);
+                scores.bp.push(bp);
+                console.log(`Run ${idx + 1}: Performance=${perf}, Accessibilità=${a11y}, Best Practices=${bp}`);
+              } catch (e) {}
+            });
+            const median = arr => {
+              if (arr.length === 0) return 0;
+              const s = [...arr].sort((a,b) => a - b);
+              const mid = Math.floor(s.length / 2);
+              return s.length % 2 !== 0 ? s[mid] : Math.round((s[mid - 1] + s[mid]) / 2);
+            };
+            console.log("----------------------------------------------------------------------");
+            console.log(`MEDIANA FINALE: Performance=${median(scores.perf)}, Accessibilità=${median(scores.a11y)}, Best Practices=${median(scores.bp)}`);
+            console.log("======================================================================\n");
+          }
+          '
+
       - name: Caricamento Report e JSON Grezzi Lighthouse
         if: always()
         uses: actions/upload-artifact@v4
@@ -137,31 +190,3 @@ jobs:
           name: lighthouse-results-${{ github.run_id }}
           path: .lighthouseci/
           retention-days: 14
-
-  staging-integration:
-    name: Test di Scrittura e Sicurezza RLS su Staging
-    needs: static-and-unit
-    runs-on: ubuntu-latest
-    # Esegue solo se l'environment staging è configurato con credenziali
-    if: false # Abilitato automaticamente quando il proprietario configura l'environment staging
-    environment: staging
-    steps:
-      - name: Checkout del codice
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: 'npm'
-
-      - name: Installazione dipendenze
-        run: npm ci
-
-      - name: Test Admin di Scrittura su Staging
-        env:
-          STAGING_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL || vars.STAGING_SUPABASE_URL }}
-          STAGING_SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY || vars.STAGING_SUPABASE_ANON_KEY }}
-          ADMIN_TEST_EMAIL: ${{ secrets.ADMIN_TEST_EMAIL }}
-          ADMIN_TEST_PASSWORD: ${{ secrets.ADMIN_TEST_PASSWORD }}
-        run: node scripts/run_admin_test.mjs

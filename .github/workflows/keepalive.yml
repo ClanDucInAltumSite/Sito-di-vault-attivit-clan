@@ -5,6 +5,11 @@ on:
     # Esegue ogni 2 giorni alle 06:00 UTC
     - cron: '0 6 */2 * *'
   workflow_dispatch:
+    inputs:
+      force_heartbeat:
+        description: 'Imposta a "true" per forzare l''heartbeat immediato su ramo dedicato keepalive-heartbeat'
+        required: false
+        default: 'false'
 
 permissions:
   contents: write
@@ -39,24 +44,27 @@ jobs:
           fi
           echo "Keepalive Supabase completato con successo (HTTP $RESPONSE_CODE)."
 
-      - name: Verifica e Heartbeat 60 Giorni Inattività GitHub
+      - name: Verifica e Heartbeat 60 Giorni Inattività GitHub (Ramo Dedicato)
         run: |
           LAST_COMMIT_DATE=$(git log -1 --format=%ct)
           CURRENT_DATE=$(date +%s)
           DIFF_DAYS=$(( (CURRENT_DATE - LAST_COMMIT_DATE) / 86400 ))
           echo "Giorni trascorsi dall'ultimo commit sul repository: $DIFF_DAYS"
 
-          # Se sono trascorsi più di 40 giorni, effettua un commit di heartbeat su docs/
-          if [ "$DIFF_DAYS" -gt 40 ]; then
-            echo "Sono trascorsi più di 40 giorni. Generazione commit di heartbeat per prevenire la disattivazione del workflow..."
-            echo "Ultimo heartbeat automatico: $(date -u +"%Y-%m-%d %H:%M:%SZ")" > docs/keepalive_heartbeat.txt
+          # Se sono trascorsi più di 40 giorni o se forzato via dispatch, effettua commit su ramo dedicato
+          if [ "$DIFF_DAYS" -gt 40 ] || [ "${{ github.event.inputs.force_heartbeat }}" = "true" ]; then
+            echo "Esecuzione heartbeat di attività su ramo dedicato keepalive-heartbeat..."
+            echo "Questo azzera il conteggio dei 60 giorni senza mai toccare né richiedere bypass su main."
             
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
+            
+            git checkout -B keepalive-heartbeat
+            echo "Ultimo heartbeat automatico di attività repository: $(date -u +"%Y-%m-%d %H:%M:%SZ")" > docs/keepalive_heartbeat.txt
             git add docs/keepalive_heartbeat.txt
-            git commit -m "chore(keepalive): heartbeat reset 60gg inattività [skip ci]"
-            git push origin main
-            echo "Heartbeat inviato con successo."
+            git commit -m "chore(keepalive): heartbeat reset 60gg inattività [skip ci]" || echo "Nessuna modifica da committare"
+            git push origin keepalive-heartbeat --force
+            echo "Heartbeat inviato con successo sul ramo keepalive-heartbeat. Il ramo main rimane rigorosamente protetto."
           else
             echo "Repository attivo (meno di 40 giorni dall'ultimo commit). Nessun heartbeat necessario."
           fi
