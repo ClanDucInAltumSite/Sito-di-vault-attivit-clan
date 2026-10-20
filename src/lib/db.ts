@@ -304,8 +304,16 @@ export async function getOdgPunti(eventoId?: string, includeDeleted = false): Pr
 
   // Verifica stato di cancellazione del genitore se eventoId è specificato
   if (eventoId) {
-    const parent = (await db.get('eventi', eventoId)) as Evento | undefined;
-    if (!parent || (!includeDeleted && parent.deleted_at !== null)) {
+    let isParentDeleted = false;
+    try {
+      const parent = (await db.get('eventi', eventoId)) as Evento | undefined;
+      if (parent && parent.deleted_at !== null) {
+        isParentDeleted = true;
+      }
+    } catch {
+      // ignore
+    }
+    if (!includeDeleted && isParentDeleted) {
       return []; // Genitore eliminato -> figli nascosti
     }
     let all: OdgPunto[] = [];

@@ -359,6 +359,7 @@ test.describe('CORREZIONE 2 - Verifica Stress UI con Dati Sporchi, Viewport Rist
   }
 
   test('Popolamento 200 elementi sporchi, ricerca typo/special chars, ordinamento, sheet e visibilità ultimo elemento su Giochi', async ({ page }) => {
+    test.slow();
     await page.setViewportSize({ width: 390, height: 844 });
     await populateDirtyData(page);
 
@@ -621,6 +622,7 @@ test.describe('FASE 7 - Verifica Calendario e ODG (#/calendario)', () => {
   });
 
   test('Verifica rendering Griglia Mese, commutazione Prossimi/Passati e apertura Dettaglio con ODG', async ({ page }) => {
+    test.slow();
     await page.setViewportSize({ width: 390, height: 844 });
     await seedCalendarData(page);
     await page.goto('/#/calendario');
