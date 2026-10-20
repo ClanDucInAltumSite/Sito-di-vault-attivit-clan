@@ -1,0 +1,167 @@
+name: CI Pipeline
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static-and-unit:
+    name: Controlli Statici, Tipi, Vitest e Budget di Peso
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del codice
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Installazione dipendenze
+        run: npm ci
+
+      - name: Controllo dei Tipi (TypeScript Typecheck)
+        run: npx tsc --noEmit
+
+      - name: Controlli Statici di Sicurezza e Assenza Segreti
+        run: |
+          echo "Verifica assenza service_role nel repository (controllo vietato)..."
+          if grep -rn "service_role" src/ supabase/migrations/ 2>/dev/null; then # controllo vietato
+            echo "::error::Rilevata stringa vietata 'service_role' nel codice sorgente!"
+            exit 1
+          fi
+          echo "Verifica assenza innerHTML insicuro..."
+          if grep -rn "dangerouslySetInnerHTML" src/ 2>/dev/null; then
+            echo "::error::Rilevato dangerouslySetInnerHTML nel codice sorgente!"
+            exit 1
+          fi
+          echo "Controlli statici superati con successo."
+
+      - name: Esecuzione Suite di Test Unitari e Golden (Vitest)
+        run: npm test
+
+      - name: Build di Produzione PWA
+        env:
+          VITE_BASE_PATH: /Sito-di-vault-attivit-clan/
+        run: npm run build
+
+      - name: Verifica Budget di Peso (Bundle, Precache, Foto)
+        run: node scripts/check_weight_budget.mjs
+
+  e2e-playwright:
+    name: Test E2E, Accessibilità Axe e Regressione Visiva (Playwright)
+    needs: static-and-unit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del codice
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Installazione dipendenze
+        run: npm ci
+
+      - name: Build preliminare per preview
+        env:
+          VITE_BASE_PATH: /Sito-di-vault-attivit-clan/
+        run: npm run build
+
+      - name: Installazione Browser Playwright (Chromium e WebKit)
+        run: npx playwright install --with-deps chromium webkit
+
+      - name: Esecuzione Test Playwright (Chromium & Mobile)
+        run: npx playwright test --project=chromium
+
+      - name: Esecuzione Test Playwright (WebKit - Safari)
+        run: npx playwright test test/verify_ui.spec.ts --project=webkit
+
+      - name: Caricamento Artefatti E2E (Screenshot, PDF e Tracce)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-artifacts-${{ github.run_id }}
+          path: |
+            test-results/
+            test/__screenshots__/
+            docs/design-review/
+            docs/design-review/fase11/
+            docs/design-review/print/*.pdf
+          retention-days: 14
+
+  lighthouse-ci:
+    name: Audit Lighthouse CI (3 Esecuzioni, Mediana e JSON)
+    needs: static-and-unit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del codice
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Installazione dipendenze
+        run: npm ci
+
+      - name: Build dell'applicazione
+        env:
+          VITE_BASE_PATH: /Sito-di-vault-attivit-clan/
+        run: npm run build
+
+      - name: Installazione Lighthouse CI CLI
+        run: npm install -g @lhci/cli@0.14.x
+
+      - name: Esecuzione Raccolta ed Assert Lighthouse CI (3 run)
+        run: |
+          lhci collect
+          lhci assert
+
+      - name: Caricamento Report e JSON Grezzi Lighthouse
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-results-${{ github.run_id }}
+          path: .lighthouseci/
+          retention-days: 14
+
+  staging-integration:
+    name: Test di Scrittura e Sicurezza RLS su Staging
+    needs: static-and-unit
+    runs-on: ubuntu-latest
+    # Esegue solo se l'environment staging è configurato con credenziali
+    if: false # Abilitato automaticamente quando il proprietario configura l'environment staging
+    environment: staging
+    steps:
+      - name: Checkout del codice
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Installazione dipendenze
+        run: npm ci
+
+      - name: Test Admin di Scrittura su Staging
+        env:
+          STAGING_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL || vars.STAGING_SUPABASE_URL }}
+          STAGING_SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY || vars.STAGING_SUPABASE_ANON_KEY }}
+          ADMIN_TEST_EMAIL: ${{ secrets.ADMIN_TEST_EMAIL }}
+          ADMIN_TEST_PASSWORD: ${{ secrets.ADMIN_TEST_PASSWORD }}
+        run: node scripts/run_admin_test.mjs

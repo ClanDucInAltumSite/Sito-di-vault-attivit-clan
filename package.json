@@ -7,9 +7,15 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:admin": "node supabase/tests/run_admin_test.mjs",
+    "test:golden": "node scripts/run_golden_test.mjs",
+    "golden:approve": "node scripts/run_golden_test.mjs --approve",
+    "snapshots:approve": "playwright test test/visual_regression.spec.ts --update-snapshots --project=chromium",
+    "check:schema": "node scripts/check_prod_schema.mjs",
+    "check:budget": "node scripts/check_weight_budget.mjs",
+    "test:admin": "node scripts/run_admin_test.mjs",
     "verify:ui": "playwright test"
   },
   "dependencies": {

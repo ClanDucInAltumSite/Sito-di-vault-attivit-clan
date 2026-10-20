@@ -231,3 +231,62 @@ Per la guida completa e il calendario operativo mese per mese, consulta il docum
    - Servizio gratuito impostato per interrogare l'endpoint `giochi?select=id&limit=1` ogni 2 giorni con avviso email immediato in caso di errore (configurazione dettagliata nella Sezione 4.3).
 3. **Livello 3 - Promemoria Mensile dei Capi:**
    - Impostare un promemoria ricorrente nel calendario capi con cadenza mensile (*"Controllo Vault Scout & Backup"*): entrare nell'area Admin, premere **"Esporta Backup JSON"** e verificare la conservazione dei file originali su Google Drive di Clan.
+
+---
+
+## 7. Configurazione dell'Ambiente di Staging (Fase 12)
+
+Per testare le migrazioni del database e i test automatici di scrittura (login admin, creazione e cancellazione di prova) senza toccare né sporcare il database di produzione, il proprietario può creare un secondo progetto gratuito su Supabase (il piano Free di Supabase include fino a 2 progetti contemporanei per account a costo zero).
+
+### 7.1 Creazione del Progetto Staging su Supabase
+1. Accedi a [https://supabase.com/dashboard](https://supabase.com/dashboard).
+2. Clicca su **"New Project"**.
+3. Scegli l'organizzazione, inserisci il nome del progetto (es. `Vault Scout - Staging`), assegna una password del database sicura e salvala nel password manager del clan. Scegli la stessa regione di produzione (es. *Frankfurt* o *Milan*).
+4. Attendi che il provisioning sia completato.
+5. In **Project Settings** -> **API**, annota:
+   - **Project URL** (es. `https://xyzstagingref.supabase.co`)
+   - **Project API Keys** -> chiave `anon` `public`
+6. In **Project Settings** -> **Database** -> **Connection string** (URI / Direct Connection), copia la stringa di connessione (o annota la password del database impostata al punto 3).
+7. Disabilita le registrazioni pubbliche su Staging: **Authentication** -> **Providers** -> **Email** -> disattiva **"Enable email signups"**.
+8. Crea l'utente di test su Staging: **Authentication** -> **Users** -> **"Add user"** -> **"Create user"**:
+   - Email: es. `test-admin@clan.test`
+   - Password: una password di prova sicura
+   - Spunta **"Auto Confirm User"**
+   - Copia lo User UID generato e incollalo in SQL Editor con:
+     ```sql
+     INSERT INTO public.admin_users (user_id) VALUES ('UID_DELL_UTENTE_DI_TEST');
+     ```
+
+### 7.2 Creazione dell'Environment `staging` su GitHub
+1. Sul repository GitHub, vai su **Settings** -> **Environments**.
+2. Clicca su **"New environment"** e assegna il nome esatto: `staging`.
+3. In **Environment secrets**, aggiungi i seguenti segreti (visibili solo ai workflow mirati):
+   - `STAGING_SUPABASE_URL`: l'URL del progetto di staging (es. `https://xyzstagingref.supabase.co`)
+   - `STAGING_SUPABASE_ANON_KEY`: la chiave `anon` pubblica del progetto di staging
+   - `STAGING_DB_PASSWORD`: la password del database PostgreSQL di staging (usata esclusivamente dallo script sicuro `apply_staging_schema.mjs`)
+   - `ADMIN_TEST_EMAIL`: l'email dell'utente di test admin (es. `test-admin@clan.test`)
+   - `ADMIN_TEST_PASSWORD`: la password dell'utente di test admin
+
+### 7.3 Come Applicare e Provare lo Schema su Staging
+Il workflow `.github/workflows/staging-schema.yml` può essere avviato manualmente da GitHub Actions (**"Actions"** -> **"Applica Schema su Staging"** -> **"Run workflow"**).
+Il workflow applica in modo idempotente `supabase/full_schema.sql` al database di staging.
+Nessun test di scrittura tocca la produzione: se un test dovesse tentare di girare sull'URL di produzione (`lpeiyzwccedtqjbficjo`), lo script `scripts/run_admin_test.mjs` si blocca all'istante con codice di errore bloccante.
+
+---
+
+## 8. Pubblicazione Controllata e Protezione del Ramo `main`
+
+Per evitare pubblicazioni accidentali o regressioni visive/funzionali sul sito in produzione:
+
+1. **GitHub Environment `production` con Approvazione Manuale:**
+   - In **Settings** -> **Environments** -> crea o modifica l'environment `production`.
+   - Attiva **"Required reviewers"** e seleziona il tuo account GitHub.
+   - Ogni volta che la CI passa con successo su `main`, il workflow di deploy su GitHub Pages attenderà la tua approvazione manuale (un click sul pulsante "Review deployments" -> "Approve and deploy") prima di aggiornare il sito pubblico.
+
+2. **Branch Protection su `main`:**
+   - In **Settings** -> **Branches** -> aggiungi una regola di protezione per il ramo `main`.
+   - Spunta:
+     - **"Require a pull request before merging"** (Nessun push diretto su main).
+     - **"Require status checks to pass before merging"** -> seleziona i job di `ci.yml` (Lint, Typecheck, Test, Build, Weight Budget).
+
+Per l'architettura completa, i dettagli di budget e l'analisi dei costi (100% 0€/mese), consulta il documento approfondito [`docs/AUTOMAZIONE.md`](AUTOMAZIONE.md).

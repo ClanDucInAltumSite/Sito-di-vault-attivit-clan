@@ -120,6 +120,10 @@ export function CantiView() {
       setSelectedCanto(canto);
       setIsDetailOpen(true);
     };
+    (window as any).__openCantoReading = (canto: Canto) => {
+      setSelectedCanto(canto);
+      setIsReadingModeOpen(true);
+    };
     (window as any).__openReviewForTesting = (data?: any) => {
       setEditingCanto(null);
       setImportedSongData({

@@ -517,19 +517,53 @@ Meta-tag restrittivo in `index.html`:
 
 ---
 
-## 9. Keepalive e Workflow CI/CD
+## 9. Keepalive, CI/CD e Pubblicazione Controllata (Fase 12)
 
-### 9.1 Deploy su GitHub Pages (`deploy.yml`)
-- Trigger su `push` al branch `main`.
-- Esclusione percorsi documentazione: `paths-ignore: ['docs/**']`.
-- Build con Vite (base path `/Sito-di-vault-attivit-clan/`) e pubblicazione su Pages.
+L'architettura di automazione è progettata per verificare ogni modifica in background, ridurre a zero i controlli manuali dei capi, e garantire l'assoluta immunità del database di produzione e del sito pubblico.
 
-### 9.2 Keepalive Supabase e Heartbeat 60 Giorni (`keepalive.yml`)
-- Esecuzione pianificata ogni 2 giorni (`0 6 */2 * *`) più avvio manuale.
-- Esegue una reale query REST SQL (`GET /rest/v1/giochi?select=id&limit=1`) verificando HTTP 200.
-- **Heartbeat 60 giorni:** Controlla la data dell'ultimo commit su `main`. Se sono passati più di 40 giorni, committa un timestamp su `docs/keepalive_heartbeat.txt` con messaggio `chore(keepalive): heartbeat [skip ci]`.
-  - Poiché il file è in `docs/` e il commit contiene `[skip ci]`, il workflow `deploy.yml` non viene eseguito, evitando build inutili.
-  - L'attività del commit azzera la soglia dei 60 giorni di inattività di GitHub.
+### 9.1 Pipeline di Integrazione Continua (`.github/workflows/ci.yml`)
+- **Trigger:** Ad ogni push su qualsiasi ramo e su ogni pull request. Concurrency attiva con `cancel-in-progress: true` per annullare esecuzioni superate sullo stesso ramo.
+- **Controllo Statico e Sicurezza:** Scansione statica su tutto il repository (`test/security_contract.test.ts`): nessun `innerHTML`, nessun segreto o token JWT hardcoded, nessun riferimento a `service_role` oltre ai divieti espliciti.
+- **Controllo Tipi e Test Unitari:** `npm run typecheck` (`tsc --noEmit`), suite Vitest completa (`npm test`), con 184 test unitari e di contratto.
+- **Test Golden Importer (`scripts/run_golden_test.mjs`):** Verifica deterministica dell'andata e ritorno dei parser Word (.docx) e PDF a 2 colonne contro le fixture sintetiche canoniche (`test/fixtures/golden/`).
+- **Verifica del Budget di Peso (`scripts/check_weight_budget.mjs`):**
+  - Bundle JS iniziale $\le 80\text{ KiB}$ GZIP (misurato $68.9\text{ KiB}$).
+  - CSS iniziale $\le 20\text{ KiB}$ GZIP (misurato $11.4\text{ KiB}$).
+  - Precache Service Worker $\le 5500\text{ KiB}$ (misurato $4990\text{ KiB}$).
+  - Esclusione garantita al 100% di `pdfjs-dist` e `pdf.worker.min.mjs` dal precache.
+  - Peso totale fotografie d'intestazione WebP $\le 700\text{ KiB}$ (misurato $637.7\text{ KiB}$).
+- **Test E2E e Matrice Dispositivi (Playwright):** Progetti Chromium, WebKit (Desktop Safari), Mobile iPhone SE, Mobile iPhone 15, Tablet iPad e Android Pixel 7.
+- **Lighthouse CI (`.lighthouserc.json`):** 3 esecuzioni mediane; soglie minime di qualità: Performance $\ge 85$ (warning sotto 90), Accessibilità $\ge 90$, Best Practices $\ge 95$.
+- **Caricamento Artefatti:** Upload automatico di report Lighthouse, screenshot e tracce Playwright ad ogni esecuzione.
+
+### 9.2 Ambiente di Staging e Isolamento Scritture (`staging-schema.yml`)
+- Il piano Free di Supabase offre 2 progetti gratuiti: uno dedicato alla Produzione e uno dedicato allo Staging.
+- I test che effettuano scritture (creazione canti, eliminazione, test permessi admin) vengono eseguiti **esclusivamente su Staging**.
+- **Hard Block di Sicurezza (`scripts/run_admin_test.mjs`):** Lo script rifiuta tassativamente l'esecuzione e termina con errore bloccante se l'URL del database corrisponde all'identificativo di produzione (`lpeiyzwccedtqjbficjo`).
+- **Workflow Staging Schema (`.github/workflows/staging-schema.yml`):** Applica in modo idempotente `supabase/full_schema.sql` all'istanza di staging sfruttando l'Environment protetto `staging` di GitHub, consentendo di collaudare le nuove migrazioni SQL prima di toccare la produzione.
+
+### 9.3 Controllo Schema Produzione in Sola Lettura (`prod-schema-check.yml`)
+- Esecuzione programmata giornaliera (07:00 UTC) e automatica dopo ogni pubblicazione in produzione.
+- Script `scripts/check_prod_schema.mjs`: interroga le tabelle tramite richieste `GET` anonime (`limit=0`), verificando la presenza di tutte le colonne richieste da `full_schema.sql`.
+- In caso di colonna mancante (es. migrazione non ancora eseguita a mano dal proprietario nel pannello Supabase), apre o aggiorna automaticamente una Issue su GitHub intitolata *"Azione richiesta: applicare migrazione SQL in produzione"*, indicando il file esatto da copiare e incollare nell'editor SQL.
+
+### 9.4 Regressioni Visive (`test/visual_regression.spec.ts`)
+- Cattura e confronto pixel-per-pixel delle viste chiave (Home, Canti, Modalità Lettura a tutto schermo, Modale di Revisione Importazione con avvisi, Anteprima Stampa A4) a 390px (mobile) e 1440px (desktop), in tema chiaro e tema scuro.
+- Snapshot baselines memorizzati in `test/__screenshots__/`. Tolleranza differenziale massima $\le 2\%$.
+- Aggiornamento controllato tramite comando `npm run snapshots:approve`.
+
+### 9.5 Pubblicazione Controllata in Produzione (`deploy.yml`)
+- Trigger non più su push diretto: il workflow si attiva esclusivamente al completamento con esito positivo della CI Pipeline su `main` (`workflow_run`), oppure tramite avvio manuale (`workflow_dispatch`).
+- Richiede approvazione esplicita del proprietario tramite GitHub Environment `production` (Required Reviewers).
+- Esegue la build Vite PWA con le chiavi di produzione.
+- Pubblica su GitHub Pages.
+- Esegue subito uno Smoke Test di produzione (`test/smoke_deploy.spec.ts`): verifica che la pagina risponda HTTP 200, che il titolo sia corretto, che non vi siano 404 per bundle JS/CSS o fotografie, che il service worker sia registrato e che la CSP non sia violata.
+- Esegue il controllo schema di produzione in sola lettura.
+
+### 9.6 Manutenzione Automatica e Keepalive (`maintenance.yml` e `keepalive.yml`)
+- **Dependabot (`.github/dependabot.yml`):** Controllo settimanale degli aggiornamenti delle dipendenze npm con raggruppamento automatico e limite di 5 PR aperte.
+- **Workflow Manutenzione Settimanale (`.github/maintenance.yml`):** Esegue `npm audit` e `npm outdated`, aprendo una Issue in caso di vulnerabilità o pacchetti obsoleti.
+- **Keepalive Supabase & Repository (`keepalive.yml`):** Ping ogni 2 giorni via REST API per prevenire la sospensione di 7 giorni del Free Tier di Supabase, e micro-commit heartbeat ogni 40 giorni per prevenire la disattivazione automatica di GitHub Actions a 60 giorni.
 
 ---
 

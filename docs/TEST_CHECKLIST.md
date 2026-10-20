@@ -292,30 +292,44 @@ Di seguito è riportato il resoconto analitico e la copertura dei test eseguiti 
 | **701-709** | **Fase 7:** Calendario e ODG (Multi-day, Riporto Idempotente, Spunte, Deep-link) | `calendario_odg.test.ts` (17 test), verifica permessi anonimi | **100% PASS** |
 | **801-807** | **Fase 8:** Rifinitura Finale, Bundle Code-Split, Red Team, Matrice Offline | `offline_matrix.spec.ts` (7 scenari), audit Red Team, Lighthouse 5 run | **100% PASS** |
 | **901-906** | **Fase 9:** Canzoniere Stile Riferimento, 2 Colonne A4, Importazione Word (.docx) & AI | `canzoniere_parser.test.ts` (14 test), `canzoniere_layout.test.ts` (7 test), `stampa_pdf.spec.ts` (10 pag A4, indice reale) | **100% PASS** |
+| **1101-1108** | **Fase 11:** Importazione PDF/Word, Editor Grande, Categorie e Isolamento Stampa | `pdf_importer.test.ts`, `canti_categoria.test.ts`, `print_style_leak.spec.ts`, test 7 PDF `_riferimenti/` | **100% PASS** |
+| **1201-1208** | **Fase 12:** CI/CD, Staging, Budget Peso, Regressioni Visive e Pubblicazione Controllata | `weight_budget.test.ts`, `golden_importer.test.ts`, `visual_regression.spec.ts`, `smoke_deploy.spec.ts` | **100% PASS** |
 
 ---
 
 ## 3. COMANDI DI ESECUZIONE VERIFICA LOCALE
 
 ```bash
-# 1. Esecuzione test unitari completi (116 test su 12 file)
+# 1. Controllo statico dei tipi TypeScript (0 errori)
+npm run typecheck
+
+# 2. Esecuzione test unitari e di contratto completi (184 test su 21 file)
 npm test
 
-# 2. Esecuzione verifica reattiva e accessibilità Playwright su 7 viewport, stress test e controlli UI (31 test)
+# 3. Verifica del budget di peso (bundle iniziale JS/CSS, precache PWA, esclusione pdfjs, foto WebP)
+npm run check:budget
+
+# 4. Test deterministico Golden Importer (Word .docx e PDF a 2 colonne contro baselines canoniche)
+npm run test:golden
+
+# 5. Regressioni visive pixel-diff Playwright (Home, Canti, Lettura, Revisione, Stampa a 390px e 1440px)
+npx playwright test test/visual_regression.spec.ts
+
+# 6. Esecuzione verifica reattiva e accessibilità Playwright su 7 viewport, stress test e controlli UI
 npm run verify:ui
 
-# 3. Test di generazione e validazione binaria del PDF di stampa (10 pagine reali, 0 pagine bianche, indice coincidente al 100%)
-npx playwright test test/stampa_pdf.spec.ts
+# 7. Controllo schema di produzione in sola lettura (anon key)
+npm run check:schema
 
-# 4. Matrice offline Playwright (7 scenari di resilienza alla disconnessione)
-npx playwright test test/offline_matrix.spec.ts
-
-# 5. Audit Lighthouse Mobile (5 esecuzioni con calcolo della mediana su Chrome DevTools)
-node scripts/run_lighthouse_5.mjs
-
-# 6. Test di sicurezza RLS e Storage (admin e anonimo, richiesta credenziali a runtime da tastiera)
+# 8. Test di sicurezza RLS e Storage su Staging (con blocco automatico se puntato alla produzione)
 npm run test:admin
 
-# 7. Compilazione TypeScript e build bundle Vite (con code-splitting Rollup e importazione dinamica jszip)
+# 9. Test di generazione e validazione binaria del PDF di stampa (10 pagine reali, 0 pagine bianche, indice coincidente al 100%)
+npx playwright test test/stampa_pdf.spec.ts
+
+# 10. Matrice offline Playwright (7 scenari di resilienza alla disconnessione)
+npx playwright test test/offline_matrix.spec.ts
+
+# 11. Compilazione TypeScript e build bundle Vite di produzione
 npm run build
 ```

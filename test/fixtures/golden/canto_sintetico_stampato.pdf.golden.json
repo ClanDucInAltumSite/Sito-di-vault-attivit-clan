@@ -1,0 +1,42 @@
+{
+  "filename": "canto_sintetico_stampato.pdf",
+  "titolo": "CANTO DEL SENTIERO LUMINOSO",
+  "autore": null,
+  "categoria": null,
+  "tonalita": null,
+  "misura": "4/4",
+  "bpm_testo": "circa 92–94",
+  "lines": [
+    "Autore di Prova",
+    "",
+    "[Do]Lungo la strada ma[Sol]estra noi pro[Lam]seguiamo, [Lam]Seconda colonna che [Mim]apre la nuova strofa,",
+    "questa è una riga pura di solo testo senza Fa Sol",
+    "accordi, sotto le stelle che vegliano il nostro bivacco.",
+    "Re Ed il vento leggero accarezza i nostri pensieri.",
+    "in un lungo cammino verso il crinale al",
+    "tramonto. RIT.",
+    "RIT. [Do]Guarda la cima che [Sol]brilla nel cielo sereno,",
+    "[Do]Guarda la cima che [Sol]brilla nel cielo sereno, [Fa]tutti uniti in cam[Sol]mino can[Do]tiamo.",
+    "[Fa]tutti uniti in cam[Sol]mino can[Do]tiamo."
+  ],
+  "warnings": [
+    {
+      "tipo": "accordo_ambiguo",
+      "riga": 8,
+      "testo": "Do Sol",
+      "messaggio": "Riga ambigua con possibili parole italiane/accordi: \"Do Sol\""
+    },
+    {
+      "tipo": "accordo_ambiguo",
+      "riga": 9,
+      "testo": "Do Sol Fa Sol Do",
+      "messaggio": "Riga ambigua con possibili parole italiane/accordi: \"Do Sol Fa Sol Do\""
+    },
+    {
+      "tipo": "accordo_ambiguo",
+      "riga": 10,
+      "testo": "Fa Sol Do",
+      "messaggio": "Riga ambigua con possibili parole italiane/accordi: \"Fa Sol Do\""
+    }
+  ]
+}
