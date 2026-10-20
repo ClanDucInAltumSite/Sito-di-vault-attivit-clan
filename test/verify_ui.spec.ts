@@ -290,72 +290,56 @@ test.describe('CORREZIONE 2 - Verifica Stress UI con Dati Sporchi, Viewport Rist
   async function populateDirtyData(page: any) {
     await page.goto('#/');
     await page.waitForLoadState('networkidle');
+    await page.waitForFunction(() => typeof (window as any).__dbPutRecords === 'function');
 
-    await page.evaluate(async () => {
-      const req = indexedDB.open('vault_scout_db', 1);
-      await new Promise<void>((resolve, reject) => {
-        req.onsuccess = () => {
-          const db = req.result;
-          const tx = db.transaction(['giochi', 'bans', 'canti'], 'readwrite');
-          const gStore = tx.objectStore('giochi');
-          const bStore = tx.objectStore('bans');
-          const cStore = tx.objectStore('canti');
+    const dirtyGiochi: any[] = [];
+    const dirtyBans: any[] = [];
+    const dirtyCanti: any[] = [];
 
-          for (let i = 1; i <= 200; i++) {
-            const longUnbroken = `SupercalifragilistichespiralidosoStranoTitoloLunghissimoSenzaSpazi_${i}`;
-            const dirtyChars = `& <special> 'singolo' "doppio" èéòàùì ${i}`;
-            const gNome = `Gioco_${i}_${longUnbroken}_${dirtyChars}`;
-            const bNome = `Ban_${i}_${longUnbroken}_${dirtyChars}`;
-            const cTitolo = `Canto_${i}_${longUnbroken}_${dirtyChars}`;
-
-            gStore.put({
-              id: `dirty-g-${i}`,
-              nome: gNome,
-              regole: `Regole lunghe con caratteri <tag> & "virgolette" per elemento ${i}. ${longUnbroken}`,
-              materiali: `Materiale_${i} <test>`,
-              created_at: new Date(Date.now() - i * 3600000).toISOString(),
-              updated_at: new Date(Date.now() - i * 3600000).toISOString(),
-              deleted_at: null,
-            });
-
-            bStore.put({
-              id: `dirty-b-${i}`,
-              nome: bNome,
-              testo: `Testo del ban con parole lunghe ${longUnbroken} e caratteri <script>alert(1)</script> & "cit"`,
-              note_gesti: `Gesti_${i} <special>`,
-              created_at: new Date(Date.now() - i * 3600000).toISOString(),
-              updated_at: new Date(Date.now() - i * 3600000).toISOString(),
-              deleted_at: null,
-            });
-
-            cStore.put({
-              id: `dirty-c-${i}`,
-              titolo: cTitolo,
-              autore: `Autore_${i} & Clan`,
-              tonalita: 'Re',
-              ritmo: '4/4',
-              tempo_bpm: 120,
-              misura: '4/4',
-              capotasto: null,
-              testo_chordpro: `[Re]Testo del canto ${i} con [Sol]accordi e <caratteri> & "cit"\n{ritornello}\n[La]Ritornello ${longUnbroken}`,
-              created_at: new Date(Date.now() - i * 3600000).toISOString(),
-              updated_at: new Date(Date.now() - i * 3600000).toISOString(),
-              deleted_at: null,
-            });
-          }
-
-          tx.oncomplete = () => {
-            db.close();
-            resolve();
-          };
-          tx.onerror = () => {
-            db.close();
-            reject(tx.error);
-          };
-        };
-        req.onerror = () => reject(req.error);
+    for (let i = 1; i <= 200; i++) {
+      const longUnbroken = `SupercalifragilistichespiralidosoStranoTitoloLunghissimoSenzaSpazi_${i}`;
+      const dirtyChars = `& <special> 'singolo' "doppio" èéòàùì ${i}`;
+      dirtyGiochi.push({
+        id: `dirty-g-${i}`,
+        nome: `Gioco_${i}_${longUnbroken}_${dirtyChars}`,
+        regole: `Regole lunghe con caratteri <tag> & "virgolette" per elemento ${i}. ${longUnbroken}`,
+        materiali: `Materiale_${i} <test>`,
+        created_at: new Date(Date.now() - i * 3600000).toISOString(),
+        updated_at: new Date(Date.now() - i * 3600000).toISOString(),
+        deleted_at: null,
       });
-    });
+
+      dirtyBans.push({
+        id: `dirty-b-${i}`,
+        nome: `Ban_${i}_${longUnbroken}_${dirtyChars}`,
+        testo: `Testo del ban con parole lunghe ${longUnbroken} e caratteri <script>alert(1)</script> & "cit"`,
+        note_gesti: `Gesti_${i} <special>`,
+        created_at: new Date(Date.now() - i * 3600000).toISOString(),
+        updated_at: new Date(Date.now() - i * 3600000).toISOString(),
+        deleted_at: null,
+      });
+
+      dirtyCanti.push({
+        id: `dirty-c-${i}`,
+        titolo: `Canto_${i}_${longUnbroken}_${dirtyChars}`,
+        autore: `Autore_${i} & Clan`,
+        tonalita: 'Re',
+        ritmo: '4/4',
+        tempo_bpm: 120,
+        misura: '4/4',
+        capotasto: null,
+        testo_chordpro: `[Re]Testo del canto ${i} con [Sol]accordi e <caratteri> & "cit"\n{ritornello}\n[La]Ritornello ${longUnbroken}`,
+        created_at: new Date(Date.now() - i * 3600000).toISOString(),
+        updated_at: new Date(Date.now() - i * 3600000).toISOString(),
+        deleted_at: null,
+      });
+    }
+
+    await page.evaluate(async (data: any) => {
+      await (window as any).__dbPutRecords('giochi', data.dirtyGiochi);
+      await (window as any).__dbPutRecords('bans', data.dirtyBans);
+      await (window as any).__dbPutRecords('canti', data.dirtyCanti);
+    }, { dirtyGiochi, dirtyBans, dirtyCanti });
   }
 
   test('Popolamento 200 elementi sporchi, ricerca typo/special chars, ordinamento, sheet e visibilità ultimo elemento su Giochi', async ({ page }) => {
@@ -501,103 +485,86 @@ test.describe('FASE 7 - Verifica Calendario e ODG (#/calendario)', () => {
   async function seedCalendarData(page: any) {
     await page.goto('#/');
     await page.waitForLoadState('networkidle');
+    await page.waitForFunction(() => typeof (window as any).__dbPutRecords === 'function');
 
-    await page.evaluate(async () => {
-      const req = indexedDB.open('vault_scout_db', 1);
-      await new Promise<void>((resolve, reject) => {
-        req.onsuccess = () => {
-          const db = req.result;
-          const tx = db.transaction(['eventi', 'odg_punti'], 'readwrite');
-          const evStore = tx.objectStore('eventi');
-          const odgStore = tx.objectStore('odg_punti');
+    const now = new Date();
+    const todayIso = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 18, 30).toISOString();
+    const tomorrowIso = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 9, 0).toISOString();
+    const pastIso = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 5, 20, 0).toISOString();
 
-          const now = new Date();
-          const todayIso = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 18, 30).toISOString();
-          const tomorrowIso = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 9, 0).toISOString();
-          const pastIso = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 5, 20, 0).toISOString();
+    // 1. Evento Oggi (Riunione con ODG denso)
+    const evOggi = {
+      id: 'ev-oggi-test',
+      titolo: 'Riunione Ordinaria di Clan & Verifica Fasi',
+      tipo: 'riunione',
+      inizio: todayIso,
+      fine: new Date(now.getFullYear(), now.getMonth(), now.getDate(), 20, 30).toISOString(),
+      tutto_il_giorno: false,
+      luogo: 'Sede Clan San Giovanni',
+      descrizione: 'Verifica dettagliata delle attività del mese e approvazione ordini del giorno.',
+      responsabile: 'Capi Clan',
+      cosa_portare: 'Quaderno di caccia, penna, cassa',
+      created_at: now.toISOString(),
+      updated_at: now.toISOString(),
+      deleted_at: null,
+    };
 
-          // 1. Evento Oggi (Riunione con ODG denso)
-          const evOggi = {
-            id: 'ev-oggi-test',
-            titolo: 'Riunione Ordinaria di Clan & Verifica Fasi',
-            tipo: 'riunione',
-            inizio: todayIso,
-            fine: new Date(now.getFullYear(), now.getMonth(), now.getDate(), 20, 30).toISOString(),
-            tutto_il_giorno: false,
-            luogo: 'Sede Clan San Giovanni',
-            descrizione: 'Verifica dettagliata delle attività del mese e approvazione ordini del giorno.',
-            responsabile: 'Capi Clan',
-            cosa_portare: 'Quaderno di caccia, penna, cassa',
-            created_at: now.toISOString(),
-            updated_at: now.toISOString(),
-            deleted_at: null,
-          };
+    // 2. Evento Domani (Uscita)
+    const evDomani = {
+      id: 'ev-domani-test',
+      titolo: 'Uscita di Pattuglia sui Sibillini',
+      tipo: 'uscita',
+      inizio: tomorrowIso,
+      fine: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 2, 17, 0).toISOString(),
+      tutto_il_giorno: false,
+      luogo: 'Monte Vettore - Rifugio Zilioli',
+      descrizione: 'Trekking di 2 giorni in autonomia.',
+      responsabile: 'Pattuglia Aquile',
+      cosa_portare: 'Tenda, fornellino, viveri',
+      created_at: now.toISOString(),
+      updated_at: now.toISOString(),
+      deleted_at: null,
+    };
 
-          // 2. Evento Domani (Uscita)
-          const evDomani = {
-            id: 'ev-domani-test',
-            titolo: 'Uscita di Pattuglia sui Sibillini',
-            tipo: 'uscita',
-            inizio: tomorrowIso,
-            fine: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 2, 17, 0).toISOString(),
-            tutto_il_giorno: false,
-            luogo: 'Monte Vettore - Rifugio Zilioli',
-            descrizione: 'Trekking di 2 giorni in autonomia.',
-            responsabile: 'Pattuglia Aquile',
-            cosa_portare: 'Tenda, fornellino, viveri',
-            created_at: now.toISOString(),
-            updated_at: now.toISOString(),
-            deleted_at: null,
-          };
+    // 3. Evento Passato
+    const evPassato = {
+      id: 'ev-passato-test',
+      titolo: 'Verifica Inizio Anno Scout',
+      tipo: 'evento',
+      inizio: pastIso,
+      fine: null,
+      tutto_il_giorno: false,
+      luogo: 'Oratorio',
+      descrizione: 'Incontro con la Comunità Capi',
+      responsabile: 'Capi Gruppo',
+      cosa_portare: null,
+      created_at: pastIso,
+      updated_at: pastIso,
+      deleted_at: null,
+    };
 
-          // 3. Evento Passato
-          const evPassato = {
-            id: 'ev-passato-test',
-            titolo: 'Verifica Inizio Anno Scout',
-            tipo: 'evento',
-            inizio: pastIso,
-            fine: null,
-            tutto_il_giorno: false,
-            luogo: 'Oratorio',
-            descrizione: 'Incontro con la Comunità Capi',
-            responsabile: 'Capi Gruppo',
-            cosa_portare: null,
-            created_at: pastIso,
-            updated_at: pastIso,
-            deleted_at: null,
-          };
+    const eventi = [evOggi, evDomani, evPassato];
+    const odgPunti: any[] = [];
 
-          evStore.put(evOggi);
-          evStore.put(evDomani);
-          evStore.put(evPassato);
-
-          // Stress test: 30 punti ODG con stringhe lunghe
-          for (let i = 1; i <= 30; i++) {
-            odgStore.put({
-              id: `odg-pt-${i}`,
-              evento_id: 'ev-oggi-test',
-              testo: `Punto ODG #${i}: Discussione approfondita sui progetti di servizio ${i % 2 === 0 ? 'con testo esteso per verifica layout reattivo senza troncamenti strani' : 'breve'}`,
-              ordine: i - 1,
-              completato: i % 4 === 0, // Ogni 4 completato
-              riportato_da: i === 5 ? 'odg-vecchio-id' : null,
-              created_at: now.toISOString(),
-              updated_at: now.toISOString(),
-              deleted_at: null,
-            });
-          }
-
-          tx.oncomplete = () => {
-            db.close();
-            resolve();
-          };
-          tx.onerror = () => {
-            db.close();
-            reject(tx.error);
-          };
-        };
-        req.onerror = () => reject(req.error);
+    // Stress test: 30 punti ODG con stringhe lunghe
+    for (let i = 1; i <= 30; i++) {
+      odgPunti.push({
+        id: `odg-pt-${i}`,
+        evento_id: 'ev-oggi-test',
+        testo: `Punto ODG #${i}: Discussione approfondita sui progetti di servizio ${i % 2 === 0 ? 'con testo esteso per verifica layout reattivo senza troncamenti strani' : 'breve'}`,
+        ordine: i - 1,
+        completato: i % 4 === 0, // Ogni 4 completato
+        riportato_da: i === 5 ? 'odg-vecchio-id' : null,
+        created_at: now.toISOString(),
+        updated_at: now.toISOString(),
+        deleted_at: null,
       });
-    });
+    }
+
+    await page.evaluate(async (data: any) => {
+      await (window as any).__dbPutRecords('eventi', data.eventi);
+      await (window as any).__dbPutRecords('odg_punti', data.odgPunti);
+    }, { eventi, odgPunti });
   }
 
   test('Audit accessibilità WCAG AA su Calendario View (#/calendario)', async ({ page }) => {

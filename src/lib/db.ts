@@ -552,3 +552,14 @@ export async function getNextUpcomingEvent(): Promise<{
     openOdgCount: openCount,
   };
 }
+
+if (typeof window !== 'undefined') {
+  (window as any).__dbPutRecords = async (tableName: ContentTableName, records: any[]) => {
+    const db = await getDb();
+    const tx = db.transaction(tableName, 'readwrite');
+    for (const r of records) {
+      await tx.store.put(r);
+    }
+    await tx.done;
+  };
+}
