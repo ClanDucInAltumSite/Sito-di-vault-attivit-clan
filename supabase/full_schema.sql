@@ -48,16 +48,21 @@ CREATE TABLE IF NOT EXISTS public.canti (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   titolo text NOT NULL,
   autore text NULL,
+  categoria text NULL,
   tonalita text NULL,
   ritmo text NULL,
   tempo_bpm integer NULL CHECK (tempo_bpm IS NULL OR (tempo_bpm >= 30 AND tempo_bpm <= 300)),
   bpm_testo text NULL,
   misura text NULL,
   capotasto integer NULL CHECK (capotasto IS NULL OR (capotasto >= 0 AND capotasto <= 12)),
+  origine text NULL,
+  nota_fonte text NULL,
   testo_chordpro text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
-  deleted_at timestamptz NULL
+  deleted_at timestamptz NULL,
+  CONSTRAINT canti_categoria_check CHECK (categoria IS NULL OR categoria IN ('scout', 'chiesa', 'esterni')),
+  CONSTRAINT canti_origine_check CHECK (origine IS NULL OR origine IN ('import_pdf', 'import_docx', 'manuale'))
 );
 
 -- Tabella Eventi Calendario
@@ -153,6 +158,7 @@ CREATE INDEX IF NOT EXISTS idx_allegati_updated_at ON public.allegati(updated_at
 CREATE INDEX IF NOT EXISTS idx_giochi_nome ON public.giochi(nome) WHERE deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_bans_nome ON public.bans(nome) WHERE deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_canti_titolo ON public.canti(titolo) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_canti_categoria ON public.canti(categoria) WHERE deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_eventi_inizio ON public.eventi(inizio) WHERE deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_odg_evento ON public.odg_punti(evento_id, ordine) WHERE deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_allegati_genitori ON public.allegati(gioco_id, ban_id, canto_id, evento_id) WHERE deleted_at IS NULL;

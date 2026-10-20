@@ -31,16 +31,21 @@ export interface Ban {
   deleted_at: string | null;
 }
 
+export type CategoriaCanto = 'scout' | 'chiesa' | 'esterni';
+
 export interface Canto {
   id: string;
   titolo: string;
   autore: string | null;
+  categoria?: CategoriaCanto | null;
   tonalita: string | null;
   ritmo: string | null;
   tempo_bpm: number | null;
   bpm_testo: string | null;
   misura: string | null;
   capotasto: number | null;
+  origine?: 'import_pdf' | 'import_docx' | 'manuale' | null;
+  nota_fonte?: string | null;
   testo_chordpro: string;
   created_at: string;
   updated_at: string;

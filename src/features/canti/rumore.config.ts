@@ -58,6 +58,12 @@ export const NOISE_RULES: NoiseRule[] = [
     pattern: /^(?:https?:\/\/|www\.)\S+$/i,
     description: 'Indirizzo web / link',
   },
+
+  // Percorsi di navigazione / breadcrumbs (es. Canti / Categoria Clan, Canti/Categoria Clan, Home > Canti > Scout)
+  {
+    pattern: /^[A-Za-zÀ-ÿ0-9\s_-]+(?:\s*[\/>»]\s*|\s+[|]\s+)[A-Za-zÀ-ÿ0-9\s_-]+.*$/i,
+    description: 'Percorso di navigazione / breadcrumb',
+  },
 ];
 
 /**

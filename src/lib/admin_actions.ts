@@ -183,13 +183,16 @@ export async function saveBan(input: {
 export async function saveCanto(input: {
   id?: string;
   titolo: string;
-  autore?: string;
-  tonalita?: string;
-  ritmo?: string;
+  autore?: string | null;
+  categoria?: 'scout' | 'chiesa' | 'esterni' | null;
+  tonalita?: string | null;
+  ritmo?: string | null;
   tempo_bpm?: number | null;
   bpm_testo?: string | null;
-  misura?: string;
+  misura?: string | null;
   capotasto?: number | null;
+  origine?: 'import_pdf' | 'import_docx' | 'manuale' | null;
+  nota_fonte?: string | null;
   testo_chordpro: string;
 }): Promise<Canto> {
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
@@ -212,15 +215,18 @@ export async function saveCanto(input: {
     }
   }
 
-  const payload = {
+  const payload: any = {
     titolo: input.titolo.trim(),
     autore: (input.autore || '').trim() || null,
+    categoria: input.categoria !== undefined ? input.categoria : null,
     tonalita: (input.tonalita || '').trim() || null,
     ritmo: (input.ritmo || '').trim() || null,
     tempo_bpm: calculatedBpm,
     bpm_testo: rawBpmTesto || (calculatedBpm !== null ? String(calculatedBpm) : null),
     misura: (input.misura || '').trim() || null,
     capotasto: typeof input.capotasto === 'number' && !isNaN(input.capotasto) ? input.capotasto : null,
+    origine: input.origine || null,
+    nota_fonte: (input.nota_fonte || '').trim() || null,
     testo_chordpro: input.testo_chordpro.trim(),
     updated_at: now,
   };

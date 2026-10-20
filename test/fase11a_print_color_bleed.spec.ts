@@ -9,7 +9,7 @@ test.describe('FASE 11A — Regressione: Stili di stampa non devono inquinare le
     }) => {
       // 1. Inizializza contesto su #/
       await page.goto('#/');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       // 2. Imposta tema e inserisci canto sintetico di test in IndexedDB
       const synthSongData = await page.evaluate(async (selectedTheme) => {
@@ -59,7 +59,7 @@ test.describe('FASE 11A — Regressione: Stili di stampa non devono inquinare le
 
       // 3. Naviga client-side a #/canti
       await page.evaluate(() => { window.location.hash = '#/canti'; });
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       // Attendi che il canto sia presente nell'elenco
       const songItem = page.locator('text=CANTO SINTETICO COLLINA VERDE').first();
@@ -162,7 +162,7 @@ test.describe('FASE 11A — Regressione: Stili di stampa non devono inquinare le
       });
 
       // Attendi che il canto sia presente nell'elenco
-      const songItemAfter = page.locator('text=CANTO SINTETICO COLLINA VERDE').first();
+      const songItemAfter = page.locator('.grouped-row-title, .grouped-row, main').locator('text=CANTO SINTETICO COLLINA VERDE').first();
       await expect(songItemAfter).toBeVisible({ timeout: 10000 });
 
       // Riapri il Dettaglio

@@ -25,7 +25,8 @@ describe('FASE 10 — Test Suite Inserimento Canti a Mano e Senza AI (10A & 10B)
       const activeDocPaths = [
         path.join(process.cwd(), 'docs/GUIDA_CAPI.md'),
         path.join(process.cwd(), 'docs/ARCHITECTURE.md'),
-        path.join(process.cwd(), 'src/features/canti/CantoFormSheet.tsx'),
+        path.join(process.cwd(), 'src/features/canti/CantoReviewModal.tsx'),
+        path.join(process.cwd(), 'src/features/canti/ImportCantoModal.tsx'),
         path.join(process.cwd(), 'src/features/canti/canzoniere_parser.ts'),
       ];
 

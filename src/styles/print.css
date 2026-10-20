@@ -393,7 +393,7 @@
     font-family: 'Roboto', sans-serif !important;
     font-size: 11pt !important;
     font-style: italic !important;
-    color: oklch(0.44 0.02 255) !important;
+    color: oklch(0.4 0 0) !important;
     margin-bottom: 4pt !important;
     line-height: 1.2 !important;
   }
@@ -401,7 +401,7 @@
   .canzoniere-header-params {
     font-family: 'Roboto', sans-serif !important;
     font-size: 11pt !important;
-    color: oklch(0.33 0.02 255) !important;
+    color: oklch(0.35 0 0) !important;
     margin-bottom: 6pt !important;
     line-height: 1.25 !important;
     display: flex !important;
@@ -476,7 +476,7 @@
   .canzoniere-line-item {
     font-family: 'Roboto', system-ui, -apple-system, sans-serif !important;
     font-weight: 400 !important;
-    color: oklch(0.33 0.02 255) !important;
+    color: oklch(0 0 0) !important;
     line-height: 1.5 !important;
     position: relative !important;
     white-space: pre-wrap !important;
@@ -507,7 +507,7 @@
     white-space: nowrap !important;
     font-family: 'Roboto', sans-serif !important;
     font-weight: 700 !important;
-    color: oklch(0.33 0.02 255) !important;
+    color: oklch(0 0 0) !important;
     line-height: 1.2 !important;
     pointer-events: none !important;
   }
@@ -515,7 +515,7 @@
   .canzoniere-chord-only-item {
     font-family: 'Roboto', sans-serif !important;
     font-weight: 700 !important;
-    color: oklch(0.33 0.02 255) !important;
+    color: oklch(0 0 0) !important;
     white-space: pre !important;
   }
 
@@ -527,7 +527,7 @@
   .canzoniere-rit-label {
     font-family: 'Roboto', sans-serif !important;
     font-weight: 700 !important;
-    color: oklch(0.33 0.02 255) !important;
+    color: oklch(0 0 0) !important;
     line-height: 1.5 !important;
     margin-top: 0 !important;
     margin-bottom: 0 !important;
@@ -729,7 +729,7 @@
   font-family: 'Roboto', sans-serif;
   font-size: 11pt;
   font-style: italic;
-  color: oklch(0.44 0.02 255);
+  color: oklch(0.4 0 0);
   margin-bottom: 4pt;
   line-height: 1.2;
 }
@@ -738,7 +738,7 @@
 .stampa-measure-host .canzoniere-header-params {
   font-family: 'Roboto', sans-serif;
   font-size: 11pt;
-  color: oklch(0.33 0.02 255);
+  color: oklch(0.35 0 0);
   margin-bottom: 6pt;
   line-height: 1.25;
   display: flex;
@@ -820,7 +820,7 @@
   box-sizing: border-box;
   padding: 10mm 20mm 20mm 20mm;
   background: oklch(1 0 0);
-  color: oklch(0.33 0.02 255);
+  color: oklch(0 0 0);
 }
 
 .canzoniere-page .canzoniere-block,
@@ -832,7 +832,7 @@
 .stampa-measure-host .canzoniere-line-item {
   font-family: 'Roboto', system-ui, -apple-system, sans-serif;
   font-weight: 400;
-  color: oklch(0.33 0.02 255);
+  color: oklch(0 0 0);
   line-height: 1.5;
   position: relative;
   white-space: pre-wrap;
@@ -867,7 +867,7 @@
   white-space: nowrap;
   font-family: 'Roboto', sans-serif;
   font-weight: 700;
-  color: oklch(0.33 0.02 255);
+  color: oklch(0 0 0);
   line-height: 1.2;
 }
 
@@ -875,7 +875,7 @@
 .stampa-measure-host .canzoniere-chord-only-item {
   font-family: 'Roboto', sans-serif;
   font-weight: 700;
-  color: oklch(0.33 0.02 255);
+  color: oklch(0 0 0);
   white-space: pre;
 }
 
@@ -889,7 +889,7 @@
 .stampa-measure-host .canzoniere-rit-label {
   font-family: 'Roboto', sans-serif;
   font-weight: 700;
-  color: oklch(0.33 0.02 255);
+  color: oklch(0 0 0);
   line-height: 1.5;
   margin-top: 0;
   margin-bottom: 0;

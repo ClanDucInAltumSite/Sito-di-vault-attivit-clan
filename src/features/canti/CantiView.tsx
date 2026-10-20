@@ -18,17 +18,29 @@ import { stripChords } from '../../lib/chordpro';
 import { splitSongIntoPages } from '../../lib/stampa';
 import { CantoDetailSheet } from './CantoDetailSheet';
 import { CantoReadingMode } from './CantoReadingMode';
-import { CantoFormSheet } from './CantoFormSheet';
+import { ImportCantoModal, ImportedSongData } from './ImportCantoModal';
+import { CantoReviewModal } from './CantoReviewModal';
+import { QuickCategoryAssignModal } from './QuickCategoryAssignModal';
 import { DeleteConfirmModal } from '../../ui/DeleteConfirmModal';
 import { DANZA_LA_VITA_PARSED } from '../../data/parsed_songs';
 
 type SortOption = 'az' | 'za' | 'recenti' | 'vecchi';
+export type CategoryFilter = 'tutti' | 'scout' | 'chiesa' | 'esterni' | 'senza_categoria';
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
 export function CantiView() {
   const { isAdmin } = useAdmin();
   const [canti, setCanti] = useState<Canto[]>([]);
+
+  // Filtro Categoria (Fase 11F)
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>(() => {
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      const saved = sessionStorage.getItem('canti_category') as CategoryFilter;
+      if (['tutti', 'scout', 'chiesa', 'esterni', 'senza_categoria'].includes(saved)) return saved;
+    }
+    return 'tutti';
+  });
 
   // Ripristino stato da sessionStorage
   const [search, setSearch] = useState(() => {
@@ -52,7 +64,10 @@ export function CantiView() {
   const [selectedCanto, setSelectedCanto] = useState<Canto | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isReadingModeOpen, setIsReadingModeOpen] = useState(false);
-  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [isQuickAssignOpen, setIsQuickAssignOpen] = useState(false);
+  const [importedSongData, setImportedSongData] = useState<ImportedSongData | null>(null);
   const [editingCanto, setEditingCanto] = useState<Canto | null>(null);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [deletingCanto, setDeletingCanto] = useState<Canto | null>(null);
@@ -88,6 +103,14 @@ export function CantiView() {
     setCanti(enriched);
   };
 
+  // Conteggi categorie (Fase 11F)
+  const countAll = canti.length;
+  const countScout = useMemo(() => canti.filter((c) => c.categoria === 'scout').length, [canti]);
+  const countChiesa = useMemo(() => canti.filter((c) => c.categoria === 'chiesa').length, [canti]);
+  const countEsterni = useMemo(() => canti.filter((c) => c.categoria === 'esterni').length, [canti]);
+  const uncategorizedCanti = useMemo(() => canti.filter((c) => !c.categoria), [canti]);
+  const countUncategorized = uncategorizedCanti.length;
+
   useEffect(() => {
     loadData();
     const unsubscribe = subscribeSyncState(() => {
@@ -97,9 +120,29 @@ export function CantiView() {
       setSelectedCanto(canto);
       setIsDetailOpen(true);
     };
+    (window as any).__openReviewForTesting = (data?: any) => {
+      setEditingCanto(null);
+      setImportedSongData({
+        titolo: data?.titolo || 'Canto Sintetico Lungo della Promessa e della Strada',
+        categoria: data?.categoria || 'scout',
+        autore: data?.autore || 'Compositore Sintetico',
+        tonalita: data?.tonalita || 'Do',
+        misura: data?.misura || '4/4',
+        bpm_testo: data?.bpm_testo || 'circa 94',
+        ritmo: data?.ritmo || '↓ ↑ ↓↑',
+        capotasto: data?.capotasto ?? 2,
+        origine: data?.origine || 'import_pdf',
+        nota_fonte: data?.nota_fonte || 'Canzoniere Sintetico 2026',
+        testo_chordpro: data?.testo_chordpro || '',
+        warnings: data?.warnings || [],
+        removedNoise: data?.removedNoise || [],
+      });
+      setIsReviewModalOpen(true);
+    };
     return () => {
       unsubscribe();
       delete (window as any).__openCantoDetail;
+      delete (window as any).__openReviewForTesting;
     };
   }, []);
 
@@ -126,9 +169,23 @@ export function CantiView() {
     }
   };
 
+  // Gestione filtro categoria e persistenza in sessionStorage
+  const handleCategoryChange = (val: string) => {
+    const c = val as CategoryFilter;
+    setCategoryFilter(c);
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      sessionStorage.setItem('canti_category', c);
+    }
+  };
+
   // Filtraggio deterministico: CERCA SOLO NEL TESTO PULITO (stripChords), MAI NEGLI ACCORDI!
   const filteredList = useMemo(() => {
     let result = canti.filter((c) => {
+      if (categoryFilter === 'scout' && c.categoria !== 'scout') return false;
+      if (categoryFilter === 'chiesa' && c.categoria !== 'chiesa') return false;
+      if (categoryFilter === 'esterni' && c.categoria !== 'esterni') return false;
+      if (categoryFilter === 'senza_categoria' && c.categoria) return false;
+
       const cleanLyrics = stripChords(c.testo_chordpro);
       return matchesQuery(debouncedSearch, c.titolo, c.autore || '', cleanLyrics);
     });
@@ -151,7 +208,7 @@ export function CantiView() {
     });
 
     return result;
-  }, [canti, debouncedSearch, sort]);
+  }, [canti, debouncedSearch, sort, categoryFilter]);
 
   // Gestione eliminazione (soft delete gerarchica)
   const handleDeleteConfirm = async () => {
@@ -190,6 +247,7 @@ export function CantiView() {
             style={{
               display: 'flex',
               justifyContent: 'flex-end',
+              alignItems: 'center',
               gap: 'var(--space-2)',
               marginBottom: 'var(--space-3)',
             }}
@@ -197,13 +255,55 @@ export function CantiView() {
             <Button
               variant="primary"
               size="sm"
+              onClick={() => setIsImportModalOpen(true)}
+            >
+              <Icon name="upload" size={16} />
+              <span>Importa canto</span>
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => {
                 setEditingCanto(null);
-                setIsFormOpen(true);
+                setImportedSongData(null);
+                setIsReviewModalOpen(true);
               }}
+              style={{ fontSize: '0.85rem' }}
             >
-              <Icon name="plus" size={16} />
-              <span>{I18N.canti.nuovoCanto}</span>
+              <Icon name="plus" size={14} />
+              <span>Nuovo canto vuoto</span>
+            </Button>
+          </div>
+        ) : null}
+
+        {/* Avviso Admin per canti senza categoria con assegnazione rapida (Fase 11F) */}
+        {isAdmin && countUncategorized > 0 ? (
+          <div
+            className="ios-card"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: 'var(--space-3) var(--space-4)',
+              marginBottom: 'var(--space-4)',
+              backgroundColor: 'oklch(0.96 0.05 85)',
+              borderColor: 'oklch(0.85 0.1 85)',
+              flexWrap: 'wrap',
+              gap: 'var(--space-2)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+              <Icon name="info" size={18} />
+              <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'oklch(0.35 0.12 85)' }}>
+                Ci sono {countUncategorized} {countUncategorized === 1 ? 'canto senza categoria' : 'canti senza categoria'}
+              </span>
+            </div>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => setIsQuickAssignOpen(true)}
+            >
+              Assegna rapidamente
             </Button>
           </div>
         ) : null}
@@ -223,6 +323,22 @@ export function CantiView() {
             placeholder={I18N.search.placeholderCanti}
             aria-label={I18N.search.placeholderCanti}
           />
+
+          {/* Filtro per Categorie (Fase 11F) */}
+          <SegmentedControl
+            options={[
+              { value: 'tutti', label: `Tutti (${countAll})` },
+              { value: 'scout', label: `Scout (${countScout})` },
+              { value: 'chiesa', label: `Chiesa (${countChiesa})` },
+              { value: 'esterni', label: `Esterni (${countEsterni})` },
+              ...(countUncategorized > 0
+                ? [{ value: 'senza_categoria', label: `Senza cat. (${countUncategorized})` }]
+                : []),
+            ]}
+            value={categoryFilter}
+            onChange={handleCategoryChange}
+          />
+
           <SegmentedControl
             options={[
               { value: 'az', label: 'A → Z' },
@@ -335,11 +451,33 @@ export function CantiView() {
                     />
                   }
                   trailing={
-                    isNew ? (
-                      <Badge variant="giallo" size="sm">
-                        Nuovo
-                      </Badge>
-                    ) : null
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                      {canto.categoria === 'scout' && (
+                        <Badge variant="azzurro" size="sm">
+                          Scout
+                        </Badge>
+                      )}
+                      {canto.categoria === 'chiesa' && (
+                        <Badge variant="giallo" size="sm">
+                          Chiesa
+                        </Badge>
+                      )}
+                      {canto.categoria === 'esterni' && (
+                        <Badge variant="neutral" size="sm">
+                          Esterni
+                        </Badge>
+                      )}
+                      {!canto.categoria && isAdmin && (
+                        <Badge variant="rosso" size="sm">
+                          Senza cat.
+                        </Badge>
+                      )}
+                      {isNew ? (
+                        <Badge variant="giallo" size="sm">
+                          Nuovo
+                        </Badge>
+                      ) : null}
+                    </div>
                   }
                   chevron
                   onClick={() => {
@@ -369,7 +507,8 @@ export function CantiView() {
         onEdit={(c) => {
           setIsDetailOpen(false);
           setEditingCanto(c);
-          setIsFormOpen(true);
+          setImportedSongData(null);
+          setIsReviewModalOpen(true);
         }}
         onDelete={(c) => {
           setIsDetailOpen(false);
@@ -390,7 +529,8 @@ export function CantiView() {
         onEdit={(c) => {
           setIsReadingModeOpen(false);
           setEditingCanto(c);
-          setIsFormOpen(true);
+          setImportedSongData(null);
+          setIsReviewModalOpen(true);
         }}
         onDelete={(c) => {
           setIsReadingModeOpen(false);
@@ -400,16 +540,42 @@ export function CantiView() {
         onUpdated={loadData}
       />
 
-      {/* Sheet Form Aggiungi/Modifica Canto (Admin - Unificato 3-in-1) */}
-      <CantoFormSheet
-        isOpen={isFormOpen}
-        onClose={() => setIsFormOpen(false)}
-        initialCanto={editingCanto}
-        existingTitles={existingTitles}
-        onSaved={async (saved) => {
-          await loadData();
-          setSelectedCanto(saved);
+      {/* Modal Ingresso Unico Importazione (PDF e Word) */}
+      <ImportCantoModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onImportSuccess={(data) => {
+          setImportedSongData(data);
+          setEditingCanto(null);
+          setIsReviewModalOpen(true);
         }}
+      />
+
+      {/* Schermata Revisione Grande Canto (Fase 11D) */}
+      {isReviewModalOpen && (
+        <CantoReviewModal
+          isOpen={isReviewModalOpen}
+          onClose={() => {
+            setIsReviewModalOpen(false);
+            setImportedSongData(null);
+            setEditingCanto(null);
+          }}
+          initialCanto={editingCanto}
+          importedData={importedSongData}
+          existingTitles={existingTitles}
+          onSaved={async (saved) => {
+            await loadData();
+            setSelectedCanto(saved);
+          }}
+        />
+      )}
+
+      {/* Modal Assegnazione Rapida Categorie (Fase 11F) */}
+      <QuickCategoryAssignModal
+        isOpen={isQuickAssignOpen}
+        onClose={() => setIsQuickAssignOpen(false)}
+        uncategorizedCanti={uncategorizedCanti}
+        onUpdated={loadData}
       />
 
       {/* Modal Conferma Eliminazione in due passaggi (Admin) */}

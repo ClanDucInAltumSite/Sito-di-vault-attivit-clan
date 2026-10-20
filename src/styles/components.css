@@ -2452,6 +2452,29 @@ select.ios-form-input option {
    Renderer Unificato Canti (CantoLineRenderer & ChordPro)
    Accordi ancorati a zero-width sopra le sillabe, interlinea fluida 1.5
    ============================================================================== */
+.canzoniere-page {
+  background: oklch(1 0 0);
+  color: oklch(0 0 0);
+  --color-text: oklch(0 0 0);
+}
+
+.canzoniere-page .canzoniere-line-item {
+  color: oklch(0 0 0);
+}
+
+.canzoniere-page .song-chord {
+  color: oklch(0.28 0.14 255);
+}
+
+.canzoniere-page .canzoniere-header-title {
+  color: oklch(0 0 0);
+}
+
+.canzoniere-page .canzoniere-header-author,
+.canzoniere-page .canzoniere-header-params {
+  color: oklch(0.35 0 0);
+}
+
 .canzoniere-line-item {
   font-family: 'Roboto', var(--font-sans), system-ui, sans-serif;
   font-weight: 400;
