@@ -39,9 +39,4 @@ describe('FASE 12A — Verifica Statica dei Budget di Peso', () => {
     expect(viteConfig).toContain('pdf.worker');
     expect(viteConfig).toContain('pdfjs');
   });
-
-  it('FALLIMENTO INTENZIONALE PER DIMOSTRAZIONE CI ROSSA (PUNTO 1 PROMPT)', () => {
-    // Dimostrazione richiesta dal prompt: rompi di proposito un test, mostra esecuzione ROSSA e ripristina.
-    expect('ci-verde').toBe('ci-rossa-dimostrativa');
-  });
 });
