@@ -169,7 +169,7 @@ export function isChordLine(
   if (!allAreChords) return { isChord: false, isAmbiguous: false };
 
   const hasBold = words.some((w) => w.isBold);
-  const hasUppercase = tokens.some((t) => t.length >= 2 && t === t.toUpperCase());
+  const hasUppercase = tokens.some((t) => (t.length >= 2 && t === t.toUpperCase()) || (t.length === 1 && /[A-G]/.test(t)));
   const hasModifiers = tokens.some((t) => {
     const withoutRoot = t.replace(/^[(\[]?(?:Do|Re|Mi|Fa|Sol|La|Si|[A-G])/i, '');
     return /[#b\-m7+]/i.test(withoutRoot);
@@ -520,6 +520,7 @@ export async function parsePdfCanto(
   options: {
     workerUrl?: string;
     snapThresholdChars?: number;
+    compactScout?: boolean;
   } = {}
 ): Promise<ParsedPdfCantoResult> {
   // Import dinamico di pdf.js (solo nell'area admin, zero impatto sul bundle di avvio)
@@ -572,7 +573,7 @@ export async function parsePdfCanto(
     for (const rawItem of textContent.items) {
       if ('str' in rawItem) {
         const str = rawItem.str.replace(/\u200b/g, '');
-        if (!str.trim() && str.length === 0) continue;
+        if (!str.trim()) continue;
 
         const tx = rawItem.transform[4] || 0;
         const ty = rawItem.transform[5] || 0;
@@ -674,13 +675,30 @@ export async function parsePdfCanto(
       return linesByY.map((l) => {
         // Ordina elementi della riga per coordinata X crescente
         const sortedItems = [...l.items].sort((a, b) => a.x0 - b.x0);
-        const text = sortedItems.map((i) => i.str).join(' ').replace(/\s+/g, ' ').trim();
-        const isBold = sortedItems.some((i) => i.isBold);
-        const isItalic = sortedItems.some((i) => i.isItalic);
+
+        // Fondi elementi adiacenti (distanza <= 2.5pt o frammenti di accordo es. FA# + m)
+        const mergedItems: RawTextItem[] = [];
+        for (const item of sortedItems) {
+          if (!item.str.trim()) continue;
+          const last = mergedItems[mergedItems.length - 1];
+          if (last && (item.x0 - last.x1 <= 2.5)) {
+            last.str += item.str;
+            last.x1 = Math.max(last.x1, item.x1);
+            last.width = last.x1 - last.x0;
+            last.isBold = last.isBold || item.isBold;
+            last.isItalic = last.isItalic || item.isItalic;
+          } else {
+            mergedItems.push({ ...item });
+          }
+        }
+
+        const text = mergedItems.map((i) => i.str).join(' ').replace(/\s+/g, ' ').trim();
+        const isBold = mergedItems.some((i) => i.isBold);
+        const isItalic = mergedItems.some((i) => i.isItalic);
         return {
           y: l.y,
           fontSize: l.fontSize,
-          items: sortedItems,
+          items: mergedItems,
           text,
           isBold,
           isItalic,
@@ -730,22 +748,36 @@ export async function parsePdfCanto(
     }
   }
 
-  if (titleCandidate && maxFontSize >= 14.0) {
+  if (titleCandidate && (maxFontSize >= 14.0 || ((titleCandidate.includes('–') || titleCandidate.includes(' - ')) && maxFontSize >= 10.0 && titleLineIdx <= 2))) {
     extractedTitle = titleCandidate;
 
-    // Sottotitolo o Autore: riga successiva in corsivo o tra parentesi
+    // Se il titolo contiene trattino di separazione artista (es. Centopassi – Modena City Ramblers)
+    if (titleCandidate.includes('–') || titleCandidate.includes(' - ')) {
+      const parts = titleCandidate.split(/\s*[–-]\s*/);
+      if (parts.length >= 2 && parts[0] && parts[1]) {
+        extractedTitle = parts[0].trim();
+        extractedAuthor = parts[1].trim();
+      }
+    }
+
+    // Sottotitolo o Autore: riga successiva in corsivo o tra parentesi o testo prima degli accordi
     if (titleLineIdx + 1 < firstPageLines.length) {
       const nextLine = firstPageLines[titleLineIdx + 1]!;
       if (nextLine.text.startsWith('(') && nextLine.text.endsWith(')')) {
         extractedSubtitle = nextLine.text;
         if (titleLineIdx + 2 < firstPageLines.length) {
           const authorLine = firstPageLines[titleLineIdx + 2]!;
-          if (authorLine.isItalic && !authorLine.text.toLowerCase().includes('tempo:')) {
+          if (!extractedAuthor && authorLine.isItalic && !authorLine.text.toLowerCase().includes('tempo:')) {
             extractedAuthor = authorLine.text;
           }
         }
-      } else if (nextLine.isItalic && !nextLine.text.toLowerCase().includes('tempo:')) {
+      } else if (!extractedAuthor && nextLine.isItalic && !nextLine.text.toLowerCase().includes('tempo:')) {
         extractedAuthor = nextLine.text;
+      } else if (!extractedAuthor && !isChordLine(nextLine.items.map(it => ({ text: it.str, isBold: it.isBold }))).isChord) {
+        const t = nextLine.text.trim();
+        if (!matchNoiseLine(t) && !/^(intro|strum|tempo:|ritmo)/i.test(t) && t.length > 2) {
+          extractedAuthor = t;
+        }
       }
     }
   }
@@ -785,6 +817,9 @@ export async function parsePdfCanto(
     if (!trimmed) continue;
 
     // Escludi riga se corrisponde al titolo o sottotitolo o autore già estratto
+    if (titleCandidate && trimmed.toUpperCase() === titleCandidate.toUpperCase()) {
+      continue;
+    }
     if (extractedTitle && trimmed.toUpperCase() === extractedTitle.toUpperCase()) {
       continue;
     }
@@ -850,6 +885,7 @@ export async function parsePdfCanto(
 
   // 4. ASSEMBLAGGIO CORPO CANTO, ACCORDI E RITORNELLI (11C.3, 11C.4, 11C.5, 11C.8)
   const outputChordProLines: string[] = [];
+  const intermediateLines: IntermediateSongLine[] = [];
   let currIdx = 0;
 
   // Calcola il passo righe medio per rilevare i salti di blocco (> 1.3 volte il passo riga)
@@ -924,13 +960,21 @@ export async function parsePdfCanto(
           outputChordProLines.push(mergedLine);
           currIdx += 2;
 
-          // Se dopo la riga c'è un salto verticale > 1.3 volte il passo righe, aggiungi riga vuota
+          let hasGapAfter = false;
           if (currIdx < cleanedLines.length) {
             const afterNextDist = Math.abs(nextLine.y - cleanedLines[currIdx]!.y);
             if (afterNextDist > lineStep * 1.3) {
               outputChordProLines.push('');
+              hasGapAfter = true;
             }
           }
+
+          intermediateLines.push({
+            text: mergedLine,
+            rawLyrics: nextTextFixed,
+            type: 'lyric_with_chord',
+            hasGapAfter,
+          });
           continue;
         }
       }
@@ -947,22 +991,52 @@ export async function parsePdfCanto(
         outputChordProLines.push(pureChords);
       }
       currIdx += 1;
+
+      let hasGapAfter = false;
+      if (currIdx < cleanedLines.length) {
+        const gap = Math.abs(currentLine.y - cleanedLines[currIdx]!.y);
+        if (gap > lineStep * 1.3) {
+          outputChordProLines.push('');
+          hasGapAfter = true;
+        }
+      }
+
+      if (pureChords.trim().length > 0) {
+        intermediateLines.push({
+          text: pureChords,
+          rawLyrics: '',
+          type: 'chords_only',
+          hasGapAfter,
+        });
+      }
     } else {
       // Riga di puro testo
       outputChordProLines.push(currentText);
       currIdx += 1;
-    }
 
-    // Controllo salto verticale tra blocchi per riga normale
-    if (currIdx < cleanedLines.length) {
-      const gap = Math.abs(currentLine.y - cleanedLines[currIdx]!.y);
-      if (gap > lineStep * 1.3) {
-        outputChordProLines.push('');
+      let hasGapAfter = false;
+      if (currIdx < cleanedLines.length) {
+        const gap = Math.abs(currentLine.y - cleanedLines[currIdx]!.y);
+        if (gap > lineStep * 1.3) {
+          outputChordProLines.push('');
+          hasGapAfter = true;
+        }
       }
+
+      const isHdr = /^(intro|strum(entale)?|stacco|outro):?$/i.test(currentText.trim()) || /^RIT[.:]?$/i.test(currentText.trim());
+      intermediateLines.push({
+        text: currentText,
+        rawLyrics: isHdr ? '' : currentText,
+        type: isHdr ? 'header' : 'lyric_plain',
+        hasGapAfter,
+      });
     }
   }
 
-  const finalChordPro = outputChordProLines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  const rawChordPro = outputChordProLines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  const finalChordPro = options.compactScout !== false
+    ? compactScoutSong(intermediateLines)
+    : rawChordPro;
 
   return {
     titolo: extractedTitle || 'Canto Senza Titolo',
@@ -984,3 +1058,202 @@ export async function parsePdfCanto(
     rawPageTexts,
   };
 }
+
+export interface IntermediateSongLine {
+  text: string;
+  rawLyrics: string;
+  type: 'chords_only' | 'lyric_with_chord' | 'lyric_plain' | 'header';
+  hasGapAfter: boolean;
+}
+
+/**
+ * Algoritmo di Compattazione Canzoniere Scout:
+ * 1. Strofa 1: accordi completi allineati sulle sillabe.
+ * 2. Strofe successive (stessa melodia/giro): solo testo, senza accordi ripetuti.
+ * 3. Primo Ritornello: etichettato con RIT: e accordi completi.
+ * 4. Ritornelli successivi: collassati a singola riga RIT. isolata con riga vuota sopra e sotto.
+ * 5. Eliminazione strofe duplicate verbatim.
+ */
+export function compactScoutSong(parsedSongLines: IntermediateSongLine[]): string {
+  const stanzas: IntermediateSongLine[][] = [];
+  let currentStanza: IntermediateSongLine[] = [];
+
+  for (let idx = 0; idx < parsedSongLines.length; idx++) {
+    const sl = parsedSongLines[idx]!;
+    const t = sl.text.trim();
+
+    const isHeader = sl.type === 'header' || /^(intro|strum(entale)?|stacco|outro):?$/i.test(t) || /^RIT[.:]?$/i.test(t);
+
+    if (isHeader) {
+      if (currentStanza.length > 0) {
+        stanzas.push(currentStanza);
+        currentStanza = [];
+      }
+      currentStanza.push(sl);
+      continue;
+    }
+
+    currentStanza.push(sl);
+
+    // Salto verticale tra blocchi o riga puramente strumentale
+    if (sl.hasGapAfter || sl.type === 'chords_only') {
+      if (currentStanza.length > 0) {
+        stanzas.push(currentStanza);
+        currentStanza = [];
+      }
+      continue;
+    }
+
+    if (idx + 1 < parsedSongLines.length) {
+      const nextSl = parsedSongLines[idx + 1]!;
+      if (/^(intro|strum|stacco|outro):?$/i.test(nextSl.text.trim()) || /^RIT[.:]?$/i.test(nextSl.text.trim())) {
+        stanzas.push(currentStanza);
+        currentStanza = [];
+      }
+    }
+  }
+  if (currentStanza.length > 0) stanzas.push(currentStanza);
+
+  const cleanStanzas = stanzas.filter((s) => s.length > 0);
+
+  // Rilevamento ritornello tramite firma testuale ripetuta >= 2 volte
+  const stanzaLyricsSignatures = cleanStanzas.map((st) => {
+    return st
+      .map((l) => l.rawLyrics.toLowerCase().replace(/[^a-z0-9]/g, ''))
+      .filter((s) => s.length > 3)
+      .slice(0, 4)
+      .join('|');
+  });
+
+  const repCounts: Record<string, number> = {};
+  for (const sig of stanzaLyricsSignatures) {
+    if (sig && sig.length >= 8) {
+      repCounts[sig] = (repCounts[sig] || 0) + 1;
+    }
+  }
+
+  let identifiedChorusSig: string | null = null;
+  let maxCount = 1;
+  for (const [sig, count] of Object.entries(repCounts)) {
+    if (count > maxCount) {
+      maxCount = count;
+      identifiedChorusSig = sig;
+    }
+  }
+
+  const finalOutput: string[] = [];
+  let chorusSeen = false;
+  let verseCount = 0;
+  const seenVerses = new Set<string>();
+
+  for (let sIdx = 0; sIdx < cleanStanzas.length; sIdx++) {
+    const st = cleanStanzas[sIdx]!;
+    const firstLine = st[0]?.text.trim() || '';
+    const sig = stanzaLyricsSignatures[sIdx] || '';
+
+    const isExplicitChorus = /^RIT[.:]?$/i.test(firstLine) || /ritornello/i.test(firstLine);
+    const isRepeatedChorus = !!identifiedChorusSig && sig === identifiedChorusSig;
+    const isChorus = isExplicitChorus || isRepeatedChorus;
+
+    if (isChorus) {
+      if (!chorusSeen) {
+        chorusSeen = true;
+        finalOutput.push('RIT:');
+        for (const l of st) {
+          if (/^RIT[.:]?$/i.test(l.text.trim())) continue;
+          finalOutput.push(l.text);
+        }
+        finalOutput.push('');
+      } else {
+        // Ritornelli successivi: singola riga RIT. con spazio sopra e sotto
+        finalOutput.push('RIT.');
+        finalOutput.push('');
+      }
+      continue;
+    }
+
+    if (/^(intro|strum(entale)?|stacco|outro):?$/i.test(firstLine)) {
+      for (const l of st) {
+        finalOutput.push(l.text);
+      }
+      finalOutput.push('');
+      continue;
+    }
+
+    const hasLyrics = st.some((l) => (l.type === 'lyric_with_chord' || l.type === 'lyric_plain') && l.rawLyrics.trim().length > 0);
+    if (!hasLyrics) {
+      for (const l of st) {
+        finalOutput.push(l.text);
+      }
+      finalOutput.push('');
+      continue;
+    }
+
+    // Strofa (Verse): evita duplicati esatti già stampati
+    if (sig && seenVerses.has(sig)) {
+      continue;
+    }
+    if (sig) seenVerses.add(sig);
+
+    verseCount++;
+    if (verseCount === 1) {
+      // Strofa 1: CON ACCORDI
+      for (const l of st) {
+        finalOutput.push(l.text);
+      }
+      finalOutput.push('');
+    } else {
+      // Strofe successive: SOLO TESTO SENZA ACCORDI
+      for (const l of st) {
+        const plain = l.rawLyrics || l.text.replace(/\[[^\]]+\]/g, '').trim();
+        if (plain) {
+          finalOutput.push(plain);
+        }
+      }
+      finalOutput.push('');
+    }
+  }
+
+  return finalOutput.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+/**
+ * Compattatore universale per qualsiasi testo ChordPro (Word, Incolla, Scrittura libera)
+ * per garantire sempre la conformità allo standard del Canzoniere Scout.
+ */
+export function compactChordProText(chordProText: string): string {
+  const lines = chordProText.split(/\r?\n/);
+  const intermediateLines: IntermediateSongLine[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const raw = lines[i]!;
+    const trimmed = raw.trim();
+    if (!trimmed) continue;
+
+    const hasChords = /\[[^\]]+\]/.test(trimmed);
+    const rawLyrics = trimmed.replace(/\[[^\]]+\]/g, '').trim();
+    const isHdr = /^(intro|strum(entale)?|stacco|outro):?$/i.test(trimmed) || /^RIT[.:]?$/i.test(trimmed);
+
+    let type: IntermediateSongLine['type'] = 'lyric_plain';
+    if (isHdr) {
+      type = 'header';
+    } else if (hasChords && !rawLyrics) {
+      type = 'chords_only';
+    } else if (hasChords) {
+      type = 'lyric_with_chord';
+    }
+
+    const hasGapAfter = (i + 1 < lines.length && !lines[i + 1]!.trim());
+
+    intermediateLines.push({
+      text: trimmed,
+      rawLyrics: isHdr ? '' : rawLyrics,
+      type,
+      hasGapAfter,
+    });
+  }
+
+  return compactScoutSong(intermediateLines);
+}
+
+
