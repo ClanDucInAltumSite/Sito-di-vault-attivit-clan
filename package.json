@@ -16,6 +16,7 @@
     "check:schema": "node scripts/check_prod_schema.mjs",
     "check:budget": "node scripts/check_weight_budget.mjs",
     "test:admin": "node scripts/run_admin_test.mjs",
+    "generate:og": "node scripts/generate_og_image.mjs",
     "verify:ui": "playwright test"
   },
   "dependencies": {
