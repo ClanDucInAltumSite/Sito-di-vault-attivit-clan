@@ -146,6 +146,13 @@ if (!fs.existsSync(swFile)) {
       console.log('  [PASS] pdf.worker correttamente ESCLUSO dal precache statico.');
     }
 
+    const hasTesseractInPrecache = precacheBlock.includes('tesseract');
+    if (hasTesseractInPrecache) {
+      violations.push('VIOLAZIONE: tesseract è presente nel precache del Service Worker! Deve essere escluso (caricato solo su richiesta admin OCR).');
+    } else {
+      console.log('  [PASS] tesseract correttamente ESCLUSO dal precache statico.');
+    }
+
     // Estrazione URL unici dal precache
     const urls = [];
     const urlRegex = /url:\s*"([^"]+)"/g;

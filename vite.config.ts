@@ -23,8 +23,6 @@ export default defineConfig({
         'favicon.ico',
         'favicon.png',
         'apple-touch-icon.png',
-        'og-image.jpg',
-        'og-image.png',
         'icons/icon-192x192.png',
         'icons/icon-512x512.png',
         'icons/icon-maskable-512x512.png',
@@ -63,13 +61,27 @@ export default defineConfig({
         ],
       },
       workbox: {
-        maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
+        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,webp}'],
-        globIgnores: ['**/pdf.worker*.*', '**/pdf-*.js', '**/pdfjs*.*'],
+        globIgnores: ['**/pdf.worker*.*', '**/pdf-*.js', '**/pdfjs*.*', '**/tesseract/**', '**/og-image.*'],
         cleanupOutdatedCaches: true,
         navigateFallback: `${basePath}index.html`,
         navigateFallbackAllowlist: [/^(?!\/__).*/],
         runtimeCaching: [
+          {
+            urlPattern: /.*\/tesseract\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'admin-ocr-cache',
+              expiration: {
+                maxEntries: 10,
+                maxAgeSeconds: 30 * 24 * 60 * 60, // 30 giorni
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
+          },
           {
             urlPattern: /^https:\/\/.*\.supabase\.co\/storage\/v1\/object\/public\/.*/i,
             handler: 'CacheFirst',
