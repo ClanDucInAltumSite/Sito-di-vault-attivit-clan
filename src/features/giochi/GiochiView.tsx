@@ -20,8 +20,6 @@ import { DeleteConfirmModal } from '../../ui/DeleteConfirmModal';
 
 type SortOption = 'az' | 'za' | 'recenti' | 'vecchi';
 
-const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
-
 export function GiochiView() {
   const { isAdmin } = useAdmin();
   const [giochi, setGiochi] = useState<Gioco[]>([]);
@@ -137,6 +135,16 @@ export function GiochiView() {
   };
 
   const existingNames = useMemo(() => giochi.map((g) => g.nome), [giochi]);
+
+  const latestGiocoId = useMemo(() => {
+    if (!giochi || giochi.length === 0) return null;
+    const first = giochi[0];
+    if (!first) return null;
+    return giochi.reduce(
+      (max, g) => (new Date(g.created_at).getTime() > new Date(max.created_at).getTime() ? g : max),
+      first
+    )?.id ?? null;
+  }, [giochi]);
 
   return (
     <div>
@@ -269,8 +277,7 @@ export function GiochiView() {
             footer="Tutti i giochi sono disponibili offline con regole e schemi di gioco."
           >
             {filteredList.map((gioco) => {
-              const isNew =
-                Date.now() - new Date(gioco.created_at).getTime() < SEVEN_DAYS_MS;
+              const isNew = gioco.id === latestGiocoId;
 
               const subtitleText = gioco.materiali
                 ? `Materiali: ${gioco.materiali}`
@@ -296,7 +303,7 @@ export function GiochiView() {
                   }
                   trailing={
                     isNew ? (
-                      <Badge variant="giallo" size="sm">
+                      <Badge variant="nuovo" size="sm">
                         Nuovo
                       </Badge>
                     ) : null
@@ -317,6 +324,7 @@ export function GiochiView() {
       <GiocoDetailSheet
         gioco={selectedGioco}
         isOpen={isDetailOpen}
+        isNew={selectedGioco ? selectedGioco.id === latestGiocoId : false}
         onClose={() => setIsDetailOpen(false)}
         onEdit={(g) => {
           setIsDetailOpen(false);

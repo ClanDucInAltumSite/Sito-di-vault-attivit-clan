@@ -8,7 +8,7 @@ import { Badge } from '../../ui/Badge';
 import { BrandLogo } from '../../ui/BrandLogo';
 import { HeaderBanner } from '../../ui/HeaderBanner';
 import { SectionIcon } from '../../ui/SectionIcon';
-import { TheTrail, CompassSync } from '../../ui/ScoutMotifs';
+import { CompassSync } from '../../ui/ScoutMotifs';
 import { Icon } from '../../ui/Icon';
 import { PwaInstallGuide } from '../../ui/PwaInstallGuide';
 import {
@@ -102,11 +102,6 @@ export function HomeView() {
           <p className="home-subtitle-display">
             {I18N.app.subtitle}
           </p>
-
-          {/* Motivo Scout: The Trail (Il Sentiero con punto giallo) */}
-          <div style={{ maxWidth: '280px', margin: '0 auto' }}>
-            <TheTrail className="scout-trail-home" />
-          </div>
         </header>
 
         {/* 4. GUIDA DI INSTALLAZIONE PWA AL PRIMO UTILIZZO (DISMISSIBILE) */}
@@ -148,7 +143,7 @@ export function HomeView() {
                 aria-label={`Prossimo evento: ${nextEventData.evento.titolo}`}
               >
                 <div
-                  className={`calendar-date-block ${dateInfo.isToday ? 'calendar-date-block-today' : ''}`}
+                  className={`calendar-date-block calendar-date-block-${nextEventData.evento.tipo || 'altro'} ${dateInfo.isToday ? 'calendar-date-block-today' : ''}`}
                   aria-hidden="true"
                 >
                   <div className="calendar-date-month">{dateInfo.month}</div>
@@ -338,10 +333,8 @@ export function HomeView() {
                 title={item.title}
                 subtitle={item.subtitle}
                 trailing={
-                  item.extraChip ? (
-                    <span className="event-type-chip event-chip-uscita">{item.extraChip}</span>
-                  ) : item.isNew ? (
-                    <Badge variant="giallo" size="sm">Nuovo</Badge>
+                  item.isNew ? (
+                    <Badge variant="nuovo" size="sm">Nuovo</Badge>
                   ) : undefined
                 }
                 chevron

@@ -50,7 +50,9 @@ export function transposeNote(noteName: string, delta: number, preferFlat = fals
 
   if (isItalian) {
     const list = useFlat ? ITALIAN_NOTES_FLAT : ITALIAN_NOTES_SHARP;
-    return list[newSemitone] ?? noteName;
+    const res = list[newSemitone] ?? noteName;
+    const isUpper = noteName === noteName.toUpperCase();
+    return isUpper ? res.toUpperCase() : res;
   } else {
     const list = useFlat ? AMERICAN_NOTES_FLAT : AMERICAN_NOTES_SHARP;
     return list[newSemitone] ?? noteName;
@@ -100,9 +102,21 @@ export function transposeChord(chord: string, delta: number): string {
  */
 export function transposeChordPro(chordproText: string, delta: number): string {
   if (delta === 0) return chordproText;
-  return chordproText.replace(/\[([^\]]+)\]/g, (_, chordInside) => {
+  let text = chordproText.replace(/\[([^\]]+)\]/g, (_, chordInside) => {
     return `[${transposeChord(chordInside, delta)}]`;
   });
+  text = text.replace(/\{(?:comment|c):\s*([^}]+)\}/gi, (_, commentBody) => {
+    const transposedComment = commentBody.replace(
+      /\b(Do|Re|Mi|Fa|Sol|La|Si|DO|RE|MI|FA|SOL|LA|SI|[A-G])([#b]?)(m|maj7|maj|7|sus4|4|dim|aug)?\b/g,
+      (match: string, root: string, accidental: string, rest: string) => {
+        if (/^(a|e|in|di|da|su|per|tra|fra|ma|se|no|canto|scout)$/i.test(match)) return match;
+        const fullChord = root + (accidental || '') + (rest || '');
+        return transposeChord(fullChord, delta);
+      }
+    );
+    return `{comment: ${transposedComment}}`;
+  });
+  return text;
 }
 
 /**

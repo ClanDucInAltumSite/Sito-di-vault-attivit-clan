@@ -15,6 +15,7 @@ export interface GiocoDetailSheetProps {
   onClose: () => void;
   onEdit?: (gioco: Gioco) => void;
   onDelete?: (gioco: Gioco) => void;
+  isNew?: boolean;
 }
 
 export function GiocoDetailSheet({
@@ -23,13 +24,12 @@ export function GiocoDetailSheet({
   onClose,
   onEdit,
   onDelete,
+  isNew = false,
 }: GiocoDetailSheetProps) {
   const { isAdmin } = useAdmin();
   const [attachmentKey, setAttachmentKey] = useState(0);
 
   if (!isOpen || !gioco) return null;
-
-  const isNew = Date.now() - new Date(gioco.created_at).getTime() < 7 * 24 * 60 * 60 * 1000;
 
   return (
     <BottomSheet
@@ -81,7 +81,7 @@ export function GiocoDetailSheet({
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
         {isNew ? (
           <div>
-            <Badge variant="giallo" size="sm">Nuovo</Badge>
+            <Badge variant="nuovo" size="sm">Nuovo</Badge>
           </div>
         ) : null}
 

@@ -61,6 +61,7 @@ export default defineConfig({
         ],
       },
       workbox: {
+        maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,webp}'],
         globIgnores: ['**/pdf.worker*.*', '**/pdf-*.js', '**/pdfjs*.*'],
         cleanupOutdatedCaches: true,

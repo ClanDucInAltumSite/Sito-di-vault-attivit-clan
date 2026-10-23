@@ -180,6 +180,8 @@ export function parseChordProAST(chordproText: string, delta = 0): ChordProAST {
 
   let pageCount = 1;
 
+  let inExplicitChorus = false;
+
   for (let i = 0; i < rawLines.length; i++) {
     const line = rawLines[i];
     if (line === undefined) continue;
@@ -193,12 +195,14 @@ export function parseChordProAST(chordproText: string, delta = 0): ChordProAST {
       const arg = directiveMatch[2]?.trim();
 
       if (name === 'soc' || name === 'start_of_chorus' || name === 'ritornello' || name === 'rit') {
+        inExplicitChorus = true;
         if (currentSection.lines.length > 0) {
           sections.push(currentSection);
         }
         currentSection = { type: 'chorus', label: arg || 'RITORNELLO', lines: [] };
         continue;
       } else if (name === 'eoc' || name === 'end_of_chorus') {
+        inExplicitChorus = false;
         if (currentSection.lines.length > 0) {
           sections.push(currentSection);
         }
@@ -231,7 +235,17 @@ export function parseChordProAST(chordproText: string, delta = 0): ChordProAST {
         if (currentSection.lines.length > 0) {
           sections.push(currentSection);
         }
-        sections.push({ type: 'comment', label: arg, lines: [] });
+        let commentLabel = arg || '';
+        if (delta !== 0 && commentLabel) {
+          commentLabel = commentLabel.replace(
+            /\b(Do|Re|Mi|Fa|Sol|La|Si|DO|RE|MI|FA|SOL|LA|SI|[A-G])([#b]?)(m|maj7|maj|7|sus4|4|dim|aug)?\b/g,
+            (match, root, accidental, rest) => {
+              if (/^(a|e|in|di|da|su|per|tra|fra|ma|se|no|canto|scout)$/i.test(match)) return match;
+              return transposeChord(root + (accidental || '') + (rest || ''), delta);
+            }
+          );
+        }
+        sections.push({ type: 'comment', label: commentLabel, lines: [] });
         currentSection = { type: 'verse', lines: [] };
         continue;
       } else {
@@ -241,13 +255,25 @@ export function parseChordProAST(chordproText: string, delta = 0): ChordProAST {
       }
     }
 
-    // Se incontra una riga vuota, separa le sezioni verse se non siamo in un ritornello esplicito
-    if (trimmed === '') {
-      if (currentSection.type === 'verse' && currentSection.lines.length > 0) {
+    // Riconoscimento intestazione Ritornello nel testo (es. "RIT:" o "Ritornello:")
+    const isChorusHeader = /^RIT:$/i.test(trimmed) || /^Ritornello:$/i.test(trimmed);
+    if (isChorusHeader) {
+      if (currentSection.lines.length > 0) {
         sections.push(currentSection);
-        currentSection = { type: 'verse', lines: [] };
+      }
+      currentSection = { type: 'chorus', label: 'RIT:', lines: [] };
+      continue;
+    }
+
+    // Se incontra una riga vuota, separa le sezioni se non siamo in un ritornello esplicito {soc}...{eoc}
+    if (trimmed === '') {
+      if (!inExplicitChorus) {
+        if (currentSection.lines.length > 0) {
+          sections.push(currentSection);
+          currentSection = { type: 'verse', lines: [] };
+        }
       } else if (currentSection.lines.length > 0) {
-        // Riga vuota dentro chorus o bridge: aggiunge linea vuota
+        // Riga vuota dentro chorus o bridge esplicito: aggiunge linea vuota
         currentSection.lines.push({ units: [{ lyric: '' }] });
       }
       continue;
@@ -351,12 +377,13 @@ export function ChordProRenderer({
                   className: isChorus ? 'song-chorus-label' : 'song-section-label',
                   style: {
                     display: 'block',
-                    fontSize: '0.75em',
+                    fontSize: isChorus ? '1em' : '0.75em',
                     fontWeight: 700,
                     textTransform: 'uppercase',
-                    color: isChorus ? 'var(--color-giochi-text)' : 'var(--color-text-secondary)',
+                    color: isChorus ? 'var(--color-text)' : 'var(--color-text-secondary)',
+                    fontFamily: isChorus ? "'Roboto', var(--font-sans), sans-serif" : undefined,
                     marginBottom: 'var(--space-2)',
-                    letterSpacing: '0.05em',
+                    letterSpacing: isChorus ? 'normal' : '0.05em',
                   },
                 },
                 section.label

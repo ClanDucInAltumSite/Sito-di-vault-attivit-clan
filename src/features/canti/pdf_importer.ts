@@ -81,8 +81,36 @@ interface ClusteredLine {
   pageNum: number;
 }
 
-// Regex per il riconoscimento dei token di accordi musicali
-export const CHORD_TOKEN_REGEX = /^[(\[]?(?:[A-G]|Do|Re|Mi|Fa|Sol|La|Si|DO|RE|MI|FA|SOL|LA|SI)(?:[#b])?(?:m|min|maj7|maj|7|sus4|sus2|add9|dim|-|\+)?(?:[\/](?:[A-G]|Do|Re|Mi|Fa|Sol|La|Si|DO|RE|MI|FA|SOL|LA|SI)(?:[#b])?)?(?:_\||_|\|)?[)\].,]?$/i;
+// Regex per il riconoscimento dei token di accordi musicali (estesa per qualità 7ª, 9ª, sus, add, alterazioni)
+export const CHORD_TOKEN_REGEX = /^[(\[]?(?:[A-G]|Do|Re|Mi|Fa|Sol|La|Si|DO|RE|MI|FA|SOL|LA|SI)(?:[#b])?(?:m|min|maj|dim|aug|-|\+|Δ|°)?(?:maj7|maj9|m7b5|m7|m9|m6|dim7|sus4|sus2|sus|add9|add2|add4|6\/9|7\+|7sus4|7sus2|7b5|7#5|7b9|7#9|7|9|11|13|6|2|4|\+|-)?(?:[\/](?:[A-G]|Do|Re|Mi|Fa|Sol|La|Si|DO|RE|MI|FA|SOL|LA|SI)(?:[#b])?)?(?:_\||_|\|)?[)\].,]?$/i;
+
+// Regex canoniche per sezioni e intestazioni musicali (Livello 1 - Invarianti strutturali universali)
+export const SECTION_HEADER_REGEX = /^(?:\[|\{)?\s*(?:intro(?:duzione)?|strum(?:entale)?|stacco|outro|ponte|bridge|coda|finale|rit(?:ornello)?|chorus|refrain|strofa\s*\d*|verse\s*\d*)\s*[.:]?\s*(?:\]|\})?$/i;
+export const CHORUS_HEADER_REGEX = /^(?:\[|\{)?\s*(?:rit(?:ornello)?|chorus|refrain)\s*[.:]?\s*(?:\]|\})?$/i;
+export const VERSE_HEADER_REGEX = /^(?:\[|\{)?\s*(?:strofa|verse)\s*\d*\s*[.:]?\s*(?:\]|\})?$/i;
+export const BRIDGE_HEADER_REGEX = /^(?:\[|\{)?\s*(?:bridge|ponte)\s*[.:]?\s*(?:\]|\})?$/i;
+export const CODA_HEADER_REGEX = /^(?:\[|\{)?\s*(?:coda|finale|ripresa)\s*[.:]?\s*(?:\]|\})?$/i;
+export const INSTRUMENTAL_HEADER_REGEX = /^(?:\[|\{)?\s*(?:intro(?:duzione)?|strum(?:entale)?|stacco|outro|coda|finale)\s*[.:]?\s*(?:\]|\})?$/i;
+
+// Parole comuni / stop-words per il calcolo di similarità testuale tra sezioni
+const COMMON_STOP_WORDS = new Set([
+  'the', 'and', 'that', 'you', 'your', 'with', 'from', 'this', 'for', 'about', 'have',
+  'che', 'non', 'per', 'con', 'del', 'della', 'dei', 'delle', 'gli', 'una', 'uno', 'nel', 'nella', 'nei', 'nelle', 'sul', 'sulla', 'questo', 'questa', 'sono'
+]);
+
+/**
+ * Estrae parole significative (lowercase, senza accordi né caratteri speciali né stop-words)
+ */
+export function extractMeaningfulWords(text: string): Set<string> {
+  const words = text
+    .toLowerCase()
+    .replace(/\[[^\]]+\]/g, ' ')
+    .replace(/\{[^}]+\}/g, ' ')
+    .replace(/[^a-z0-9àèéìòùáéíóú]/gi, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length >= 3 && !COMMON_STOP_WORDS.has(w));
+  return new Set(words);
+}
 
 // Parole italiane che potrebbero essere ambigue (note isolate o brevi)
 const AMBIGUOUS_ITALIAN_WORDS = new Set([
@@ -110,7 +138,7 @@ export function normalizeChordName(token: string): string {
   const normalizePart = (part: string) => {
     const match = part.match(/^(Do|Re|Mi|Fa|Sol|La|Si|[A-G])([#b]?)(.*)$/i);
     if (match && match[1]) {
-      const root = match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase();
+      const root = match[1].toUpperCase();
       const accidental = match[2] || '';
       let rest = match[3] || '';
       if (rest.toLowerCase() === 'maj7') {
@@ -158,9 +186,10 @@ export function isChordLine(
 ): { isChord: boolean; isAmbiguous: boolean } {
   if (!words || words.length === 0) return { isChord: false, isAmbiguous: false };
 
+  // Filtra stanghette di battuta (|), ripetizioni (x2, 2v) che non inficiano la riga di accordi
   const tokens = words
     .map((w) => w.text.trim().replace(/\u200b/g, '').replace(/[.,]$/, ''))
-    .filter((t) => t.length > 0);
+    .filter((t) => t.length > 0 && !/^[|:–—\-/]+$/.test(t) && !/^\(?[xX]?\d+[vV]?\)?$/.test(t));
 
   if (tokens.length === 0) return { isChord: false, isAmbiguous: false };
 
@@ -624,7 +653,8 @@ export async function parsePdfCanto(
     if (items.length === 0) continue;
 
     // 1. RILEVAMENTO DUE COLONNE (11C.1)
-    // Fascia verticale vuota lungo almeno il 70% delle righe nella zona centrale (35%-65% della larghezza pagina)
+    // Fascia verticale vuota lungo la zona centrale (35%-65% della larghezza pagina)
+    // con testo effettivo presente su entrambe le colonne (evita falsi positivi su pagine a 1 colonna)
     const pageWidth = viewport.width;
     const centerStart = pageWidth * 0.35;
     const centerEnd = pageWidth * 0.65;
@@ -634,18 +664,30 @@ export async function parsePdfCanto(
     let isTwoColumns = false;
     let gutterMidX = pageWidth / 2;
 
-    if (bodyItems.length >= 10) {
+    if (bodyItems.length >= 24) {
       // Cerca una colonna libera
       const STEP = 5;
       for (let testX = centerStart; testX <= centerEnd; testX += STEP) {
-        const gutterLeft = testX - 8;
-        const gutterRight = testX + 8;
+        const gutterLeft = testX - 10;
+        const gutterRight = testX + 10;
         const itemsCrossing = bodyItems.filter((it) => it.x0 < gutterRight && it.x1 > gutterLeft);
         if (itemsCrossing.length === 0) {
-          isTwoColumns = true;
-          gutterMidX = testX;
-          detectedColumnsAcrossPages = true;
-          break;
+          const leftItems = bodyItems.filter((it) => it.x1 <= gutterLeft);
+          const rightItems = bodyItems.filter((it) => it.x0 >= gutterRight);
+
+          // Affinché siano due colonne vere, entrambi i lati devono avere un numero congruo di parole
+          // distribuite su una larghezza reale (evita che un margine vuoto a destra venga scambiato per colonna)
+          if (leftItems.length >= 12 && rightItems.length >= 12) {
+            const leftWidth = Math.max(...leftItems.map((i) => i.x1)) - Math.min(...leftItems.map((i) => i.x0));
+            const rightWidth = Math.max(...rightItems.map((i) => i.x1)) - Math.min(...rightItems.map((i) => i.x0));
+
+            if (leftWidth >= 70 && rightWidth >= 70) {
+              isTwoColumns = true;
+              gutterMidX = testX;
+              detectedColumnsAcrossPages = true;
+              break;
+            }
+          }
         }
       }
     }
@@ -760,6 +802,15 @@ export async function parsePdfCanto(
       }
     }
 
+    // Pulisci suffissi web frequenti da titolo e autore (es. "Accordi 100% Corretti", "Chords", "Spartito")
+    const cleanWebSuffix = (str: string) =>
+      str.replace(/\s*(?:accordi(?:\s+100%\s+corretti|\s+per\s+chitarra|\s+semplici)?|chords|testo\s+e\s+accordi|spartito|tabs?)\s*$/i, '').trim();
+
+    extractedTitle = cleanWebSuffix(extractedTitle);
+    if (extractedAuthor) {
+      extractedAuthor = cleanWebSuffix(extractedAuthor);
+    }
+
     // Sottotitolo o Autore: riga successiva in corsivo o tra parentesi o testo prima degli accordi
     if (titleLineIdx + 1 < firstPageLines.length) {
       const nextLine = firstPageLines[titleLineIdx + 1]!;
@@ -787,11 +838,18 @@ export async function parsePdfCanto(
   if (numPages >= 2) {
     const pageHeaderMap: Map<number, Set<string>> = new Map();
     for (const line of allPageLines) {
-      if (line.y >= 750 || line.y <= 80) {
+      if (line.y >= 780 || line.y <= 50) {
+        // MAI considerare accordi come header o footer!
+        const isChord = isChordLine(line.items.map((it) => ({ text: it.str, isBold: it.isBold }))).isChord;
+        if (isChord) continue;
+
+        const t = line.text.trim().toLowerCase();
+        if (t.length <= 4) continue;
+
         if (!pageHeaderMap.has(line.pageNum)) {
           pageHeaderMap.set(line.pageNum, new Set());
         }
-        pageHeaderMap.get(line.pageNum)!.add(line.text.trim().toLowerCase());
+        pageHeaderMap.get(line.pageNum)!.add(t);
       }
     }
     const textCounts: Map<string, number> = new Map();
@@ -816,6 +874,13 @@ export async function parsePdfCanto(
 
     if (!trimmed) continue;
 
+    // Se la riga è una riga di accordi musicali, NON È MAI RUMORE NÉ HEADER/FOOTER
+    const chordCheck = isChordLine(line.items.map((it) => ({ text: it.str, isBold: it.isBold })));
+    if (chordCheck.isChord) {
+      cleanedLines.push(line);
+      continue;
+    }
+
     // Escludi riga se corrisponde al titolo o sottotitolo o autore già estratto
     if (titleCandidate && trimmed.toUpperCase() === titleCandidate.toUpperCase()) {
       continue;
@@ -830,8 +895,36 @@ export async function parsePdfCanto(
       continue;
     }
 
-    // Controllo intestazioni e piè di pagina ripetuti (11C.6)
-    if (repeatedHeaderFooterTexts.has(trimmed.toLowerCase())) {
+    // Controllo dicitura autore esplicita (es. "AUTORE: NOEL GALLAGHER", "Autori: Vasco Rossi")
+    const authorExplicitMatch = trimmed.match(/^(?:autori?|compositore|testo\s+di):\s*(.+)$/i);
+    if (authorExplicitMatch && authorExplicitMatch[1]) {
+      if (!extractedAuthor) {
+        extractedAuthor = authorExplicitMatch[1].trim();
+      }
+      removedNoise.push({
+        id: `noise-${i}-${Date.now()}`,
+        rigaOriginale: trimmed,
+        motivo: 'Dicitura autore o crediti',
+        numeroPagina: line.pageNum,
+        indiceOriginale: i,
+      });
+      continue;
+    }
+
+    // Escludi etichette di categoria o genere isolate in testata
+    if (line.pageNum === 1 && cleanedLines.length <= 2) {
+      if (/^(?:canti\s+(?:liturgici|scout|popolari|di\s+chiesa)|liturgico|canzoni\s+scout|musica\s+pop)$/i.test(trimmed)) {
+        if (!extractedParams.categoria) {
+          if (/liturgic|chiesa/i.test(trimmed)) extractedParams.categoria = 'chiesa';
+          else if (/scout/i.test(trimmed)) extractedParams.categoria = 'scout';
+        }
+        continue;
+      }
+    }
+
+    // Controllo intestazioni e piè di pagina ripetuti (11C.6): SOLO se la riga è effettivamente ai margini estremi!
+    const isAtMargin = line.y >= 780 || line.y <= 50;
+    if (isAtMargin && repeatedHeaderFooterTexts.has(trimmed.toLowerCase())) {
       removedNoise.push({
         id: `noise-${i}-${Date.now()}`,
         rigaOriginale: trimmed,
@@ -857,27 +950,23 @@ export async function parsePdfCanto(
     }
 
     // Controllo rumore (watermark, URL, numeri di pagina)
-    // Una riga di accordi non è mai rumore
-    const chordCheck = isChordLine(line.items.map((it) => ({ text: it.str, isBold: it.isBold })));
-    if (!chordCheck.isChord) {
-      const noiseMatch = matchNoiseLine(trimmed);
-      if (noiseMatch) {
-        removedNoise.push({
-          id: `noise-${i}-${Date.now()}`,
-          rigaOriginale: trimmed,
-          motivo: noiseMatch.description,
-          numeroPagina: line.pageNum,
-          indiceOriginale: i,
-        });
-        warnings.push({
-          tipo: 'riga_rumore_tolta',
-          riga: cleanedLines.length,
-          testo: trimmed,
-          messaggio: `Rimossa riga di rumore: "${trimmed}" (${noiseMatch.description})`,
-          dettagli: { motivo: noiseMatch.description },
-        });
-        continue;
-      }
+    const noiseMatch = matchNoiseLine(trimmed);
+    if (noiseMatch) {
+      removedNoise.push({
+        id: `noise-${i}-${Date.now()}`,
+        rigaOriginale: trimmed,
+        motivo: noiseMatch.description,
+        numeroPagina: line.pageNum,
+        indiceOriginale: i,
+      });
+      warnings.push({
+        tipo: 'riga_rumore_tolta',
+        riga: cleanedLines.length,
+        testo: trimmed,
+        messaggio: `Rimossa riga di rumore: "${trimmed}" (${noiseMatch.description})`,
+        dettagli: { motivo: noiseMatch.description },
+      });
+      continue;
     }
 
     cleanedLines.push(line);
@@ -943,7 +1032,7 @@ export async function parsePdfCanto(
         const verticalDist = Math.abs(currentLine.y - nextLine.y);
         const isRightAbove = verticalDist <= lineStep * 1.8;
 
-        if (!nextChordAnalysis.isChord && isRightAbove) {
+        if (!nextChordAnalysis.isChord && !SECTION_HEADER_REGEX.test(nextLine.text.trim()) && isRightAbove) {
           // Unione accordi con testo
           let nextTextFixed = nextLine.text;
           nextTextFixed = fixDamagedAccents(nextTextFixed, outputChordProLines.length, warnings, accentiCorretti);
@@ -962,10 +1051,21 @@ export async function parsePdfCanto(
 
           let hasGapAfter = false;
           if (currIdx < cleanedLines.length) {
-            const afterNextDist = Math.abs(nextLine.y - cleanedLines[currIdx]!.y);
-            if (afterNextDist > lineStep * 1.3) {
-              outputChordProLines.push('');
-              hasGapAfter = true;
+            const nextRemaining = cleanedLines[currIdx]!;
+            const samePage = nextLine.pageNum === nextRemaining.pageNum;
+            if (samePage) {
+              const gap = Math.abs(nextLine.y - nextRemaining.y);
+              if (gap > lineStep * 1.65) {
+                outputChordProLines.push('');
+                hasGapAfter = true;
+              }
+            } else {
+              // Su pagina diversa: se la riga precedente era in fondo alla pagina (y < 120),
+              // è un flusso continuo di testo tracimato tra pagine; altrimenti è un salto di blocco
+              if (nextLine.y >= 120) {
+                outputChordProLines.push('');
+                hasGapAfter = true;
+              }
             }
           }
 
@@ -980,13 +1080,22 @@ export async function parsePdfCanto(
       }
 
       // Riga di soli accordi senza testo subito sotto
-      const pureChords = currentLine.items
+      const chordTokens = currentLine.items
         .filter((it) => {
           const raw = it.str.trim();
           return raw.length > 0 && isChordToken(raw);
         })
-        .map((it) => `[${normalizeChordName(it.str)}]`)
-        .join(' ');
+        .map((it) => normalizeChordName(it.str));
+
+      // Comprimi ripetizioni consecutive identiche (es. [Reb] [Reb] [Lab] [Mib] [Mib] -> [Reb] [Lab] [Mib])
+      const deduplicatedChords: string[] = [];
+      for (const ch of chordTokens) {
+        if (deduplicatedChords.length === 0 || deduplicatedChords[deduplicatedChords.length - 1] !== ch) {
+          deduplicatedChords.push(ch);
+        }
+      }
+
+      const pureChords = deduplicatedChords.map((c) => `[${c}]`).join(' ');
       if (pureChords.trim().length > 0) {
         outputChordProLines.push(pureChords);
       }
@@ -994,10 +1103,19 @@ export async function parsePdfCanto(
 
       let hasGapAfter = false;
       if (currIdx < cleanedLines.length) {
-        const gap = Math.abs(currentLine.y - cleanedLines[currIdx]!.y);
-        if (gap > lineStep * 1.3) {
-          outputChordProLines.push('');
-          hasGapAfter = true;
+        const nextRemaining = cleanedLines[currIdx]!;
+        const samePage = currentLine.pageNum === nextRemaining.pageNum;
+        if (samePage) {
+          const gap = Math.abs(currentLine.y - nextRemaining.y);
+          if (gap > lineStep * 1.65) {
+            outputChordProLines.push('');
+            hasGapAfter = true;
+          }
+        } else {
+          if (currentLine.y >= 120) {
+            outputChordProLines.push('');
+            hasGapAfter = true;
+          }
         }
       }
 
@@ -1016,18 +1134,29 @@ export async function parsePdfCanto(
 
       let hasGapAfter = false;
       if (currIdx < cleanedLines.length) {
-        const gap = Math.abs(currentLine.y - cleanedLines[currIdx]!.y);
-        if (gap > lineStep * 1.3) {
-          outputChordProLines.push('');
-          hasGapAfter = true;
+        const nextRemaining = cleanedLines[currIdx]!;
+        const samePage = currentLine.pageNum === nextRemaining.pageNum;
+        if (samePage) {
+          const gap = Math.abs(currentLine.y - nextRemaining.y);
+          if (gap > lineStep * 1.65) {
+            outputChordProLines.push('');
+            hasGapAfter = true;
+          }
+        } else {
+          if (currentLine.y >= 120) {
+            outputChordProLines.push('');
+            hasGapAfter = true;
+          }
         }
       }
 
-      const isHdr = /^(intro|strum(entale)?|stacco|outro):?$/i.test(currentText.trim()) || /^RIT[.:]?$/i.test(currentText.trim());
+      const isHdr = SECTION_HEADER_REGEX.test(currentText.trim());
+      const hasInlineChords = /\[[A-Za-z0-9#b\-\+\/]+\]/.test(currentText);
+      const rawText = isHdr ? '' : (hasInlineChords ? currentText.replace(/\[[^\]]+\]/g, '').trim() : currentText);
       intermediateLines.push({
         text: currentText,
-        rawLyrics: isHdr ? '' : currentText,
-        type: isHdr ? 'header' : 'lyric_plain',
+        rawLyrics: rawText,
+        type: isHdr ? 'header' : (hasInlineChords ? 'lyric_with_chord' : 'lyric_plain'),
         hasGapAfter,
       });
     }
@@ -1074,19 +1203,55 @@ export interface IntermediateSongLine {
  * 4. Ritornelli successivi: collassati a singola riga RIT. isolata con riga vuota sopra e sotto.
  * 5. Eliminazione strofe duplicate verbatim.
  */
+function extractChordsFromStanza(st: IntermediateSongLine[]): string[] {
+  const chords: string[] = [];
+  for (const l of st) {
+    if (SECTION_HEADER_REGEX.test(l.text.trim())) continue;
+    const matches = Array.from(l.text.matchAll(/\[([^\]]+)\]/g));
+    for (const m of matches) {
+      if (m[1]) {
+        const norm = normalizeChordName(m[1].trim());
+        if (isChordToken(norm)) chords.push(norm);
+      }
+    }
+    if (matches.length === 0 && l.type === 'chords_only') {
+      const parts = l.text.split(/\s+/).filter(Boolean);
+      for (const p of parts) {
+        const norm = normalizeChordName(p);
+        if (isChordToken(norm)) chords.push(norm);
+      }
+    }
+  }
+  return chords;
+}
+
+/**
+ * Algoritmo di Compattazione Canzoniere Scout:
+ * 1. Strofa 1: accordi completi allineati sulle sillabe.
+ * 2. Strofe successive con stesso giro: solo testo, senza accordi ripetuti.
+ *    Se una strofa successiva cambia accordi (modulazione o variazione armonica), mantiene gli accordi.
+ * 3. Primo Ritornello: etichettato con RIT: e accordi completi.
+ * 4. Ritornelli successivi: collassati a singola riga RIT. isolata con riga vuota sopra e sotto.
+ * 5. Giri strumentali / intro / strum / outro: convertiti in commenti {comment: prefix CHORDS}, un commento per riga.
+ * 6. Eliminazione strofe duplicate verbatim ed eliminazione RIT. consecutivi.
+ */
 export function compactScoutSong(parsedSongLines: IntermediateSongLine[]): string {
-  const stanzas: IntermediateSongLine[][] = [];
+  if (parsedSongLines.length === 0) return '';
+
+  // 1. Costruzione preliminare delle stanze secondo i salti di riga e stacchi
+  const rawStanzas: IntermediateSongLine[][] = [];
   let currentStanza: IntermediateSongLine[] = [];
 
   for (let idx = 0; idx < parsedSongLines.length; idx++) {
     const sl = parsedSongLines[idx]!;
     const t = sl.text.trim();
+    if (!t) continue;
 
-    const isHeader = sl.type === 'header' || /^(intro|strum(entale)?|stacco|outro):?$/i.test(t) || /^RIT[.:]?$/i.test(t);
+    const isHeader = sl.type === 'header' || SECTION_HEADER_REGEX.test(t) || /^\{(?:comment|c):/i.test(t);
 
     if (isHeader) {
       if (currentStanza.length > 0) {
-        stanzas.push(currentStanza);
+        rawStanzas.push(currentStanza);
         currentStanza = [];
       }
       currentStanza.push(sl);
@@ -1095,29 +1260,199 @@ export function compactScoutSong(parsedSongLines: IntermediateSongLine[]): strin
 
     currentStanza.push(sl);
 
-    // Salto verticale tra blocchi o riga puramente strumentale
-    if (sl.hasGapAfter || sl.type === 'chords_only') {
+    // Se la riga successiva è anch'essa solo accordi, mantienile insieme nella stessa stanza strumentale!
+    const nextSl = idx + 1 < parsedSongLines.length ? parsedSongLines[idx + 1] : null;
+    const isConsecutiveChords = sl.type === 'chords_only' && nextSl && nextSl.type === 'chords_only';
+
+    // Se è una riga di soli accordi isolata tra due righe di testo (chord lick), non spezzare la stanza
+    const isInlineChordLick = sl.type === 'chords_only' &&
+      idx > 0 && (parsedSongLines[idx - 1]!.type === 'lyric_with_chord' || parsedSongLines[idx - 1]!.type === 'lyric_plain') &&
+      idx + 1 < parsedSongLines.length && (parsedSongLines[idx + 1]!.type === 'lyric_with_chord' || parsedSongLines[idx + 1]!.type === 'lyric_plain') &&
+      !sl.hasGapAfter;
+
+    if (!isInlineChordLick && !isConsecutiveChords && (sl.hasGapAfter || sl.type === 'chords_only')) {
       if (currentStanza.length > 0) {
-        stanzas.push(currentStanza);
+        rawStanzas.push(currentStanza);
         currentStanza = [];
       }
       continue;
     }
 
-    if (idx + 1 < parsedSongLines.length) {
-      const nextSl = parsedSongLines[idx + 1]!;
-      if (/^(intro|strum|stacco|outro):?$/i.test(nextSl.text.trim()) || /^RIT[.:]?$/i.test(nextSl.text.trim())) {
-        stanzas.push(currentStanza);
+    if (nextSl) {
+      if (nextSl.type === 'header' || SECTION_HEADER_REGEX.test(nextSl.text.trim()) || /^\{(?:comment|c):/i.test(nextSl.text.trim())) {
+        rawStanzas.push(currentStanza);
         currentStanza = [];
       }
     }
   }
-  if (currentStanza.length > 0) stanzas.push(currentStanza);
+  if (currentStanza.length > 0) rawStanzas.push(currentStanza);
 
-  const cleanStanzas = stanzas.filter((s) => s.length > 0);
+  const cleanStanzas = rawStanzas.filter((s) => s.length > 0);
 
-  // Rilevamento ritornello tramite firma testuale ripetuta >= 2 volte
-  const stanzaLyricsSignatures = cleanStanzas.map((st) => {
+  // 2. Se una stanza contiene un ritornello o refrain attaccato (a inizio o fine),
+  // la divide ricorsivamente in unità canoniche (strofa, ritornello, refrain)
+  function splitSingleStanza(st: IntermediateSongLine[], sIndex: number, stanzasList: IntermediateSongLine[][]): IntermediateSongLine[][] {
+    const lyricLines = st.filter((l) => (l.type === 'lyric_with_chord' || l.type === 'lyric_plain') && l.rawLyrics.trim().length > 0);
+    if (lyricLines.length < 2) return [st];
+
+    let splitAt = -1;
+
+    // 0. Controllo presenza header di sezione incorporato (es. [Chorus], RIT:, Strofa 2:, Bridge:)
+    for (let k = 1; k < st.length; k++) {
+      if (SECTION_HEADER_REGEX.test(st[k]!.text.trim())) {
+        splitAt = k;
+        break;
+      }
+    }
+
+    // 1. Controllo inizio stanza: se una riga k >= 1 corrisponde all'inizio di un'altra stanza (es. Strofa 1)
+    if (splitAt === -1) {
+      for (let k = 1; k < st.length; k++) {
+      const lK = st[k]?.rawLyrics.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (!lK || lK.length < 5) continue;
+      for (let o = 0; o < stanzasList.length; o++) {
+        if (o === sIndex) continue;
+        const oFirst = stanzasList[o]![0]?.rawLyrics.toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (oFirst && oFirst.length >= 5 && oFirst === lK) {
+          splitAt = k;
+          break;
+        }
+      }
+      if (splitAt !== -1) break;
+      }
+    }
+
+    // 2. Controllo Suffix Refrain: se gli ultimi versi si ripetono come suffisso in altre stanze (Falco: "E allora eha...")
+    if (splitAt === -1 && lyricLines.length >= 4) {
+      for (let suffLen = Math.min(4, st.length - 2); suffLen >= 2; suffLen--) {
+        const k = st.length - suffLen;
+        if (k < 2) continue;
+        const suffSig = st.slice(k)
+          .map((l) => l.rawLyrics.toLowerCase().replace(/[^a-z0-9]/g, ''))
+          .filter((str) => str.length > 3)
+          .join('|');
+        if (suffSig.length < 8) continue;
+
+        let matchCount = 0;
+        for (let o = 0; o < stanzasList.length; o++) {
+          if (o === sIndex) continue;
+          const other = stanzasList[o]!;
+          if (other.length >= suffLen) {
+            const otherSuffSig = other.slice(other.length - suffLen)
+              .map((l) => l.rawLyrics.toLowerCase().replace(/[^a-z0-9]/g, ''))
+              .filter((str) => str.length > 3)
+              .join('|');
+            if (otherSuffSig === suffSig) {
+              matchCount++;
+            }
+          }
+        }
+        if (matchCount >= 2) {
+          splitAt = k;
+          break;
+        }
+      }
+    }
+
+    // 3. Controllo Triplet match per stanze lunghe
+    if (splitAt === -1 && lyricLines.length > 6) {
+      for (let k = 3; k <= st.length - 3; k++) {
+        const l1 = st[k]?.rawLyrics.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const l2 = st[k + 1]?.rawLyrics.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const l3 = st[k + 2]?.rawLyrics.toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (!l1 || !l2 || !l3 || l1.length < 5 || l2.length < 5) continue;
+        const triplet = `${l1}|${l2}|${l3}`;
+
+        let matchesOther = false;
+        for (let o = 0; o < stanzasList.length; o++) {
+          if (o === sIndex) continue;
+          const other = stanzasList[o]!;
+          const o1 = other[0]?.rawLyrics.toLowerCase().replace(/[^a-z0-9]/g, '');
+          const o2 = other[1]?.rawLyrics.toLowerCase().replace(/[^a-z0-9]/g, '');
+          const o3 = other[2]?.rawLyrics.toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (`${o1}|${o2}|${o3}` === triplet) {
+            matchesOther = true;
+            break;
+          }
+        }
+        if (matchesOther) {
+          splitAt = k;
+          break;
+        }
+      }
+    }
+
+    if (splitAt !== -1 && splitAt > 0 && splitAt < st.length) {
+      const partA = splitSingleStanza(st.slice(0, splitAt), sIndex, stanzasList);
+      const partB = splitSingleStanza(st.slice(splitAt), sIndex, stanzasList);
+      return [...partA, ...partB];
+    }
+    return [st];
+  }
+
+  const splitStanzas: IntermediateSongLine[][] = [];
+  for (let s = 0; s < cleanStanzas.length; s++) {
+    const pieces = splitSingleStanza(cleanStanzas[s]!, s, cleanStanzas);
+    splitStanzas.push(...pieces);
+  }
+
+  // 3. Unisci parti consecutive dello stesso ritornello
+  const mergedStanzas: IntermediateSongLine[][] = [];
+  let sIdx = 0;
+  while (sIdx < splitStanzas.length) {
+    const stA = splitStanzas[sIdx]!;
+    if (sIdx + 1 < splitStanzas.length) {
+      const stB = splitStanzas[sIdx + 1]!;
+      const hasLyricsA = stA.some((l) => (l.type === 'lyric_with_chord' || l.type === 'lyric_plain') && l.rawLyrics.trim().length > 0);
+      const hasLyricsB = stB.some((l) => (l.type === 'lyric_with_chord' || l.type === 'lyric_plain') && l.rawLyrics.trim().length > 0);
+
+      if (hasLyricsA && hasLyricsB) {
+        const sigA = stA.map((l) => l.rawLyrics.toLowerCase().replace(/[^a-z0-9]/g, '')).filter((s) => s.length > 3).slice(0, 2).join('|');
+        const sigB = stB.map((l) => l.rawLyrics.toLowerCase().replace(/[^a-z0-9]/g, '')).filter((s) => s.length > 3).slice(0, 2).join('|');
+
+        if (sigA && sigB) {
+          let seqCount = 0;
+          for (let m = 0; m < splitStanzas.length - 1; m++) {
+            const mA = splitStanzas[m]!.map((l) => l.rawLyrics.toLowerCase().replace(/[^a-z0-9]/g, '')).filter((s) => s.length > 3).slice(0, 2).join('|');
+            const mB = splitStanzas[m + 1]!.map((l) => l.rawLyrics.toLowerCase().replace(/[^a-z0-9]/g, '')).filter((s) => s.length > 3).slice(0, 2).join('|');
+            if (mA === sigA && mB === sigB) {
+              seqCount++;
+            }
+          }
+
+          // Controlla se [...stA, ...stB] corrisponde al testo di un'altra stanza singola (es. Riptide Chorus 2)
+          let matchesSingleStanza = false;
+          const combinedLyrics = [...stA, ...stB]
+            .map((l) => l.rawLyrics.toLowerCase().replace(/[^a-z0-9]/g, ''))
+            .filter((s) => s.length > 3)
+            .join('|');
+
+          for (let o = 0; o < splitStanzas.length; o++) {
+            if (o === sIdx || o === sIdx + 1) continue;
+            const otherLyrics = splitStanzas[o]!
+              .map((l) => l.rawLyrics.toLowerCase().replace(/[^a-z0-9]/g, ''))
+              .filter((s) => s.length > 3)
+              .join('|');
+            if (otherLyrics && otherLyrics === combinedLyrics) {
+              matchesSingleStanza = true;
+              break;
+            }
+          }
+
+          if (seqCount >= 2 || matchesSingleStanza) {
+            mergedStanzas.push([...stA, ...stB]);
+            sIdx += 2;
+            continue;
+          }
+        }
+      }
+    }
+    mergedStanzas.push(stA);
+    sIdx++;
+  }
+
+  // 4. Identificazione della prima strofa con testo e rilevamento del ritornello
+  const stanzaLyricsSignatures = mergedStanzas.map((st) => {
     return st
       .map((l) => l.rawLyrics.toLowerCase().replace(/[^a-z0-9]/g, ''))
       .filter((s) => s.length > 3)
@@ -1125,10 +1460,32 @@ export function compactScoutSong(parsedSongLines: IntermediateSongLine[]): strin
       .join('|');
   });
 
+  // Trova l'indice della PRIMA stanza contenente testo del brano (Strofa 1)
+  const firstLyricalStanzaIdx = mergedStanzas.findIndex((st) =>
+    st.some((l) => (l.type === 'lyric_with_chord' || l.type === 'lyric_plain') && l.rawLyrics.trim().length > 0)
+  );
+  const firstLyricalSig = firstLyricalStanzaIdx !== -1 ? stanzaLyricsSignatures[firstLyricalStanzaIdx] : null;
+
+  // Trova l'indice dell'ultima stanza contenente testo
+  let lastLyricalStanzaIdx = -1;
+  for (let i = mergedStanzas.length - 1; i >= 0; i--) {
+    if (mergedStanzas[i]!.some((l) => (l.type === 'lyric_with_chord' || l.type === 'lyric_plain') && l.rawLyrics.trim().length > 0)) {
+      lastLyricalStanzaIdx = i;
+      break;
+    }
+  }
+
   const repCounts: Record<string, number> = {};
-  for (const sig of stanzaLyricsSignatures) {
-    if (sig && sig.length >= 8) {
-      repCounts[sig] = (repCounts[sig] || 0) + 1;
+  for (let i = 0; i < stanzaLyricsSignatures.length; i++) {
+    const sig = stanzaLyricsSignatures[i];
+    // La prima strofa del brano NON deve MAI essere considerata come ritornello automatico!
+    if (sig && sig.length >= 8 && sig !== firstLyricalSig) {
+      const st = mergedStanzas[i]!;
+      const lyricsCount = st.filter((l) => (l.type === 'lyric_with_chord' || l.type === 'lyric_plain') && l.rawLyrics.trim().length > 0).length;
+      // Un ritornello automatico deve avere almeno 2 righe di testo
+      if (lyricsCount >= 2) {
+        repCounts[sig] = (repCounts[sig] || 0) + 1;
+      }
     }
   }
 
@@ -1144,35 +1501,107 @@ export function compactScoutSong(parsedSongLines: IntermediateSongLine[]): strin
   const finalOutput: string[] = [];
   let chorusSeen = false;
   let verseCount = 0;
+  let verse1Chords: string[] = [];
   const seenVerses = new Set<string>();
 
-  for (let sIdx = 0; sIdx < cleanStanzas.length; sIdx++) {
-    const st = cleanStanzas[sIdx]!;
-    const firstLine = st[0]?.text.trim() || '';
-    const sig = stanzaLyricsSignatures[sIdx] || '';
+  // Insieme delle parole del ritornello per il calcolo di similarità (Level 1 deterministico)
+  const chorusWordsSet = new Set<string>();
+  if (identifiedChorusSig) {
+    for (let i = 0; i < mergedStanzas.length; i++) {
+      if (stanzaLyricsSignatures[i] === identifiedChorusSig) {
+        const text = mergedStanzas[i]!.map((l) => l.rawLyrics).join(' ');
+        for (const w of extractMeaningfulWords(text)) {
+          chorusWordsSet.add(w);
+        }
+        break;
+      }
+    }
+  }
 
-    const isExplicitChorus = /^RIT[.:]?$/i.test(firstLine) || /ritornello/i.test(firstLine);
+  for (let idx = 0; idx < mergedStanzas.length; idx++) {
+    const st = mergedStanzas[idx]!;
+    const firstLine = st[0]?.text.trim() || '';
+    const sig = stanzaLyricsSignatures[idx] || '';
+
+    const isExplicitChorus = CHORUS_HEADER_REGEX.test(firstLine);
     const isRepeatedChorus = !!identifiedChorusSig && sig === identifiedChorusSig;
     const isChorus = isExplicitChorus || isRepeatedChorus;
 
     if (isChorus) {
       if (!chorusSeen) {
         chorusSeen = true;
+        if (chorusWordsSet.size === 0) {
+          const text = st.map((l) => l.rawLyrics).join(' ');
+          for (const w of extractMeaningfulWords(text)) {
+            chorusWordsSet.add(w);
+          }
+        }
         finalOutput.push('RIT:');
         for (const l of st) {
-          if (/^RIT[.:]?$/i.test(l.text.trim())) continue;
+          if (CHORUS_HEADER_REGEX.test(l.text.trim())) continue;
           finalOutput.push(l.text);
         }
         finalOutput.push('');
       } else {
-        // Ritornelli successivi: singola riga RIT. con spazio sopra e sotto
-        finalOutput.push('RIT.');
-        finalOutput.push('');
+        // Verifica se questa ripetizione del ritornello è seguita da una variazione o coda
+        let isFollowedByCoda = false;
+        let nextLyricalIdx = -1;
+        for (let n = idx + 1; n < mergedStanzas.length; n++) {
+          const candidate = mergedStanzas[n]!;
+          if (candidate.some((l) => (l.type === 'lyric_with_chord' || l.type === 'lyric_plain') && l.rawLyrics.trim().length > 0)) {
+            nextLyricalIdx = n;
+            break;
+          }
+        }
+
+        if (nextLyricalIdx !== -1) {
+          const nextStanza = mergedStanzas[nextLyricalIdx]!;
+          const nextSig = stanzaLyricsSignatures[nextLyricalIdx] || '';
+          const isNextIdenticalChorus = !!identifiedChorusSig && nextSig === identifiedChorusSig;
+
+          if (!isNextIdenticalChorus) {
+            const nextText = nextStanza.map((l) => l.rawLyrics).join(' ');
+            const nextWords = extractMeaningfulWords(nextText);
+            const firstLineNext = nextStanza[0]?.text.trim() || '';
+            const isExplicitCodaHeader = CODA_HEADER_REGEX.test(firstLineNext);
+
+            if (chorusWordsSet.size > 0 && nextWords.size > 0) {
+              let commonCount = 0;
+              for (const w of nextWords) {
+                if (chorusWordsSet.has(w)) commonCount++;
+              }
+              const overlap = commonCount / nextWords.size;
+              if (overlap >= 0.35 || isExplicitCodaHeader) {
+                isFollowedByCoda = true;
+              }
+            } else if (isExplicitCodaHeader) {
+              isFollowedByCoda = true;
+            }
+          }
+        }
+
+        if (isFollowedByCoda) {
+          // Non collassare a "RIT.": emetti l'intero testo del ritornello perché funge da testa della sequenza di finale/coda!
+          for (const l of st) {
+            if (CHORUS_HEADER_REGEX.test(l.text.trim())) continue;
+            finalOutput.push(l.text);
+          }
+          finalOutput.push('');
+        } else {
+          // Evita duplicati consecutivi di RIT.
+          const prev = finalOutput.filter(Boolean);
+          if (prev.length > 0 && prev[prev.length - 1] === 'RIT.') {
+            continue;
+          }
+          finalOutput.push('RIT.');
+          finalOutput.push('');
+        }
       }
       continue;
     }
 
-    if (/^(intro|strum(entale)?|stacco|outro):?$/i.test(firstLine)) {
+    // Se è un commento esplicito ChordPro
+    if (/^\{(?:comment|c):\s*(.*?)\}$/i.test(firstLine)) {
       for (const l of st) {
         finalOutput.push(l.text);
       }
@@ -1181,36 +1610,164 @@ export function compactScoutSong(parsedSongLines: IntermediateSongLine[]): strin
     }
 
     const hasLyrics = st.some((l) => (l.type === 'lyric_with_chord' || l.type === 'lyric_plain') && l.rawLyrics.trim().length > 0);
-    if (!hasLyrics) {
+
+    // Sezione Bridge / Ponte con testo
+    const isBridge = hasLyrics && BRIDGE_HEADER_REGEX.test(firstLine);
+    if (isBridge) {
+      finalOutput.push(`{comment: ${/ponte/i.test(firstLine) ? 'ponte' : 'bridge'}}`);
       for (const l of st) {
+        if (BRIDGE_HEADER_REGEX.test(l.text.trim())) continue;
         finalOutput.push(l.text);
       }
       finalOutput.push('');
       continue;
     }
 
-    // Strofa (Verse): evita duplicati esatti già stampati
-    if (sig && seenVerses.has(sig)) {
+    // Sezione Coda / Finale esplicita con testo
+    const isExplicitCoda = hasLyrics && CODA_HEADER_REGEX.test(firstLine);
+    if (isExplicitCoda) {
+      finalOutput.push(`{comment: ${/finale/i.test(firstLine) ? 'finale' : 'coda'}}`);
+      for (const l of st) {
+        if (CODA_HEADER_REGEX.test(l.text.trim())) continue;
+        finalOutput.push(l.text);
+      }
+      finalOutput.push('');
       continue;
     }
-    if (sig) seenVerses.add(sig);
+
+    // Sezione strumentale (Intro, Strum, Stacco, Outro o soli accordi)
+    if (!hasLyrics || INSTRUMENTAL_HEADER_REGEX.test(firstLine)) {
+      let defaultPrefix = 'strum:';
+      if (firstLyricalStanzaIdx === -1 || idx < firstLyricalStanzaIdx) {
+        defaultPrefix = 'intro:';
+      } else if (lastLyricalStanzaIdx !== -1 && idx > lastLyricalStanzaIdx) {
+        defaultPrefix = 'outro:';
+      }
+
+      if (/intro/i.test(firstLine)) defaultPrefix = 'intro:';
+      else if (/strum/i.test(firstLine)) defaultPrefix = 'strum:';
+      else if (/stacco/i.test(firstLine)) defaultPrefix = 'stacco:';
+      else if (/outro/i.test(firstLine)) defaultPrefix = 'outro:';
+      else if (/coda/i.test(firstLine)) defaultPrefix = 'coda:';
+      else if (/finale/i.test(firstLine)) defaultPrefix = 'finale:';
+
+      // "I giri di accordi strumentali vanno indicati però come detto sempre come comment, ogni riga un comment"
+      for (const l of st) {
+        if (INSTRUMENTAL_HEADER_REGEX.test(l.text.trim())) continue;
+        if (/^\{(?:comment|c):/i.test(l.text.trim())) {
+          finalOutput.push(l.text.trim());
+          continue;
+        }
+
+        const chords: string[] = [];
+        const matches = Array.from(l.text.matchAll(/\[([^\]]+)\]/g));
+        for (const m of matches) {
+          if (m[1]) {
+            const norm = normalizeChordName(m[1].trim());
+            if (isChordToken(norm)) chords.push(norm);
+          }
+        }
+        if (matches.length === 0 && l.type === 'chords_only') {
+          const parts = l.text.split(/\s+/).filter(Boolean);
+          for (const p of parts) {
+            const norm = normalizeChordName(p);
+            if (isChordToken(norm)) chords.push(norm);
+          }
+        }
+
+        if (chords.length > 0) {
+          const commentText = `{comment: ${defaultPrefix} ${chords.join(' ')}}`;
+          // Evita commenti identici consecutivi (es. intro duplicata)
+          const lastOutput = finalOutput.filter(Boolean);
+          if (lastOutput.length > 0 && lastOutput[lastOutput.length - 1] === commentText) {
+            continue;
+          }
+          finalOutput.push(commentText);
+        }
+      }
+      finalOutput.push('');
+      continue;
+    }
+
+    // Strofa con testo (Verse)
+    // Evita duplicati identici esatti dell'INTERA strofa già emessi (strofa ripetuta verbatim)
+    const fullVerseSig = st
+      .filter((l) => !SECTION_HEADER_REGEX.test(l.text.trim()))
+      .map((l) => l.rawLyrics.toLowerCase().replace(/[^a-z0-9]/g, ''))
+      .filter(Boolean)
+      .join('|');
+    if (fullVerseSig && seenVerses.has(fullVerseSig)) {
+      continue;
+    }
+    if (fullVerseSig) seenVerses.add(fullVerseSig);
 
     verseCount++;
+    const thisVerseChords = extractChordsFromStanza(st);
+
     if (verseCount === 1) {
       // Strofa 1: CON ACCORDI
+      verse1Chords = thisVerseChords;
       for (const l of st) {
+        if (VERSE_HEADER_REGEX.test(l.text.trim())) continue;
         finalOutput.push(l.text);
       }
       finalOutput.push('');
     } else {
-      // Strofe successive: SOLO TESTO SENZA ACCORDI
-      for (const l of st) {
-        const plain = l.rawLyrics || l.text.replace(/\[[^\]]+\]/g, '').trim();
-        if (plain) {
-          finalOutput.push(plain);
+      // Strofe successive:
+      // "se una strofa cambia il giro di accordi vanno scritti quelli differenti, per tutta la strofa"
+      let isDifferentProgression = false;
+
+      // Se la strofa è una variazione del ritornello o una coda, mantiene sempre tutti gli accordi
+      const stanzaText = st.map((l) => l.rawLyrics).join(' ');
+      const stanzaWords = extractMeaningfulWords(stanzaText);
+      let isChorusVariationOrCoda = false;
+      if (chorusWordsSet.size > 0 && stanzaWords.size > 0) {
+        let common = 0;
+        for (const w of stanzaWords) {
+          if (chorusWordsSet.has(w)) common++;
+        }
+        if (common / stanzaWords.size >= 0.35) {
+          isChorusVariationOrCoda = true;
         }
       }
-      finalOutput.push('');
+
+      if (isChorusVariationOrCoda) {
+        isDifferentProgression = true;
+      } else if (thisVerseChords.length > 0 && verse1Chords.length > 0) {
+        if (thisVerseChords[0] !== verse1Chords[0]) {
+          // Modulazione o tonalità diversa (es. Re dei re da MIm a FAm)
+          isDifferentProgression = true;
+        } else {
+          let matchCount = 0;
+          const minLen = Math.min(verse1Chords.length, thisVerseChords.length);
+          for (let c = 0; c < minLen; c++) {
+            if (verse1Chords[c] === thisVerseChords[c]) matchCount++;
+          }
+          const similarity = minLen > 0 ? matchCount / minLen : 0;
+          if (similarity < 0.65) {
+            isDifferentProgression = true;
+          }
+        }
+      }
+
+      if (isDifferentProgression) {
+        // Mantiene TUTTI gli accordi differenti
+        for (const l of st) {
+          if (VERSE_HEADER_REGEX.test(l.text.trim())) continue;
+          finalOutput.push(l.text);
+        }
+        finalOutput.push('');
+      } else {
+        // Stesso giro di accordi della Strofa 1: SOLO TESTO SENZA ACCORDI (compattazione scout)
+        for (const l of st) {
+          if (VERSE_HEADER_REGEX.test(l.text.trim())) continue;
+          const plain = l.rawLyrics || l.text.replace(/\[[^\]]+\]/g, '').trim();
+          if (plain) {
+            finalOutput.push(plain);
+          }
+        }
+        finalOutput.push('');
+      }
     }
   }
 
@@ -1232,7 +1789,7 @@ export function compactChordProText(chordProText: string): string {
 
     const hasChords = /\[[^\]]+\]/.test(trimmed);
     const rawLyrics = trimmed.replace(/\[[^\]]+\]/g, '').trim();
-    const isHdr = /^(intro|strum(entale)?|stacco|outro):?$/i.test(trimmed) || /^RIT[.:]?$/i.test(trimmed);
+    const isHdr = SECTION_HEADER_REGEX.test(trimmed) || /^\{(?:comment|c):/i.test(trimmed);
 
     let type: IntermediateSongLine['type'] = 'lyric_plain';
     if (isHdr) {

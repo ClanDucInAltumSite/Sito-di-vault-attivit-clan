@@ -50,10 +50,10 @@ export const I18N = {
     oldest: 'Più vecchi',
   },
   auth: {
-    loginTitle: 'Accesso Capi / Admin',
+    loginTitle: 'Accesso Admin',
     loginDescription: 'Inserisci le credenziali admin per creare o modificare i contenuti.',
-    emailLabel: 'Email Capi',
-    emailPlaceholder: 'es. staff.capi@gruppo.scout',
+    emailLabel: 'Email Admin',
+    emailPlaceholder: 'es. admin@gruppo.scout',
     passwordLabel: 'Password',
     passwordPlaceholder: 'Inserisci la password',
     loginButton: 'Accedi',

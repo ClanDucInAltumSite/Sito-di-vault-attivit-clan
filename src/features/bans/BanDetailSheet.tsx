@@ -16,6 +16,7 @@ export interface BanDetailSheetProps {
   onEdit?: (ban: Ban) => void;
   onDelete?: (ban: Ban) => void;
   onUpdated?: () => void;
+  isNew?: boolean;
 }
 
 export function BanDetailSheet({
@@ -25,13 +26,12 @@ export function BanDetailSheet({
   onEdit,
   onDelete,
   onUpdated,
+  isNew = false,
 }: BanDetailSheetProps) {
   const { isAdmin } = useAdmin();
   const [attachmentKey, setAttachmentKey] = useState(0);
 
   if (!isOpen || !ban) return null;
-
-  const isNew = Date.now() - new Date(ban.created_at).getTime() < 7 * 24 * 60 * 60 * 1000;
 
   return (
     <BottomSheet
@@ -83,7 +83,7 @@ export function BanDetailSheet({
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
         {isNew && (
           <div>
-            <Badge variant="giallo" size="sm">Nuovo</Badge>
+            <Badge variant="nuovo" size="sm">Nuovo</Badge>
           </div>
         )}
 

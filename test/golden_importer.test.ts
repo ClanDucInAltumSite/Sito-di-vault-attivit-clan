@@ -194,7 +194,7 @@ describe('FASE 12E — Test Golden Risultati Approvati per Importazione', () => 
 
         let parsed: any;
         if (file.endsWith('.pdf')) {
-          parsed = await parsePdfCanto(buffer);
+          parsed = await parsePdfCanto(buffer, { compactScout: false });
         } else {
           parsed = await parseDocx(buffer);
         }

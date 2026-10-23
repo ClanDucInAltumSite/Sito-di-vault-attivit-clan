@@ -11,7 +11,7 @@ export interface NoiseRule {
 export const NOISE_RULES: NoiseRule[] = [
   // Diritti e copyright
   {
-    pattern: /^(?:tutti\s+i\s+diritti\s+riservati|all\s+rights\s+reserved|copyright|©|\(c\))\b.*$/i,
+    pattern: /^(?:tutti\s+i\s+diritti\s+riservati|all\s+rights\s+reserved|copyright|©|\(c\))(?:\b|\s).*$/i,
     description: 'Dicitura copyright / diritti riservati',
   },
   {
@@ -87,8 +87,12 @@ export const NOISE_RULES: NoiseRule[] = [
     description: 'Clausola divieto commerciale',
   },
   {
-    pattern: /^(?:credits|autori:|copyright:)/i,
+    pattern: /^(?:credits|autori?:|autore:|copyright:|publishing\b)/i,
     description: 'Intestazione crediti o copyright',
+  },
+  {
+    pattern: /(?:universal\s+music|warner\s+chappell|sony\/atv|edizioni\s+musicali|music\s+union|publishing\s+ricordi)/i,
+    description: 'Casa editrice / publisher musicale',
   },
   {
     pattern: /^by\s+[a-z0-9._-]+\.[a-z]{2,}/i,

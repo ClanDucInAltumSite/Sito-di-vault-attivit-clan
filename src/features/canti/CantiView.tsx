@@ -27,8 +27,6 @@ import { DANZA_LA_VITA_PARSED } from '../../data/parsed_songs';
 type SortOption = 'az' | 'za' | 'recenti' | 'vecchi';
 export type CategoryFilter = 'tutti' | 'scout' | 'chiesa' | 'esterni' | 'senza_categoria';
 
-const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
-
 export function CantiView() {
   const { isAdmin } = useAdmin();
   const [canti, setCanti] = useState<Canto[]>([]);
@@ -234,6 +232,15 @@ export function CantiView() {
 
   const existingTitles = useMemo(() => canti.map((c) => c.titolo), [canti]);
 
+  const latestCantoId = useMemo(() => {
+    const first = canti[0];
+    if (!first) return null;
+    return canti.reduce(
+      (max, c) => (new Date(c.created_at).getTime() > new Date(max.created_at).getTime() ? c : max),
+      first
+    ).id;
+  }, [canti]);
+
   return (
     <div>
       {/* 1. FASCIA FOTOGRAFICA D'INTESTAZIONE */}
@@ -425,8 +432,7 @@ export function CantiView() {
             footer="Tocca un canto per visualizzare gli accordi, trasporre la tonalità o avviare il metronomo."
           >
             {filteredList.map((canto) => {
-              const isNew =
-                Date.now() - new Date(canto.created_at).getTime() < SEVEN_DAYS_MS;
+              const isNew = canto.id === latestCantoId;
 
               const pageCount = splitSongIntoPages(canto.testo_chordpro).length;
               const metaParts = [];
@@ -467,7 +473,7 @@ export function CantiView() {
                         </Badge>
                       )}
                       {canto.categoria === 'esterni' && (
-                        <Badge variant="neutral" size="sm">
+                        <Badge variant="rosso" size="sm">
                           Esterni
                         </Badge>
                       )}
@@ -477,7 +483,7 @@ export function CantiView() {
                         </Badge>
                       )}
                       {isNew ? (
-                        <Badge variant="giallo" size="sm">
+                        <Badge variant="nuovo" size="sm">
                           Nuovo
                         </Badge>
                       ) : null}
@@ -499,6 +505,7 @@ export function CantiView() {
       <CantoDetailSheet
         canto={selectedCanto}
         isOpen={isDetailOpen}
+        isNew={selectedCanto ? selectedCanto.id === latestCantoId : false}
         onClose={() => {
           setIsDetailOpen(false);
           setSelectedCanto(null);

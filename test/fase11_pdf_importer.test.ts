@@ -55,8 +55,8 @@ describe('FASE 11C — Prove Ufficiali Importatore PDF Canzoniere', () => {
       const mergedLeft = mergeChordsWithLyricsLine(leftColChord, leftColLyric);
       const mergedRight = mergeChordsWithLyricsLine(rightColChord, rightColLyric);
 
-      expect(mergedLeft).toBe('[Do]Strofa colonna sinistra');
-      expect(mergedRight).toBe('[Sol]Strofa colonna destra');
+      expect(mergedLeft).toBe('[DO]Strofa colonna sinistra');
+      expect(mergedRight).toBe('[SOL]Strofa colonna destra');
     });
 
     it('andata e ritorno: un canto impaginato a due colonne dal motore di layout mantiene l\'integrità dei blocchi', () => {
@@ -259,11 +259,11 @@ describe('FASE 11C — Prove Ufficiali Importatore PDF Canzoniere', () => {
      ALLINEAMENTO GEOMETRICO, ACCORDI MINORI E ACCENTI
      ============================================================================== */
   describe('Ulteriori verifiche geometriche e lessicali', () => {
-    it('normalizza accordi minori col trattino (La- -> Lam, Do#- -> Do#m)', () => {
-      expect(normalizeChordName('La-')).toBe('Lam');
-      expect(normalizeChordName('LA-')).toBe('Lam');
-      expect(normalizeChordName('Do#-')).toBe('Do#m');
-      expect(normalizeChordName('SI-')).toBe('Sim');
+    it('normalizza accordi minori col trattino (La- -> LAm, Do#- -> DO#m)', () => {
+      expect(normalizeChordName('La-')).toBe('LAm');
+      expect(normalizeChordName('LA-')).toBe('LAm');
+      expect(normalizeChordName('Do#-')).toBe('DO#m');
+      expect(normalizeChordName('SI-')).toBe('SIm');
     });
 
     it('rispetta la soglia di 1.5 caratteri per l\'aggancio a inizio parola', () => {
@@ -275,7 +275,7 @@ describe('FASE 11C — Prove Ufficiali Importatore PDF Canzoniere', () => {
       ];
 
       const merged = mergeChordsWithLyricsLine(chordWords, lyricWords);
-      expect(merged).toBe('[Do]Canta insieme a noi');
+      expect(merged).toBe('[DO]Canta insieme a noi');
     });
 
     it('non tocca MAI il punto interrogativo né in frase né isolato', () => {
@@ -299,7 +299,7 @@ describe('FASE 11C — Prove Ufficiali Importatore PDF Canzoniere', () => {
       if (!fs.existsSync(pdfPath) || !fs.existsSync(jsonPath)) return;
 
       const pdfBuf = fs.readFileSync(pdfPath);
-      const res = await parsePdfCanto(pdfBuf);
+      const res = await parsePdfCanto(pdfBuf, { compactScout: false });
       const pyJson = JSON.parse(fs.readFileSync(jsonPath, 'utf-8'))[0];
 
       expect(res.titolo.toUpperCase()).toBe(pyJson.titolo.toUpperCase());

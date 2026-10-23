@@ -17,7 +17,7 @@ import { CalendarioMonthView } from './CalendarioMonthView';
 import { CalendarioListView } from './CalendarioListView';
 import { EventoDetailSheet } from './EventoDetailSheet';
 import { EventoFormSheet } from './EventoFormSheet';
-import { parseDateOnly } from '../../lib/calendario';
+import { parseDateOnly, isEventoDataDaDefinire, SENTINEL_DATA_DA_DEFINIRE, TAG_DATA_DA_DEFINIRE } from '../../lib/calendario';
 
 export function CalendarioView() {
   const { isAdmin } = useAdmin();
@@ -97,13 +97,13 @@ export function CalendarioView() {
     setIsDetailOpen(false);
     setEditingEvento({
       id: '',
-      titolo: 'Riunione di Clan',
+      titolo: 'Prossima Riunione',
       tipo: 'riunione',
-      inizio: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString(),
+      inizio: SENTINEL_DATA_DA_DEFINIRE,
       fine: null,
       tutto_il_giorno: false,
       luogo: 'Sede',
-      descrizione: null,
+      descrizione: TAG_DATA_DA_DEFINIRE,
       responsabile: null,
       cosa_portare: null,
       created_at: '',
@@ -141,10 +141,16 @@ export function CalendarioView() {
     setIsDetailOpen(true);
   };
 
+  // Riunioni aperte con data ancora da concordare
+  const meetingsTbd = eventi.filter(
+    (e) => e.tipo === 'riunione' && isEventoDataDaDefinire(e) && e.deleted_at === null
+  );
+
   // Conteggio eventi futuri per la testata
   const todayTime = new Date().setHours(0, 0, 0, 0);
   const upcomingCount = eventi.filter((e) => {
     if (e.deleted_at !== null) return false;
+    if (isEventoDataDaDefinire(e)) return true;
     const start = parseDateOnly(e.inizio).getTime();
     const end = e.fine ? parseDateOnly(e.fine).getTime() : start;
     return end >= todayTime;
@@ -200,6 +206,58 @@ export function CalendarioView() {
             </Button>
           )}
         </div>
+
+        {/* 2B. BANNER RIUNIONE CON DATA DA CONCORDARE (ODG IN CORSO) */}
+        {meetingsTbd.length > 0 && (
+          <div
+            style={{
+              marginBottom: 'var(--space-4)',
+              padding: 'var(--space-3) var(--space-4)',
+              background: 'var(--color-surface)',
+              border: '1px solid var(--color-border)',
+              borderLeft: '4px solid var(--color-interactive)',
+              borderRadius: 'var(--radius-md)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 'var(--space-3)',
+              flexWrap: 'wrap',
+              cursor: 'pointer',
+              boxShadow: 'var(--shadow-rest)',
+            }}
+            onClick={() => handleOpenDetail(meetingsTbd[0]!)}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+              <div
+                className="section-sq-icon section-sq-calendario section-sq-sm"
+                aria-hidden="true"
+              >
+                <Icon name="calendar" size={16} />
+              </div>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 'var(--font-size-sm)', color: 'var(--color-ink)' }}>
+                  {meetingsTbd[0]!.titolo} — Data da concordare
+                </div>
+                <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
+                  {(odgMap[meetingsTbd[0]!.id] || []).length} punti ODG inseriti • Tocca per visualizzare o gestire i punti
+                </div>
+              </div>
+            </div>
+            {isAdmin && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleEditEvento(meetingsTbd[0]!);
+                }}
+              >
+                <Icon name="edit" size={14} />
+                <span>Fissa data e ora</span>
+              </Button>
+            )}
+          </div>
+        )}
 
         {/* 3. VISTA ATTIVA */}
         {viewMode === 'mese' ? (

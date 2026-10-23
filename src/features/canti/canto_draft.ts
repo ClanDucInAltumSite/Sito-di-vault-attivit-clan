@@ -23,7 +23,7 @@ export interface CantoDraft {
   note?: string; // per retrocompatibilità
   settore?: string;
   capotasto: string;
-  tonalita: string;
+  tonalita?: string;
   origine?: string | null;
   nota_fonte?: string | null;
   testo_chordpro: string;

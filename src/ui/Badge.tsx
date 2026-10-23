@@ -1,7 +1,7 @@
 import { JSX } from 'preact';
 
 export interface BadgeProps extends JSX.HTMLAttributes<HTMLSpanElement> {
-  variant?: 'azzurro' | 'giallo' | 'rosso' | 'neutral';
+  variant?: 'azzurro' | 'giallo' | 'rosso' | 'neutral' | 'nuovo';
   size?: 'sm' | 'md';
 }
 

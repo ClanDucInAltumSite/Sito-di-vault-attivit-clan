@@ -15,6 +15,7 @@ import {
   upsertRecords,
 } from './db';
 import { I18N } from './i18n';
+import { isEventoDataDaDefinire } from './calendario';
 
 export interface TrashItem {
   id: string;
@@ -505,8 +506,17 @@ export async function findNextFutureMeeting(currentInizio: string): Promise<Even
   const allEvents = await getEventi(false);
   const currentTime = new Date(currentInizio).getTime();
 
+  // 1. Prima controlla se c'è una riunione aperta "data da definire" creata appositamente per la prossima riunione
+  const tbdMeeting = allEvents.find(
+    (e) => e.tipo === 'riunione' && isEventoDataDaDefinire(e) && e.deleted_at === null
+  );
+  if (tbdMeeting) {
+    return tbdMeeting;
+  }
+
+  // 2. Altrimenti cerca la prossima riunione futura programmata
   const futureMeetings = allEvents.filter(
-    (e) => e.tipo === 'riunione' && new Date(e.inizio).getTime() > currentTime && e.deleted_at === null
+    (e) => e.tipo === 'riunione' && !isEventoDataDaDefinire(e) && new Date(e.inizio).getTime() > currentTime && e.deleted_at === null
   );
 
   futureMeetings.sort((a, b) => new Date(a.inizio).getTime() - new Date(b.inizio).getTime());

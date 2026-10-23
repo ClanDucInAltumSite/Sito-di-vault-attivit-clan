@@ -38,7 +38,11 @@ export type IconName =
   | 'file'
   | 'camera'
   | 'zoom-in'
-  | 'close';
+  | 'close'
+  | 'x'
+  | 'calendar'
+  | 'print'
+  | 'warning';
 
 export interface IconProps extends JSX.SVGAttributes<SVGSVGElement> {
   name: IconName;
@@ -110,6 +114,7 @@ export function Icon({
         </svg>
       );
     case 'calendario':
+    case 'calendar':
       /* Calendario clan */
       return (
         <svg {...commonProps}>
@@ -120,6 +125,7 @@ export function Icon({
         </svg>
       );
     case 'stampa':
+    case 'print':
       /* Stampante */
       return (
         <svg {...commonProps}>
@@ -273,6 +279,7 @@ export function Icon({
         </svg>
       );
     case 'info':
+    case 'warning':
       return (
         <svg {...commonProps}>
           <circle cx="12" cy="12" r="10" />
@@ -366,6 +373,7 @@ export function Icon({
         </svg>
       );
     case 'close':
+    case 'x':
       return (
         <svg {...commonProps}>
           <line x1="18" y1="6" x2="6" y2="18" />

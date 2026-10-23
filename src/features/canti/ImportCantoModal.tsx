@@ -14,6 +14,7 @@ import { Icon } from '../../ui/Icon';
 import { parsePdfCanto, compactChordProText, ParsedPdfCantoResult } from './pdf_importer';
 import { parseDocx, parsePastedText } from './canzoniere_parser';
 import { downloadScoutWordTemplate } from './word_template';
+import { parseImageCanto } from './image_importer';
 
 export interface ImportedSongData {
   titolo: string;
@@ -31,6 +32,8 @@ export interface ImportedSongData {
   warnings?: any[];
   removedNoise?: any[];
   pdfBytes?: Uint8Array | null;
+  imageUrl?: string | null;
+  imageFileName?: string | null;
 }
 
 export interface ImportCantoModalProps {
@@ -103,18 +106,62 @@ export function ImportCantoModal({
     }
   };
 
-  // Gestione caricamento Immagine (PNG, JPG)
-  const handleImageFile = (file: File) => {
+  // Gestione caricamento Immagine (PNG, JPG) con analisi automatica OCR
+  const handleImageFile = async (file: File) => {
+    setIsLoading(true);
     setErrorMessage(null);
-    const cleanName = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
-    setImageTitle(cleanName);
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const dataUrl = e.target?.result as string;
-      setLoadedImage({ name: file.name, dataUrl });
-    };
-    reader.readAsDataURL(file);
+    const previewUrl = URL.createObjectURL(file);
+
+    try {
+      const parsed = await parseImageCanto(file, file.name);
+
+      onImportSuccess({
+        titolo: parsed.titolo,
+        autore: parsed.autore,
+        categoria: parsed.categoria,
+        tonalita: parsed.tonalita,
+        misura: parsed.misura,
+        tempo_bpm: parsed.tempo_bpm,
+        bpm_testo: parsed.bpm_testo,
+        ritmo: parsed.ritmo,
+        capotasto: parsed.capotasto,
+        origine: 'import_immagine',
+        nota_fonte: `Analizzato da immagine (OCR): ${file.name}`,
+        testo_chordpro: parsed.testo_chordpro,
+        warnings: parsed.warnings.map((w) => ({
+          tipo: 'info' as const,
+          riga: w.riga,
+          testo: w.testo,
+          messaggio: w.messaggio,
+        })),
+        removedNoise: [],
+        pdfBytes: null,
+        imageUrl: previewUrl,
+        imageFileName: file.name,
+      });
+      onClose();
+    } catch (err) {
+      console.error('Errore analisi immagine:', err);
+      // Fallback assistente manuale se l'immagine è illeggibile
+      const cleanName = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
+      setImageTitle(cleanName);
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const dataUrl = e.target?.result as string;
+        setLoadedImage({ name: file.name, dataUrl });
+      };
+      reader.readAsDataURL(file);
+
+      setErrorMessage(
+        err instanceof Error
+          ? `Riconoscimento OCR non riuscito: ${err.message}. Puoi trascrivere il testo manualmente.`
+          : 'Impossibile leggere il testo automaticamente dall\'immagine. Puoi trascriverlo qui sotto.'
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Compattazione scout del testo inserito per l'immagine
@@ -308,7 +355,7 @@ export function ImportCantoModal({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            background: 'var(--color-surface-raised, #f8f9fa)',
+            background: 'var(--color-surface)',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
@@ -317,8 +364,8 @@ export function ImportCantoModal({
                 width: '32px',
                 height: '32px',
                 borderRadius: 'var(--radius-md)',
-                background: 'var(--color-ink)',
-                color: '#ffffff',
+                background: 'var(--color-interactive-tenue)',
+                color: 'var(--color-interactive)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -327,10 +374,10 @@ export function ImportCantoModal({
               <Icon name="upload" size={18} />
             </div>
             <div>
-              <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: 'var(--color-ink)' }}>
+              <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: 'var(--color-text)' }}>
                 Importa Canto nel Canzoniere
               </h2>
-              <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
+              <div style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)' }}>
                 Compattazione automatica in stile tascabile Scout (Strofa 1 con accordi, RIT. sintetico)
               </div>
             </div>
@@ -343,7 +390,7 @@ export function ImportCantoModal({
               background: 'none',
               border: 'none',
               cursor: 'pointer',
-              color: 'var(--color-text-muted)',
+              color: 'var(--color-text-secondary)',
               padding: '0.35rem',
               borderRadius: 'var(--radius-sm)',
             }}
@@ -357,7 +404,7 @@ export function ImportCantoModal({
           style={{
             display: 'flex',
             borderBottom: '1px solid var(--color-border)',
-            background: 'var(--color-surface-raised, #f3f4f6)',
+            background: 'var(--color-surface-hover)',
           }}
         >
           <button
@@ -370,8 +417,8 @@ export function ImportCantoModal({
               fontSize: '0.92rem',
               border: 'none',
               background: activeTab === 'visual' ? 'var(--color-surface)' : 'transparent',
-              borderBottom: activeTab === 'visual' ? '3px solid var(--color-ink)' : 'none',
-              color: activeTab === 'visual' ? 'var(--color-ink)' : 'var(--color-text-muted)',
+              borderBottom: activeTab === 'visual' ? '3px solid var(--color-interactive)' : 'none',
+              color: activeTab === 'visual' ? 'var(--color-interactive)' : 'var(--color-text-secondary)',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
@@ -393,8 +440,8 @@ export function ImportCantoModal({
               fontSize: '0.92rem',
               border: 'none',
               background: activeTab === 'docs' ? 'var(--color-surface)' : 'transparent',
-              borderBottom: activeTab === 'docs' ? '3px solid var(--color-ink)' : 'none',
-              color: activeTab === 'docs' ? 'var(--color-ink)' : 'var(--color-text-muted)',
+              borderBottom: activeTab === 'docs' ? '3px solid var(--color-interactive)' : 'none',
+              color: activeTab === 'docs' ? 'var(--color-interactive)' : 'var(--color-text-secondary)',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
@@ -406,6 +453,31 @@ export function ImportCantoModal({
             <Icon name="file" size={17} />
             <span>Modello Word & Scrittura Libera</span>
           </button>
+        </div>
+
+        {/* Avviso importante: i risultati vanno sempre ricontrollati e modificati */}
+        <div
+          style={{
+            margin: '0.85rem 1.25rem 0 1.25rem',
+            padding: '0.65rem 0.85rem',
+            borderRadius: 'var(--radius-md)',
+            background: 'var(--color-surface-hover)',
+            border: '1px solid var(--color-border)',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '0.6rem',
+            fontSize: '0.8rem',
+            lineHeight: 1.4,
+            color: 'var(--color-text-secondary)',
+          }}
+        >
+          <Icon name="info" size={16} style={{ color: 'var(--color-interactive)', flexShrink: 0, marginTop: '2px' }} />
+          <div>
+            <strong style={{ color: 'var(--color-text)', display: 'block', marginBottom: '2px' }}>
+              Importante: i risultati vanno ricontrollati e modificati
+            </strong>
+            L'importazione automatica fornisce una bozza compattata in stile Scout, ma la traduzione da PDF o immagini non può essere perfetta al 100%. Nella schermata successiva potrai verificare e rifinire comodamente testo e accordi nell'editor dedicato.
+          </div>
         </div>
 
         {/* Corpo del Modal con Scroll */}
@@ -422,8 +494,8 @@ export function ImportCantoModal({
             <div
               style={{
                 padding: '0.75rem 1rem',
-                background: 'var(--color-error-bg, #fee2e2)',
-                color: 'var(--color-error, #dc2626)',
+                background: 'var(--color-bans-tenue)',
+                color: 'var(--color-bans-text)',
                 borderRadius: 'var(--radius-md)',
                 fontSize: '0.85rem',
                 display: 'flex',
@@ -453,33 +525,33 @@ export function ImportCantoModal({
                       borderRadius: 'var(--radius-lg)',
                       padding: '2.5rem 1.5rem',
                       textAlign: 'center',
-                      backgroundColor: 'var(--color-bg)',
+                      backgroundColor: 'var(--color-surface-hover)',
                       cursor: 'pointer',
-                      transition: 'border-color 0.2s ease',
+                      transition: 'all 0.2s ease',
                     }}
                     onClick={() => visualInputRef.current?.click()}
                   >
                     <input
                       ref={visualInputRef}
                       type="file"
-                      accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
+                      accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/png,image/jpeg,image/webp"
                       style={{ display: 'none' }}
                       onChange={(e) => {
                         const file = (e.target as HTMLInputElement).files?.[0];
                         if (file) handleVisualFileSelect(file);
                       }}
                     />
-                    <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', marginBottom: '0.75rem', color: 'var(--color-ink)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', marginBottom: '0.75rem', color: 'var(--color-interactive)' }}>
                       <Icon name="file-text" size={36} />
                       <Icon name="image" size={36} />
                     </div>
-                    <div style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: '0.35rem' }}>
+                    <div style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: '0.35rem', color: 'var(--color-text)' }}>
                       {isLoading ? 'Analisi e compattazione in corso...' : 'Trascina qui il file PDF o l\'immagine (PNG, JPG)'}
                     </div>
-                    <div style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)', maxWidth: '420px', margin: '0 auto 0.75rem auto' }}>
+                    <div style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', maxWidth: '420px', margin: '0 auto 0.75rem auto' }}>
                       Supporta PDF di Accordi e Spartiti, spartiti generici o screenshot/scansioni fotografiche di canzonieri.
                     </div>
-                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', color: 'var(--color-ink)', fontWeight: 600 }}>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', color: 'var(--color-interactive)', fontWeight: 600 }}>
                       <Icon name="upload" size={14} />
                       <span>Clicca per sfogliare dal tuo dispositivo</span>
                     </div>
@@ -490,16 +562,17 @@ export function ImportCantoModal({
                     style={{
                       marginTop: '1rem',
                       padding: '0.75rem 1rem',
-                      background: 'var(--color-surface-raised, #f8f9fa)',
+                      background: 'var(--color-surface-hover)',
+                      border: '1px solid var(--color-border-subtle)',
                       borderRadius: 'var(--radius-md)',
                       fontSize: '0.8rem',
-                      color: 'var(--color-text-muted)',
+                      color: 'var(--color-text-secondary)',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '0.35rem',
                     }}
                   >
-                    <div style={{ fontWeight: 600, color: 'var(--color-ink)' }}>
+                    <div style={{ fontWeight: 600, color: 'var(--color-text)' }}>
                       Regole di formattazione automatica applicate:
                     </div>
                     <div>• <strong>Strofa 1:</strong> Accordi completi posizionati esattamente sulle sillabe.</div>
@@ -512,7 +585,7 @@ export function ImportCantoModal({
                 /* Modalità Assistente Immagine */
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--color-ink)' }}>
+                    <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--color-text)' }}>
                       Immagine caricata: {loadedImage.name}
                     </div>
                     <Button
@@ -568,6 +641,8 @@ export function ImportCantoModal({
                             padding: '0.45rem 0.65rem',
                             borderRadius: 'var(--radius-md)',
                             border: '1px solid var(--color-border)',
+                            backgroundColor: 'var(--color-surface)',
+                            color: 'var(--color-text)',
                             fontSize: '0.85rem',
                           }}
                         />
@@ -581,6 +656,8 @@ export function ImportCantoModal({
                             padding: '0.45rem 0.65rem',
                             borderRadius: 'var(--radius-md)',
                             border: '1px solid var(--color-border)',
+                            backgroundColor: 'var(--color-surface)',
+                            color: 'var(--color-text)',
                             fontSize: '0.85rem',
                           }}
                         />
@@ -597,6 +674,8 @@ export function ImportCantoModal({
                           padding: '0.65rem',
                           borderRadius: 'var(--radius-md)',
                           border: '1px solid var(--color-border)',
+                          backgroundColor: 'var(--color-surface)',
+                          color: 'var(--color-text)',
                           fontFamily: 'monospace',
                           fontSize: '0.82rem',
                           resize: 'vertical',
@@ -633,7 +712,7 @@ export function ImportCantoModal({
                   padding: '1rem',
                   border: '1px solid var(--color-border)',
                   borderRadius: 'var(--radius-md)',
-                  background: 'var(--color-surface-raised, #f9fafb)',
+                  background: 'var(--color-surface-hover)',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '0.75rem',
@@ -641,10 +720,10 @@ export function ImportCantoModal({
               >
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.75rem' }}>
                   <div>
-                    <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--color-ink)' }}>
+                    <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--color-text)' }}>
                       1. Modello Word / Google Docs pre-impostato
                     </div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>
                       Scarica il modello ufficiale conforme a "Strade di Coraggio", modificalo su Word o Google Docs e ricaricalo compilato.
                     </div>
                   </div>
@@ -675,7 +754,7 @@ export function ImportCantoModal({
                     borderRadius: 'var(--radius-md)',
                     padding: '1.25rem 1rem',
                     textAlign: 'center',
-                    backgroundColor: 'var(--color-bg)',
+                    backgroundColor: 'var(--color-surface)',
                     cursor: 'pointer',
                   }}
                   onClick={() => docxInputRef.current?.click()}
@@ -690,11 +769,11 @@ export function ImportCantoModal({
                       if (file) handleDocxFile(file);
                     }}
                   />
-                  <Icon name="file" size={28} style={{ color: 'var(--color-ink)', marginBottom: '0.35rem' }} />
-                  <div style={{ fontSize: '0.88rem', fontWeight: 600 }}>
+                  <Icon name="file" size={28} style={{ color: 'var(--color-interactive)', marginBottom: '0.35rem' }} />
+                  <div style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--color-text)' }}>
                     {isLoading ? 'Analisi Word in corso...' : 'Trascina qui il file .docx compilato o clicca'}
                   </div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>
                     Riconosce tabelle a 2 colonne, accordi in grassetto e compattazione scout automatica.
                   </div>
                 </div>
@@ -706,17 +785,17 @@ export function ImportCantoModal({
                   padding: '1rem',
                   border: '1px solid var(--color-border)',
                   borderRadius: 'var(--radius-md)',
-                  background: 'var(--color-surface)',
+                  background: 'var(--color-surface-hover)',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '0.75rem',
                 }}
               >
                 <div>
-                  <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--color-ink)' }}>
+                  <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--color-text)' }}>
                     2. Scrittura Libera o Incolla Rapido
                   </div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>
                     Incolla testo da qualsiasi sito o digita liberamente con accordi sopra le parole o tra parentesi quadre.
                   </div>
                 </div>
@@ -732,6 +811,8 @@ export function ImportCantoModal({
                       padding: '0.45rem 0.65rem',
                       borderRadius: 'var(--radius-md)',
                       border: '1px solid var(--color-border)',
+                      backgroundColor: 'var(--color-surface)',
+                      color: 'var(--color-text)',
                       fontSize: '0.85rem',
                     }}
                   />
@@ -745,6 +826,8 @@ export function ImportCantoModal({
                       padding: '0.45rem 0.65rem',
                       borderRadius: 'var(--radius-md)',
                       border: '1px solid var(--color-border)',
+                      backgroundColor: 'var(--color-surface)',
+                      color: 'var(--color-text)',
                       fontSize: '0.85rem',
                     }}
                   />
@@ -760,6 +843,8 @@ export function ImportCantoModal({
                     padding: '0.65rem',
                     borderRadius: 'var(--radius-md)',
                     border: '1px solid var(--color-border)',
+                    backgroundColor: 'var(--color-surface)',
+                    color: 'var(--color-text)',
                     fontFamily: 'monospace',
                     fontSize: '0.82rem',
                     resize: 'vertical',
@@ -790,7 +875,7 @@ export function ImportCantoModal({
           style={{
             padding: '0.75rem 1.25rem',
             borderTop: '1px solid var(--color-border)',
-            background: 'var(--color-surface-raised, #f9fafb)',
+            background: 'var(--color-surface)',
             display: 'flex',
             justifyContent: 'flex-end',
           }}

@@ -25,7 +25,8 @@
     "idb": "^8.0.2",
     "jszip": "^3.10.2",
     "pdfjs-dist": "^6.4.299",
-    "preact": "^10.25.4"
+    "preact": "^10.25.4",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
