@@ -8,7 +8,7 @@
     <!-- Content Security Policy Restrittiva (Nessuna CDN esterna, solo dominio locale e Supabase del progetto con WebSockets) -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://lpeiyzwccedtqjbficjo.supabase.co; connect-src 'self' https://lpeiyzwccedtqjbficjo.supabase.co wss://lpeiyzwccedtqjbficjo.supabase.co; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self';"
+      content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://lpeiyzwccedtqjbficjo.supabase.co; connect-src 'self' https://lpeiyzwccedtqjbficjo.supabase.co wss://lpeiyzwccedtqjbficjo.supabase.co; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self';"
     />
 
     <title>Vault Clan - Duc In Altum</title>

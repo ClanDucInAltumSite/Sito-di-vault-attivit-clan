@@ -349,27 +349,48 @@ export async function parseDocx(
   let tonalita: string | null = null;
   let categoria: 'scout' | 'chiesa' | 'esterni' | null = null;
 
-  // 1. Estrazione metadati da paragrafi dell'intestazione (prima della tabella)
+  // 1. Estrazione metadati da paragrafi dell'intestazione (prima della tabella o prima del corpo)
+  const tables = Array.from(doc.getElementsByTagName('w:tbl'));
   const paragraphs = Array.from(doc.getElementsByTagName('w:p'));
   const headerParagraphs: Element[] = [];
-  let tableFound = false;
+  const continuousBodyParagraphs: Element[] = [];
 
-  for (const p of paragraphs) {
-    // Verifica se questo paragrafo è dentro una tabella w:tbl
-    let parent: Node | null = p.parentNode;
-    let isInsideTable = false;
-    while (parent) {
-      if (parent.nodeName === 'w:tbl' || parent.nodeName === 'w:tc') {
-        isInsideTable = true;
-        break;
+  if (tables.length > 0) {
+    let tableFound = false;
+    for (const p of paragraphs) {
+      let parent: Node | null = p.parentNode;
+      let isInsideTable = false;
+      while (parent) {
+        if (parent.nodeName === 'w:tbl' || parent.nodeName === 'w:tc') {
+          isInsideTable = true;
+          break;
+        }
+        parent = parent.parentNode;
       }
-      parent = parent.parentNode;
-    }
 
-    if (!isInsideTable && !tableFound) {
-      headerParagraphs.push(p);
-    } else if (isInsideTable) {
-      tableFound = true;
+      if (!isInsideTable && !tableFound) {
+        headerParagraphs.push(p);
+      } else if (isInsideTable) {
+        tableFound = true;
+      }
+    }
+  } else {
+    let bodyStarted = false;
+    for (const p of paragraphs) {
+      const text = extractWordNodeText(p).trim();
+      if (!bodyStarted) {
+        if (!text) continue;
+        const isParam = /tempo:/i.test(text) || /ritmo/i.test(text) || /capotasto:/i.test(text) || /tonalit/i.test(text) || /categoria:/i.test(text);
+        const isChords = isChordLine(text, { isBold: false, nextLineIsText: true });
+        if (isChords || (!isParam && headerParagraphs.length >= 2)) {
+          bodyStarted = true;
+          continuousBodyParagraphs.push(p);
+          continue;
+        }
+        headerParagraphs.push(p);
+      } else {
+        continuousBodyParagraphs.push(p);
+      }
     }
   }
 
@@ -436,7 +457,6 @@ export async function parseDocx(
   }
 
   // 2. Estrazione corpo: colonne della tabella o paragrafi normali
-  const tables = Array.from(doc.getElementsByTagName('w:tbl'));
   let bodyLinesLeft: string[] = [];
   let bodyLinesRight: string[] = [];
 
@@ -462,8 +482,7 @@ export async function parseDocx(
     }
   } else {
     // Nessuna tabella: testo a flusso continuo
-    const remainingParagraphs = paragraphs.slice(headerParagraphs.length);
-    extractParagraphsIntoLines(remainingParagraphs, bodyLinesLeft, options.isMonospace, warnings);
+    extractParagraphsIntoLines(continuousBodyParagraphs, bodyLinesLeft, options.isMonospace, warnings);
   }
 
   // Ricomponi il corpo in ChordPro unendo colonna sinistra e destra con {nuova_colonna}

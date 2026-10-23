@@ -8,6 +8,7 @@ import {
   formatEventDateTimeRange,
   getEventTypeInfo,
   parseDateOnly,
+  isEventoDataDaDefinire,
 } from '../../lib/calendario';
 import { I18N } from '../../lib/i18n';
 import { GroupedList } from '../../ui/GroupedList';
@@ -31,20 +32,30 @@ export function CalendarioListView({
   // Filtra eventi
   const filtered = eventi.filter((e) => {
     if (e.deleted_at !== null) return false;
-    const start = parseDateOnly(e.inizio).getTime();
-    const end = e.fine ? parseDateOnly(e.fine).getTime() : start;
+    const isTbd = isEventoDataDaDefinire(e);
 
     if (mode === 'prossimi') {
+      if (isTbd) return true;
+      const start = parseDateOnly(e.inizio).getTime();
+      const end = e.fine ? parseDateOnly(e.fine).getTime() : start;
       return end >= todayTime;
     }
     if (mode === 'passati') {
+      if (isTbd) return false; // Un'attività con data da concordare non è passata
+      const start = parseDateOnly(e.inizio).getTime();
+      const end = e.fine ? parseDateOnly(e.fine).getTime() : start;
       return end < todayTime;
     }
     return true;
   });
 
-  // Ordinamento: prossimi in ordine crescente (più vicini prima), passati in ordine decrescente (più recenti prima)
+  // Ordinamento: prossimi in ordine crescente (quelli con data da concordare sempre in cima!), passati in ordine decrescente
   filtered.sort((a, b) => {
+    const aTbd = isEventoDataDaDefinire(a);
+    const bTbd = isEventoDataDaDefinire(b);
+    if (aTbd && !bTbd) return -1;
+    if (!aTbd && bTbd) return 1;
+
     const timeA = new Date(a.inizio).getTime();
     const timeB = new Date(b.inizio).getTime();
     return mode === 'passati' ? timeB - timeA : timeA - timeB;
@@ -77,7 +88,8 @@ export function CalendarioListView({
         </div>
       ) : (
         filtered.map((evento) => {
-          const dateBlock = getWallCalendarDate(evento.inizio);
+          const isTbd = isEventoDataDaDefinire(evento);
+          const dateBlock = getWallCalendarDate(evento.inizio, isTbd);
           const typeInfo = getEventTypeInfo(evento.tipo);
           const timeRange = formatEventDateTimeRange(evento);
           const evOdg = odgMap[evento.id] || [];
@@ -94,7 +106,7 @@ export function CalendarioListView({
               key={evento.id}
               leading={
                 <div
-                  className={`calendar-date-block ${
+                  className={`calendar-date-block calendar-date-block-${evento.tipo || 'altro'} ${
                     dateBlock.isToday ? 'calendar-date-block-today' : ''
                   }`}
                   aria-hidden="true"
@@ -106,7 +118,15 @@ export function CalendarioListView({
               }
               title={evento.titolo}
               subtitle={subtitleParts.join(' • ')}
-              trailing={<span className={typeInfo.chipClass}>{typeInfo.label}</span>}
+              trailing={
+                isTbd ? (
+                  <span className="event-type-chip event-chip-riunione" style={{ fontWeight: 600 }}>
+                    Data da concordare
+                  </span>
+                ) : (
+                  <span className={typeInfo.chipClass}>{typeInfo.label}</span>
+                )
+              }
               chevron
               onClick={() => onSelectEvento(evento)}
             />

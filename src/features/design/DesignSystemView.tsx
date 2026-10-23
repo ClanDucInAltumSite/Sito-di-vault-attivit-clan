@@ -309,7 +309,7 @@ export function DesignSystemView() {
             <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '4px' }}>
               Badge "Nuovo" (sfondo giallo, testo viola):
             </span>
-            <Badge variant="giallo" size="md">Nuovo</Badge>
+            <Badge variant="nuovo" size="md">Nuovo</Badge>
           </div>
         </div>
       </GroupedList>
@@ -428,7 +428,7 @@ export function DesignSystemView() {
             />
           }
           subtitle="Evidenziazione ricerca sicura senza markup non validato in giallo scout"
-          trailing={<Badge variant="giallo" size="sm">Nuovo</Badge>}
+          trailing={<Badge variant="nuovo" size="sm">Nuovo</Badge>}
         />
         <GroupedRow
           leading={<Icon name="trash" size={20} />}

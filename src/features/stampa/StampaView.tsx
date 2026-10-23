@@ -34,6 +34,7 @@ import {
 import { ChordProRenderer, stripChords } from '../../lib/chordpro';
 import { SearchField } from '../../ui/SearchField';
 import { matchesQuery } from '../../lib/search';
+import { parseDateOnly } from '../../lib/calendario';
 import { CanzonierePageRenderer } from '../canti/CanzonierePageRenderer';
 import { ensureCanzoniereFontsLoaded } from '../canti/canzoniere_fonts';
 
@@ -95,15 +96,24 @@ export function StampaView() {
           enrichedCanti.push(DANZA_LA_VITA_PARSED as any);
         }
 
+        // Rimuove gli eventi passati: sono stampabili solo gli eventi futuri o in corso
+        const todayTime = new Date().setHours(0, 0, 0, 0);
+        const upcomingEventi = eList.filter((ev) => {
+          if (ev.deleted_at !== null) return false;
+          const start = parseDateOnly(ev.inizio).getTime();
+          const end = ev.fine ? parseDateOnly(ev.fine).getTime() : start;
+          return end >= todayTime;
+        });
+
         if (!mounted) return;
         setGiochi(gList);
         setBans(bList);
         setCanti(enrichedCanti);
-        setEventi(eList);
+        setEventi(upcomingEventi);
 
-        // Carica ODG per gli eventi
+        // Carica ODG per gli eventi stampabili
         const pMap: Record<string, OdgPunto[]> = {};
-        for (const ev of eList) {
+        for (const ev of upcomingEventi) {
           const pts = await getOdgPunti(ev.id, false);
           if (pts.length > 0) {
             pMap[ev.id] = pts;
@@ -295,8 +305,16 @@ export function StampaView() {
   }, [canti, cantiCategoryTab, searchQuery]);
 
   const filteredEventi = useMemo(() => {
-    if (!searchQuery.trim()) return eventi;
-    return eventi.filter((ev) => {
+    const todayTime = new Date().setHours(0, 0, 0, 0);
+    const validEventi = eventi.filter((ev) => {
+      if (ev.deleted_at !== null) return false;
+      const start = parseDateOnly(ev.inizio).getTime();
+      const end = ev.fine ? parseDateOnly(ev.fine).getTime() : start;
+      return end >= todayTime;
+    });
+
+    if (!searchQuery.trim()) return validEventi;
+    return validEventi.filter((ev) => {
       const pts = odgPuntiMap[ev.id] || [];
       const ptsText = pts.map((p) => p.testo).join(' ');
       return matchesQuery(searchQuery, ev.titolo, ev.luogo || '', ptsText);
@@ -1056,12 +1074,12 @@ export function StampaView() {
             {isOdgOpen && (
               <div style={{ marginTop: 'var(--space-3)' }}>
                 <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-3)' }}>
-                  Seleziona un evento del calendario con Ordine del Giorno per stampare una scheda A4 compatta con caselle quadrate stampabili.
+                  Seleziona una riunione o un evento in programma con Ordine del Giorno per stampare la scheda A4 (gli eventi passati sono esclusi).
                 </p>
 
                 {filteredEventi.length === 0 ? (
                   <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
-                    {searchQuery.trim() ? 'Nessuna riunione o ODG corrispondente alla ricerca.' : 'Nessun evento disponibile.'}
+                    {searchQuery.trim() ? 'Nessuna riunione o ODG in programma corrispondente alla ricerca.' : 'Nessuna riunione o evento in programma disponibile.'}
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>

@@ -291,8 +291,8 @@ export function QuickCategoryAssignModal({
                         fontSize: 'var(--font-size-xs)',
                         fontWeight: 600,
                         backgroundColor: 'var(--color-surface)',
-                        color: 'var(--color-text)',
-                        border: '1px solid var(--color-border)',
+                        color: 'var(--color-bans)',
+                        border: '1px solid oklch(0.55 0.22 27 / 0.45)',
                         borderRadius: 'var(--radius-sm)',
                         cursor: 'pointer',
                       }}

@@ -262,13 +262,8 @@ export function TopographicBackground({ className = '' }: TopographicBackgroundP
     <path d="M529.6,276.7L530.9,274.4L526,267.8L509.6,260.3L499.1,250.6L493.7,250L493.4,252.2L497.6,261.1L495.7,267.8L497.1,270L516.7,277.1L529.6,276.7Z" className="topo-line" data-elevation="2750" />
   </g>
 
-    <g className="topo-contour-anim-1">
-    <path d="M343.6,157.6L369.5,188L394.1,214.4L416.8,224L445.3,236L467.4,248L489.5,260L510.8,269.5" className="topo-line topo-line-accent" />
-  </g>
-
     <g className="topo-labels-layer">
         <g transform="translate(510.8, 269.5)">
-      <circle cx="0" cy="0" r="5" fill="var(--color-giochi, #facc15)" stroke="var(--color-ink)" strokeWidth="1.2" opacity="0.85" />
       <polygon points="0,-11 -5,-3 5,-3" fill="var(--color-ink)" opacity="0.6" />
       <text x="8" y="-4" fill="var(--color-ink)" className="topo-elevation-text topo-peak-title">▲ Monte Amaro 2793 m</text>
     </g>

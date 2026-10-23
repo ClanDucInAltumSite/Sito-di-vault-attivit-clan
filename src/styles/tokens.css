@@ -82,13 +82,17 @@
   --color-accent-subtle: var(--color-interactive-tenue);
   --color-accent-contrast: var(--color-interactive-contrast);
 
-  /* COLORI DI SEZIONE FUNZIONALI (PIENO, TENUE, TESTO-SU-TENUE) */
-  /* 1. Giochi = Giallo (#FDC500) */
-  --color-giallo: oklch(0.83 0.18 85);
-  --color-giochi: oklch(0.83 0.18 85);
-  --color-giochi-hover: oklch(0.79 0.19 85);
-  --color-giochi-tenue: oklch(0.96 0.05 85);
-  --color-giochi-text: oklch(0.22 0.08 305); /* Viola scuro su giallo: contrasto > 10:1 AAA */
+  /* Colore dedicato badge "Nuovo" (acceso e vibrante per risaltare) */
+  --color-nuovo: oklch(0.85 0.18 85);
+  --color-nuovo-text: oklch(0.20 0.08 305);
+
+  /* 1. Giochi = Giallo Caldo / Ambra Scout Vivo (vibrante, caldo, distinto da Nuovo e Chiesa) */
+  --color-giallo: oklch(0.80 0.18 78);
+  --color-giochi: oklch(0.80 0.18 78);
+  --color-giochi-hover: oklch(0.75 0.19 78);
+  --color-giochi-tenue: oklch(0.96 0.04 78);
+  --color-giochi-text: oklch(0.18 0.08 305); /* Contrasto > 8:1 AAA */
+  --color-giochi-badge-text: oklch(0.42 0.14 78);
   --color-giallo-subtle: var(--color-giochi-tenue);
   --color-giallo-text: var(--color-giochi-text);
 
@@ -106,6 +110,7 @@
   --color-canti-hover: oklch(0.48 0.19 245);
   --color-canti-tenue: oklch(0.95 0.035 245);
   --color-canti-text: oklch(0.38 0.16 245);
+  --color-chord: oklch(0.42 0.18 245);
 
   /* 4. Calendario = Azzurro Scuro */
   --color-calendario: oklch(0.42 0.15 255);
@@ -117,6 +122,12 @@
   --color-neutral: oklch(0.48 0.02 260);
   --color-neutral-tenue: oklch(0.95 0.005 260);
   --color-neutral-text: oklch(0.30 0.02 260);
+
+  /* 6. Uscita = Verde Bosco Scout */
+  --color-uscita: oklch(0.52 0.15 145);
+  --color-uscita-hover: oklch(0.47 0.16 145);
+  --color-uscita-tenue: oklch(0.95 0.04 145);
+  --color-uscita-text: oklch(0.30 0.12 145);
 
   /* Targa Bianca del Logo (fondamentale per logo sempre su fondo chiaro) */
   --color-targa-bg: oklch(1 0 0);
@@ -224,12 +235,17 @@
     --color-interactive-tenue: oklch(0.26 0.04 245);
     --color-interactive-contrast: oklch(0.12 0.01 260);
 
-    /* Colori di sezione in dark mode */
-    --color-giallo: oklch(0.85 0.17 85);
-    --color-giochi: oklch(0.85 0.17 85);
-    --color-giochi-hover: oklch(0.89 0.16 85);
-    --color-giochi-tenue: oklch(0.28 0.045 85);
-    --color-giochi-text: oklch(0.15 0.01 260);
+    /* Colore dedicato badge "Nuovo" */
+    --color-nuovo: oklch(0.86 0.18 85);
+    --color-nuovo-text: oklch(0.18 0.08 305);
+
+    /* Colori di sezione in dark mode: Giochi ambra scout vivo e caldo */
+    --color-giallo: oklch(0.82 0.17 78);
+    --color-giochi: oklch(0.82 0.17 78);
+    --color-giochi-hover: oklch(0.86 0.16 78);
+    --color-giochi-tenue: oklch(0.28 0.05 78);
+    --color-giochi-text: oklch(0.18 0.08 305);
+    --color-giochi-badge-text: oklch(0.90 0.11 78);
 
     --color-rosso: oklch(0.64 0.20 27);
     --color-bans: oklch(0.64 0.20 27);
@@ -241,6 +257,7 @@
     --color-canti-hover: oklch(0.72 0.15 240);
     --color-canti-tenue: oklch(0.26 0.04 245);
     --color-canti-text: oklch(0.88 0.08 240);
+    --color-chord: oklch(0.72 0.16 240);
 
     --color-calendario: oklch(0.62 0.15 255);
     --color-calendario-hover: oklch(0.66 0.14 255);
@@ -250,6 +267,12 @@
     --color-neutral: oklch(0.70 0.015 260);
     --color-neutral-tenue: oklch(0.24 0.01 260);
     --color-neutral-text: oklch(0.88 0.01 260);
+
+    /* 6. Uscita = Verde Bosco Scout */
+    --color-uscita: oklch(0.68 0.15 145);
+    --color-uscita-hover: oklch(0.72 0.14 145);
+    --color-uscita-tenue: oklch(0.26 0.045 145);
+    --color-uscita-text: oklch(0.92 0.06 145);
 
     /* Targa Bianca del Logo: resta BIANCA OPACA anche in tema scuro */
     --color-targa-bg: oklch(1 0 0);
@@ -297,11 +320,16 @@
   --color-interactive-tenue: oklch(0.26 0.04 245);
   --color-interactive-contrast: oklch(0.12 0.01 260);
 
-  --color-giallo: oklch(0.85 0.17 85);
-  --color-giochi: oklch(0.85 0.17 85);
-  --color-giochi-hover: oklch(0.89 0.16 85);
-  --color-giochi-tenue: oklch(0.28 0.045 85);
-  --color-giochi-text: oklch(0.15 0.01 260);
+  /* Colore dedicato badge "Nuovo" */
+  --color-nuovo: oklch(0.86 0.18 85);
+  --color-nuovo-text: oklch(0.18 0.08 305);
+
+  --color-giallo: oklch(0.82 0.17 78);
+  --color-giochi: oklch(0.82 0.17 78);
+  --color-giochi-hover: oklch(0.86 0.16 78);
+  --color-giochi-tenue: oklch(0.28 0.05 78);
+  --color-giochi-text: oklch(0.18 0.08 305);
+  --color-giochi-badge-text: oklch(0.90 0.11 78);
 
   --color-rosso: oklch(0.64 0.20 27);
   --color-bans: oklch(0.64 0.20 27);
@@ -313,6 +341,7 @@
   --color-canti-hover: oklch(0.72 0.15 240);
   --color-canti-tenue: oklch(0.26 0.04 245);
   --color-canti-text: oklch(0.88 0.08 240);
+  --color-chord: oklch(0.72 0.16 240);
 
   --color-calendario: oklch(0.62 0.15 255);
   --color-calendario-hover: oklch(0.66 0.14 255);
@@ -322,6 +351,12 @@
   --color-neutral: oklch(0.70 0.015 260);
   --color-neutral-tenue: oklch(0.24 0.01 260);
   --color-neutral-text: oklch(0.88 0.01 260);
+
+  /* 6. Uscita = Verde Bosco Scout */
+  --color-uscita: oklch(0.68 0.15 145);
+  --color-uscita-hover: oklch(0.72 0.14 145);
+  --color-uscita-tenue: oklch(0.26 0.045 145);
+  --color-uscita-text: oklch(0.92 0.06 145);
 
   --color-targa-bg: oklch(1 0 0);
   --color-targa-border: oklch(0.90 0.005 80);

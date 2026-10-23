@@ -18,6 +18,8 @@ import {
   formatEventDateTimeRange,
   getEventCountdownText,
   getEventTypeInfo,
+  isEventoDataDaDefinire,
+  getCleanDescrizione,
 } from '../../lib/calendario';
 
 export interface EventoDetailSheetProps {
@@ -46,10 +48,12 @@ export function EventoDetailSheet({
 
   if (!isOpen || !evento) return null;
 
-  const dateBlock = getWallCalendarDate(evento.inizio);
+  const isTbd = isEventoDataDaDefinire(evento);
+  const dateBlock = getWallCalendarDate(evento.inizio, isTbd);
   const countdown = getEventCountdownText(evento);
   const timeRange = formatEventDateTimeRange(evento);
   const typeInfo = getEventTypeInfo(evento.tipo);
+  const cleanDesc = getCleanDescrizione(evento.descrizione);
 
   return (
     <BottomSheet
@@ -102,7 +106,7 @@ export function EventoDetailSheet({
         {/* Intestazione rapida: Blocco Data da Parete + Chip Tipo + Countdown */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
           <div
-            className={`calendar-date-block ${dateBlock.isToday ? 'calendar-date-block-today' : ''}`}
+            className={`calendar-date-block calendar-date-block-${evento.tipo || 'altro'} ${dateBlock.isToday ? 'calendar-date-block-today' : ''}`}
             aria-hidden="true"
           >
             <div className="calendar-date-month">{dateBlock.month}</div>
@@ -180,8 +184,39 @@ export function EventoDetailSheet({
           </div>
         )}
 
+        {/* Se data da concordare: blocco informativo e azione rapida per Admin */}
+        {isTbd && (
+          <div
+            style={{
+              padding: 'var(--space-3) var(--space-4)',
+              backgroundColor: 'var(--color-interactive-tenue)',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--color-interactive)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 'var(--space-3)',
+              flexWrap: 'wrap',
+            }}
+          >
+            <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-interactive)', fontWeight: 600 }}>
+              Questa riunione ha la data ancora da concordare. Puoi già aggiungere tutti i punti ODG in basso!
+            </div>
+            {isAdmin && (
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => onEdit?.(evento)}
+              >
+                <Icon name="calendar" size={14} />
+                <span>Fissa data e ora</span>
+              </Button>
+            )}
+          </div>
+        )}
+
         {/* Descrizione / Note */}
-        {evento.descrizione && (
+        {cleanDesc && (
           <div>
             <strong
               style={{
@@ -203,7 +238,7 @@ export function EventoDetailSheet({
                 wordBreak: 'break-word',
               }}
             >
-              {evento.descrizione}
+              {cleanDesc}
             </div>
           </div>
         )}

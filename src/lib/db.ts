@@ -406,65 +406,62 @@ export async function getDetailedCounts(): Promise<
  * Elementi aggiunti o aggiornati di recente per la schermata Home.
  */
 export async function getRecentItems(limit = 4): Promise<RecentItem[]> {
-  const [giochi, bans, canti, eventi] = await Promise.all([
+  const [giochi, bans, canti] = await Promise.all([
     getGiochi(false),
     getBans(false),
     getCanti(false),
-    getEventi(false),
   ]);
 
   const items: RecentItem[] = [];
-  const now = Date.now();
-  const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+
+  // Trova l'ultimo elemento inserito per ciascuna sezione
+  const firstGioco = giochi[0];
+  const latestGioco = firstGioco
+    ? giochi.reduce((max, g) => (new Date(g.created_at).getTime() > new Date(max.created_at).getTime() ? g : max), firstGioco)
+    : null;
+  const firstBan = bans[0];
+  const latestBan = firstBan
+    ? bans.reduce((max, b) => (new Date(b.created_at).getTime() > new Date(max.created_at).getTime() ? b : max), firstBan)
+    : null;
+  const firstCanto = canti[0];
+  const latestCanto = firstCanto
+    ? canti.reduce((max, c) => (new Date(c.created_at).getTime() > new Date(max.created_at).getTime() ? c : max), firstCanto)
+    : null;
 
   for (const g of giochi) {
-    const age = now - new Date(g.created_at).getTime();
     items.push({
       id: g.id,
       title: g.nome,
       subtitle: g.regole ? g.regole.slice(0, 45) + (g.regole.length > 45 ? '…' : '') : 'Regole e materiali',
       section: 'giochi',
       created_at: g.created_at,
-      isNew: age < SEVEN_DAYS_MS,
+      isNew: latestGioco !== null && g.id === latestGioco.id,
     });
   }
 
   for (const b of bans) {
-    const age = now - new Date(b.created_at).getTime();
     items.push({
       id: b.id,
       title: b.nome,
       subtitle: b.note_gesti || 'Fuoco di bivacco • Animazione',
       section: 'bans',
       created_at: b.created_at,
-      isNew: age < SEVEN_DAYS_MS,
+      isNew: latestBan !== null && b.id === latestBan.id,
     });
   }
 
   for (const c of canti) {
-    const age = now - new Date(c.created_at).getTime();
     items.push({
       id: c.id,
       title: c.titolo,
       subtitle: c.autore ? `Canzoniere • ${c.autore}` : 'Canzoniere • Con accordi',
       section: 'canti',
       created_at: c.created_at,
-      isNew: age < SEVEN_DAYS_MS,
+      isNew: latestCanto !== null && c.id === latestCanto.id,
     });
   }
 
-  for (const e of eventi) {
-    const age = now - new Date(e.created_at).getTime();
-    items.push({
-      id: e.id,
-      title: e.titolo,
-      subtitle: e.luogo ? `${e.tipo} • ${e.luogo}` : `${e.tipo}`,
-      section: 'calendario',
-      created_at: e.created_at,
-      isNew: age < SEVEN_DAYS_MS,
-      extraChip: e.tipo,
-    });
-  }
+  // ODG ed eventi sono esclusi dagli aggiunti di recente come da specifica
 
   // Ordina per data di creazione più recente
   items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());

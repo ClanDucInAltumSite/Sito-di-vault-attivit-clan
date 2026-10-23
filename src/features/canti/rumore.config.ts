@@ -11,7 +11,7 @@ export interface NoiseRule {
 export const NOISE_RULES: NoiseRule[] = [
   // Diritti e copyright
   {
-    pattern: /^(?:tutti\s+i\s+diritti\s+riservati|all\s+rights\s+reserved|copyright|©|\(c\))\b.*$/i,
+    pattern: /^(?:tutti\s+i\s+diritti\s+riservati|all\s+rights\s+reserved|copyright|©|\(c\))(?:\b|\s).*$/i,
     description: 'Dicitura copyright / diritti riservati',
   },
   {
@@ -63,6 +63,44 @@ export const NOISE_RULES: NoiseRule[] = [
   {
     pattern: /^[A-Za-zÀ-ÿ0-9\s_-]+(?:\s*[\/>»]\s*|\s+[|]\s+)[A-Za-zÀ-ÿ0-9\s_-]+.*$/i,
     description: 'Percorso di navigazione / breadcrumb',
+  },
+
+  // Disclaimer didattici e legali generici da siti di accordi
+  {
+    pattern: /accordi\s+100%\s+corretti/i,
+    description: 'Slogan promozionale spartito',
+  },
+  {
+    pattern: /generato\s+su\s+accordi/i,
+    description: 'Watermark generatore spartito',
+  },
+  {
+    pattern: /(?:uso|fini)\s+didattic[io]|interpretazioni\s+personali/i,
+    description: 'Clausola uso didattico / studio',
+  },
+  {
+    pattern: /non\s+è\s+tratto\s+da\s+alcuna\s+pubblicazione/i,
+    description: 'Clausola non estratto da pubblicazione',
+  },
+  {
+    pattern: /scopi\s+commerciali|pubblica\s+rappresentazione|pubblicazione\s+a\s+mezzo\s+stampa/i,
+    description: 'Clausola divieto commerciale',
+  },
+  {
+    pattern: /^(?:credits|autori?:|autore:|copyright:|publishing\b)/i,
+    description: 'Intestazione crediti o copyright',
+  },
+  {
+    pattern: /(?:universal\s+music|warner\s+chappell|sony\/atv|edizioni\s+musicali|music\s+union|publishing\s+ricordi)/i,
+    description: 'Casa editrice / publisher musicale',
+  },
+  {
+    pattern: /^by\s+[a-z0-9._-]+\.[a-z]{2,}/i,
+    description: 'Firma dominio web autore spartito',
+  },
+  {
+    pattern: /^>\s*indice$/i,
+    description: 'Link a indice canzoniere web',
   },
 ];
 

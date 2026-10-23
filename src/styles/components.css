@@ -386,7 +386,7 @@
 
 .calendar-date-month {
   width: 100%;
-  background-color: var(--color-ink);
+  background-color: var(--color-brand-purple, oklch(0.28 0.10 305));
   color: oklch(1 0 0);
   font-size: var(--font-size-2xs);
   font-weight: 700;
@@ -394,6 +394,11 @@
   letter-spacing: 0.05em;
   padding: 2px 0;
   line-height: 1.2;
+}
+
+[data-theme='dark'] .calendar-date-month {
+  background-color: var(--color-brand-purple, oklch(0.72 0.11 305));
+  color: oklch(0.14 0.03 305);
 }
 
 .calendar-date-day {
@@ -414,8 +419,70 @@
   line-height: 1;
 }
 
-.calendar-date-block-today .calendar-date-month {
+/* Varianti tipo evento per la schedina data calendario */
+.calendar-date-block-uscita {
+  border-color: var(--color-uscita);
+}
+.calendar-date-block-uscita .calendar-date-month {
+  background-color: var(--color-uscita);
+  color: oklch(1 0 0);
+}
+[data-theme='dark'] .calendar-date-block-uscita .calendar-date-month {
+  background-color: var(--color-uscita);
+  color: oklch(0.12 0.05 145);
+}
+
+.calendar-date-block-riunione {
+  border-color: var(--color-interactive);
+}
+.calendar-date-block-riunione .calendar-date-month {
+  background-color: var(--color-interactive);
+  color: oklch(1 0 0);
+}
+[data-theme='dark'] .calendar-date-block-riunione .calendar-date-month {
+  background-color: var(--color-interactive);
+  color: oklch(0.12 0.05 240);
+}
+
+.calendar-date-block-scadenza {
+  border-color: var(--color-bans);
+}
+.calendar-date-block-scadenza .calendar-date-month {
   background-color: var(--color-bans);
+  color: oklch(1 0 0);
+}
+[data-theme='dark'] .calendar-date-block-scadenza .calendar-date-month {
+  background-color: var(--color-bans);
+  color: oklch(1 0 0);
+}
+
+.calendar-date-block-evento {
+  border-color: var(--color-calendario);
+}
+.calendar-date-block-evento .calendar-date-month {
+  background-color: var(--color-calendario);
+  color: oklch(1 0 0);
+}
+[data-theme='dark'] .calendar-date-block-evento .calendar-date-month {
+  background-color: var(--color-calendario);
+  color: oklch(0.12 0.05 255);
+}
+
+.calendar-date-block-altro {
+  border-color: var(--color-neutral);
+}
+.calendar-date-block-altro .calendar-date-month {
+  background-color: var(--color-neutral);
+  color: oklch(1 0 0);
+}
+[data-theme='dark'] .calendar-date-block-altro .calendar-date-month {
+  background-color: var(--color-neutral);
+  color: oklch(0.14 0.02 260);
+}
+
+.calendar-date-block-today .calendar-date-month {
+  background-color: var(--color-bans) !important;
+  color: oklch(1 0 0) !important;
 }
 
 .calendar-date-block-today .calendar-date-day {
@@ -893,8 +960,8 @@
 }
 
 .event-chip-uscita {
-  background-color: var(--color-giochi-tenue);
-  color: var(--color-giochi-text);
+  background-color: var(--color-uscita-tenue);
+  color: var(--color-uscita-text);
 }
 
 .event-chip-scadenza {
@@ -914,23 +981,32 @@
 
 /* --- 12. CANTI: RITORNELLO & ACCORDI --- */
 .song-chorus-block {
-  border-left: none;
-  background-color: transparent;
-  padding: 0;
+  border-left: 3px solid var(--color-giochi);
+  background-color: var(--color-giochi-tenue);
+  padding: var(--space-2) var(--space-3);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
   margin: var(--space-3) 0;
 }
 
+.canzoniere-page .song-chorus-block {
+  border-left: none;
+  background-color: transparent;
+  padding: 0;
+}
+
 .song-chorus-label {
-  display: inline-block;
-  font-size: var(--font-size-2xs);
+  display: block;
+  font-family: 'Roboto', var(--font-sans), sans-serif;
+  font-size: 1em;
   font-weight: 700;
   text-transform: uppercase;
-  color: var(--color-giochi-text);
-  margin-bottom: var(--space-1);
+  color: var(--color-text);
+  margin-bottom: var(--space-2);
+  line-height: 1.5;
 }
 
 .song-chord {
-  color: var(--color-calendario);
+  color: var(--color-chord, var(--color-interactive));
   font-weight: 700;
   font-size: var(--font-size-sm);
   font-variant-numeric: tabular-nums;
@@ -964,8 +1040,10 @@
 }
 
 .ios-badge-nuovo {
-  background-color: var(--color-giochi);
-  color: var(--color-giochi-text);
+  background-color: var(--color-nuovo);
+  color: var(--color-nuovo-text);
+  font-weight: 700;
+  box-shadow: 0 1px 3px oklch(0 0 0 / 0.15);
 }
 
 .ios-badge-azzurro {
@@ -974,8 +1052,9 @@
 }
 
 .ios-badge-giallo {
-  background-color: var(--color-giochi);
-  color: var(--color-giochi-text);
+  background-color: var(--color-giochi-tenue);
+  color: var(--color-giochi-badge-text);
+  border: 1px solid oklch(0.80 0.18 78 / 0.30);
 }
 
 .ios-badge-rosso {
@@ -2084,7 +2163,7 @@ select.ios-form-input option {
 }
 
 .event-dot-riunione { background-color: var(--color-canti); }
-.event-dot-uscita { background-color: var(--color-giochi); }
+.event-dot-uscita { background-color: var(--color-uscita); }
 .event-dot-scadenza { background-color: var(--color-bans); }
 .event-dot-evento { background-color: var(--color-calendario); }
 .event-dot-altro { background-color: var(--color-text-tertiary); }
@@ -2509,7 +2588,7 @@ select.ios-form-input option {
   white-space: nowrap;
   font-family: 'Roboto', var(--font-sans), sans-serif;
   font-weight: 700;
-  color: var(--color-ink, oklch(0.28 0.10 305));
+  color: var(--color-chord, var(--color-interactive));
   line-height: 1.2;
   pointer-events: none;
 }
@@ -2517,8 +2596,16 @@ select.ios-form-input option {
 .canzoniere-chord-only-item {
   font-family: 'Roboto', var(--font-sans), sans-serif;
   font-weight: 700;
-  color: var(--color-ink, oklch(0.28 0.10 305));
+  color: var(--color-chord, var(--color-interactive));
   white-space: pre;
+  display: inline-block;
+}
+
+.canzoniere-chord-only-item .song-chord {
+  position: static !important;
+  display: inline-block;
+  font-weight: 700;
+  color: var(--color-chord, var(--color-interactive));
 }
 
 .canzoniere-line-empty {

@@ -16,6 +16,10 @@ import {
   formatEventDateTimeRange,
   getEventTypeInfo,
   countOpenOdgPoints,
+  isEventoDataDaDefinire,
+  getCleanDescrizione,
+  SENTINEL_DATA_DA_DEFINIRE,
+  TAG_DATA_DA_DEFINIRE,
 } from '../src/lib/calendario';
 import { Evento, OdgPunto, getDb, resetDbInstanceForTesting, getOdgPunti, upsertRecords } from '../src/lib/db';
 import { saveEvento, forwardUnfinishedOdgPunti, findNextFutureMeeting } from '../src/lib/admin_actions';
@@ -448,6 +452,131 @@ describe('Calendario & ODG - Test Logica di Dominio', () => {
       const pointsAfterRestore = await getOdgPunti(evento.id, false);
       expect(pointsAfterRestore.length).toBe(1);
       expect(pointsAfterRestore[0]?.id).toBe('odg_child_test');
+    });
+  });
+
+  describe('6. Gestione Riunione con Data da Concordare e ODG Anticipato', () => {
+    it('riconosce correttamente un evento con data da concordare', () => {
+      const normalEvent: Evento = {
+        id: 'ev_norm',
+        titolo: 'Riunione Ordinaria',
+        tipo: 'riunione',
+        inizio: '2026-10-25T20:45:00Z',
+        fine: null,
+        tutto_il_giorno: false,
+        luogo: 'Sede',
+        descrizione: 'Note varie',
+        responsabile: null,
+        cosa_portare: null,
+        created_at: '',
+        updated_at: '',
+        deleted_at: null,
+      };
+
+      const tbdEventByDate: Evento = {
+        ...normalEvent,
+        id: 'ev_tbd_1',
+        inizio: SENTINEL_DATA_DA_DEFINIRE,
+      };
+
+      const tbdEventByTag: Evento = {
+        ...normalEvent,
+        id: 'ev_tbd_2',
+        descrizione: `${TAG_DATA_DA_DEFINIRE} Verifica uscita precedente`,
+      };
+
+      expect(isEventoDataDaDefinire(normalEvent)).toBe(false);
+      expect(isEventoDataDaDefinire(tbdEventByDate)).toBe(true);
+      expect(isEventoDataDaDefinire(tbdEventByTag)).toBe(true);
+
+      expect(getCleanDescrizione(tbdEventByTag.descrizione)).toBe('Verifica uscita precedente');
+    });
+
+    it('non inserisce la riunione con data da definire nei giorni della griglia del mese', () => {
+      const tbdEvent: Evento = {
+        id: 'ev_tbd_month',
+        titolo: 'Prossima Riunione',
+        tipo: 'riunione',
+        inizio: SENTINEL_DATA_DA_DEFINIRE,
+        fine: null,
+        tutto_il_giorno: false,
+        luogo: 'Sede',
+        descrizione: TAG_DATA_DA_DEFINIRE,
+        responsabile: null,
+        cosa_portare: null,
+        created_at: '',
+        updated_at: '',
+        deleted_at: null,
+      };
+
+      expect(isEventOnDate(tbdEvent, '2026-10-25')).toBe(false);
+      expect(isEventOnDate(tbdEvent, '2099-12-31')).toBe(false);
+    });
+
+    it('formatta correttamente badge, countdown e date range per eventi da concordare', () => {
+      const tbdEvent: Evento = {
+        id: 'ev_tbd_format',
+        titolo: 'Prossima Riunione',
+        tipo: 'riunione',
+        inizio: SENTINEL_DATA_DA_DEFINIRE,
+        fine: null,
+        tutto_il_giorno: false,
+        luogo: 'Sede',
+        descrizione: TAG_DATA_DA_DEFINIRE,
+        responsabile: null,
+        cosa_portare: null,
+        created_at: '',
+        updated_at: '',
+        deleted_at: null,
+      };
+
+      const dateBlock = getWallCalendarDate(tbdEvent.inizio, true);
+      expect(dateBlock.month).toBe('ODG');
+      expect(dateBlock.day).toBe('?');
+      expect(dateBlock.weekday).toBe('DA DEFINIRE');
+
+      expect(getEventCountdownText(tbdEvent)).toBe('Data da concordare');
+      expect(formatEventDateTimeRange(tbdEvent)).toBe('Data e ora da concordare');
+    });
+
+    it('findNextFutureMeeting assegna prioritariamente la riunione aperta con data da definire', async () => {
+      const pastEvent: Evento = {
+        id: 'ev_past',
+        titolo: 'Riunione Passata',
+        tipo: 'riunione',
+        inizio: '2026-10-10T20:45:00Z',
+        fine: null,
+        tutto_il_giorno: false,
+        luogo: 'Sede',
+        descrizione: null,
+        responsabile: null,
+        cosa_portare: null,
+        created_at: '',
+        updated_at: '',
+        deleted_at: null,
+      };
+
+      const tbdEvent: Evento = {
+        id: 'ev_next_tbd',
+        titolo: 'Prossima Riunione (Data da concordare)',
+        tipo: 'riunione',
+        inizio: SENTINEL_DATA_DA_DEFINIRE,
+        fine: null,
+        tutto_il_giorno: false,
+        luogo: 'Sede',
+        descrizione: TAG_DATA_DA_DEFINIRE,
+        responsabile: null,
+        cosa_portare: null,
+        created_at: '',
+        updated_at: '',
+        deleted_at: null,
+      };
+
+      await upsertRecords('eventi', [pastEvent, tbdEvent]);
+
+      const target = await findNextFutureMeeting(pastEvent.inizio);
+      expect(target).not.toBeNull();
+      expect(target?.id).toBe('ev_next_tbd');
     });
   });
 });

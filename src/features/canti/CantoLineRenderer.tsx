@@ -6,6 +6,7 @@ export interface CantoLineData {
   chords: { chord: string; charIndex: number }[];
   isRitLabel?: boolean;
   isChordOnly?: boolean;
+  isComment?: boolean;
   hasChords: boolean;
 }
 
@@ -23,6 +24,19 @@ export interface CantoLineRendererProps {
  */
 export function parseCantoLine(lineStr: string): CantoLineData | null {
   const trimmed = lineStr.trim();
+
+  // Direttive commento {comment:...} o {c:...}
+  if (/^\{(?:comment|c):\s*(.*?)\}$/i.test(trimmed)) {
+    const match = trimmed.match(/^\{(?:comment|c):\s*(.*?)\}$/i);
+    const commentText = match && match[1] ? match[1].trim() : '';
+    if (!commentText) return null;
+    return {
+      lyrics: commentText,
+      chords: [],
+      isComment: true,
+      hasChords: false,
+    };
+  }
 
   // Riconosci ed elimina direttive {...} (invisibili in lettura, anteprima e stampa)
   if (/^\{[^}]*\}$/.test(trimmed)) {
@@ -103,7 +117,6 @@ export function CantoLineRenderer({
     if (!displayChords || chords.length <= 1 || !lineRef.current) return;
 
     const badges = lineRef.current.querySelectorAll<HTMLElement>('.canzoniere-chord-badge');
-    const anchors = lineRef.current.querySelectorAll<HTMLElement>('.canzoniere-chord-anchor');
     if (badges.length <= 1) return;
 
     const firstBadge = badges[0];
@@ -111,28 +124,24 @@ export function CantoLineRenderer({
     const computedFontSize = parseFloat(window.getComputedStyle(firstBadge).fontSize) || 14;
     const minGapPx = 0.4 * computedFontSize;
 
-    for (let i = 0; i < badges.length - 1; i++) {
-      const b1 = badges[i];
-      const b2 = badges[i + 1];
-      const a3 = anchors[i + 2];
-      if (!b1 || !b2) continue;
+    // Resetta prima eventuali trasformazioni precedenti
+    for (let i = 0; i < badges.length; i++) {
+      badges[i]!.style.transform = '';
+    }
 
-      const r1 = b1.getBoundingClientRect();
-      const r2 = b2.getBoundingClientRect();
+    let currentRightEdge = badges[0]!.getBoundingClientRect().right;
 
-      const overlap = r1.right + minGapPx - r2.left;
-      if (overlap > 0) {
-        let shift = overlap;
-        if (a3) {
-          const a3Rect = a3.getBoundingClientRect();
-          const maxAllowed = a3Rect.left - r2.left;
-          if (maxAllowed > 0) {
-            shift = Math.min(overlap, maxAllowed);
-          }
-        }
-        b2.style.transform = `translateX(${shift}px)`;
+    for (let i = 1; i < badges.length; i++) {
+      const b = badges[i]!;
+      const r = b.getBoundingClientRect();
+      const requiredLeft = currentRightEdge + minGapPx;
+
+      if (r.left < requiredLeft) {
+        const shift = requiredLeft - r.left;
+        b.style.transform = `translateX(${shift}px)`;
+        currentRightEdge = r.left + shift + r.width;
       } else {
-        b2.style.transform = '';
+        currentRightEdge = r.right;
       }
     }
   }, [data, showChords, transposeDelta]);
@@ -143,6 +152,23 @@ export function CantoLineRenderer({
       <div
         className={`canzoniere-rit-label ${className}`.trim()}
         style={{ fontSize: fontSize || undefined }}
+      >
+        {lyrics}
+      </div>
+    );
+  }
+
+  // 1b. Commento (es. intro: Do Fa Do Fa)
+  if (data.isComment) {
+    return (
+      <div
+        className={`canzoniere-comment-item ${className}`.trim()}
+        style={{
+          fontSize: fontSize || undefined,
+          fontStyle: 'italic',
+          color: 'var(--color-text-secondary)',
+          margin: '0.35rem 0',
+        }}
       >
         {lyrics}
       </div>
@@ -171,11 +197,10 @@ export function CantoLineRenderer({
         style={{ fontSize: fontSize || undefined }}
       >
         {chords.map((ch, idx) => (
-          <span key={idx} className="canzoniere-chord-only-item">
-            <strong className="canzoniere-chord-badge song-chord">
+          <span key={idx} className="canzoniere-chord-only-item" style={{ marginRight: '1rem', display: 'inline-block' }}>
+            <strong className="song-chord">
               {transposeChord(ch.chord, transposeDelta)}
             </strong>
-            {idx < chords.length - 1 ? '    ' : ''}
           </span>
         ))}
       </div>

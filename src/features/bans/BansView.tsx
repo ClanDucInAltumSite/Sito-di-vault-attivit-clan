@@ -20,8 +20,6 @@ import { DeleteConfirmModal } from '../../ui/DeleteConfirmModal';
 
 type SortOption = 'az' | 'za' | 'recenti' | 'vecchi';
 
-const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
-
 export function BansView() {
   const { isAdmin } = useAdmin();
   const [bans, setBans] = useState<Ban[]>([]);
@@ -137,6 +135,16 @@ export function BansView() {
   };
 
   const existingNames = useMemo(() => bans.map((b) => b.nome), [bans]);
+
+  const latestBanId = useMemo(() => {
+    if (!bans || bans.length === 0) return null;
+    const first = bans[0];
+    if (!first) return null;
+    return bans.reduce(
+      (max, b) => (new Date(b.created_at).getTime() > new Date(max.created_at).getTime() ? b : max),
+      first
+    )?.id ?? null;
+  }, [bans]);
 
   return (
     <div>
@@ -269,8 +277,7 @@ export function BansView() {
             footer="Tocca un ban per aprire il testo e la modalità lettura all'aperto."
           >
             {filteredList.map((ban) => {
-              const isNew =
-                Date.now() - new Date(ban.created_at).getTime() < SEVEN_DAYS_MS;
+              const isNew = ban.id === latestBanId;
 
               const subtitleText = ban.note_gesti
                 ? ban.note_gesti
@@ -296,7 +303,7 @@ export function BansView() {
                   }
                   trailing={
                     isNew ? (
-                      <Badge variant="giallo" size="sm">
+                      <Badge variant="nuovo" size="sm">
                         Nuovo
                       </Badge>
                     ) : null
@@ -317,6 +324,7 @@ export function BansView() {
       <BanDetailSheet
         ban={selectedBan}
         isOpen={isDetailOpen}
+        isNew={selectedBan ? selectedBan.id === latestBanId : false}
         onClose={() => setIsDetailOpen(false)}
         onEdit={(b) => {
           setIsDetailOpen(false);

@@ -18,6 +18,7 @@ export interface CantoDetailSheetProps {
   onEdit?: (canto: Canto) => void;
   onDelete?: (canto: Canto) => void;
   onUpdated?: () => void;
+  isNew?: boolean;
 }
 
 export function CantoDetailSheet({
@@ -28,13 +29,13 @@ export function CantoDetailSheet({
   onEdit,
   onDelete,
   onUpdated,
+  isNew = false,
 }: CantoDetailSheetProps) {
   const { isAdmin } = useAdmin();
   const [attachmentKey, setAttachmentKey] = useState(0);
 
   if (!isOpen || !canto) return null;
 
-  const isNew = Date.now() - new Date(canto.created_at).getTime() < 7 * 24 * 60 * 60 * 1000;
   const pageCount = calculatePageCount(canto.testo_chordpro);
 
   return (
@@ -88,14 +89,18 @@ export function CantoDetailSheet({
         {/* Chips informativa metadati musicali */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
           {isNew ? (
-            <Badge variant="giallo" size="sm">Nuovo</Badge>
+            <Badge variant="nuovo" size="sm">Nuovo</Badge>
           ) : null}
 
-          {canto.tonalita ? (
-            <Badge variant="azzurro" size="sm">
-              Tonalità: {canto.tonalita}
-            </Badge>
-          ) : null}
+          {canto.categoria === 'scout' && (
+            <Badge variant="azzurro" size="sm">Scout</Badge>
+          )}
+          {canto.categoria === 'chiesa' && (
+            <Badge variant="giallo" size="sm">Chiesa</Badge>
+          )}
+          {canto.categoria === 'esterni' && (
+            <Badge variant="rosso" size="sm">Esterni</Badge>
+          )}
 
           {(canto.bpm_testo || canto.tempo_bpm) ? (
             <Badge variant="neutral" size="sm">

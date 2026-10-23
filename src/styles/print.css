@@ -517,6 +517,12 @@
     font-weight: 700 !important;
     color: oklch(0 0 0) !important;
     white-space: pre !important;
+    display: inline-block !important;
+  }
+
+  .canzoniere-chord-only-item .song-chord {
+    position: static !important;
+    display: inline-block !important;
   }
 
   .canzoniere-line-empty {

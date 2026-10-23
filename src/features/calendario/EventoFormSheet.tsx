@@ -10,6 +10,7 @@ import { Icon } from '../../ui/Icon';
 import { I18N } from '../../lib/i18n';
 import { Evento, TipoEvento, getOdgPunti } from '../../lib/db';
 import { saveEvento, saveOdgPunto, softDeleteRecord } from '../../lib/admin_actions';
+import { isEventoDataDaDefinire, getCleanDescrizione, SENTINEL_DATA_DA_DEFINIRE, TAG_DATA_DA_DEFINIRE } from '../../lib/calendario';
 
 export interface EventoFormSheetProps {
   isOpen: boolean;
@@ -35,6 +36,7 @@ export function EventoFormSheet({
   const [inizio, setInizio] = useState('');
   const [fine, setFine] = useState('');
   const [oraFine, setOraFine] = useState('');
+  const [dataDaDefinire, setDataDaDefinire] = useState(false);
   const [tuttoIlGiorno, setTuttoIlGiorno] = useState(false);
   const [luogo, setLuogo] = useState('');
   const [cosaPortare, setCosaPortare] = useState('');
@@ -72,15 +74,17 @@ export function EventoFormSheet({
   useEffect(() => {
     if (isOpen) {
       if (initialEvento) {
+        const isTbd = isEventoDataDaDefinire(initialEvento);
+        setDataDaDefinire(isTbd);
         setTitolo(initialEvento.titolo);
         setTipo(initialEvento.tipo);
         setTuttoIlGiorno(initialEvento.tutto_il_giorno);
-        setInizio(toInputDate(initialEvento.inizio, initialEvento.tutto_il_giorno));
-        setFine(toInputDate(initialEvento.fine, initialEvento.tutto_il_giorno));
-        setOraFine(toInputTime(initialEvento.fine));
+        setInizio(isTbd ? '' : toInputDate(initialEvento.inizio, initialEvento.tutto_il_giorno));
+        setFine(isTbd ? '' : toInputDate(initialEvento.fine, initialEvento.tutto_il_giorno));
+        setOraFine(isTbd ? '' : toInputTime(initialEvento.fine));
         setLuogo(initialEvento.luogo || (initialEvento.tipo === 'riunione' ? 'Sede' : ''));
         setCosaPortare(initialEvento.cosa_portare || '');
-        setDescrizione(initialEvento.descrizione || '');
+        setDescrizione(getCleanDescrizione(initialEvento.descrizione));
         setDeletedOdgIds([]);
 
         // Se è riunione, carica gli ODG esistenti per consentire modifiche contestuali
@@ -99,6 +103,7 @@ export function EventoFormSheet({
         defaultDate.setHours(20, 45, 0, 0);
         setTitolo('');
         setTipo('riunione');
+        setDataDaDefinire(false);
         setTuttoIlGiorno(false);
         setInizio(toInputDate(defaultDate.toISOString(), false));
         setFine('');
@@ -151,7 +156,7 @@ export function EventoFormSheet({
       setErrorMessage(I18N.calendario.titolo + ' è obbligatorio.');
       return;
     }
-    if (!inizio) {
+    if (!dataDaDefinire && !inizio) {
       setErrorMessage(I18N.calendario.inizio + ' è obbligatoria.');
       return;
     }
@@ -160,7 +165,10 @@ export function EventoFormSheet({
     let inizioIso: string;
     let fineIso: string | null = null;
 
-    if (tuttoIlGiorno) {
+    if (dataDaDefinire) {
+      inizioIso = SENTINEL_DATA_DA_DEFINIRE;
+      fineIso = null;
+    } else if (tuttoIlGiorno) {
       inizioIso = new Date(`${inizio}T00:00:00`).toISOString();
       if (tipo === 'scadenza') {
         fineIso = null;
@@ -204,17 +212,22 @@ export function EventoFormSheet({
     setErrorMessage(null);
 
     try {
+      let finalDesc = descrizione.trim();
+      if (dataDaDefinire) {
+        finalDesc = `${TAG_DATA_DA_DEFINIRE} ${finalDesc}`.trim();
+      }
+
       const saved = await saveEvento({
         id: initialEvento?.id,
         titolo: titolo.trim(),
         tipo,
         inizio: inizioIso,
         fine: fineIso,
-        tutto_il_giorno: tuttoIlGiorno,
+        tutto_il_giorno: dataDaDefinire ? false : tuttoIlGiorno,
         luogo: luogo.trim(),
         responsabile: '', // Campo responsabile rimosso dai requisiti utente
         cosa_portare: cosaPortare.trim(),
-        descrizione: descrizione.trim(),
+        descrizione: finalDesc,
       });
 
       // Se è una riunione, salva i punti ODG aggiunti o modificati
@@ -266,7 +279,7 @@ export function EventoFormSheet({
             variant="primary"
             onClick={handleSave}
             isLoading={isSaving}
-            disabled={!titolo.trim() || !inizio || isSaving}
+            disabled={!titolo.trim() || (!dataDaDefinire && !inizio) || isSaving}
           >
             {I18N.dialogs.salva}
           </Button>
@@ -355,28 +368,84 @@ export function EventoFormSheet({
           </select>
         </div>
 
-        {/* Toggle Tutto il giorno */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-          <input
-            id="evento-allday"
-            type="checkbox"
-            checked={tuttoIlGiorno}
-            onChange={(e) => {
-              const checked = (e.target as HTMLInputElement).checked;
-              setTuttoIlGiorno(checked);
-              if (inizio) setInizio(toInputDate(new Date(inizio).toISOString(), checked));
-              if (fine) setFine(toInputDate(new Date(fine).toISOString(), checked));
+        {/* Opzione Data da Concordare (Specifica per Riunioni Clan) */}
+        {tipo === 'riunione' && (
+          <div
+            style={{
+              padding: 'var(--space-3)',
+              backgroundColor: dataDaDefinire ? 'var(--color-interactive-tenue)' : 'var(--color-surface-hover)',
+              borderRadius: 'var(--radius-sm)',
+              border: `1px solid ${dataDaDefinire ? 'var(--color-interactive)' : 'var(--color-border)'}`,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 'var(--space-1)',
             }}
-            disabled={isSaving}
-            style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-          />
-          <label htmlFor="evento-allday" style={{ fontSize: 'var(--font-size-sm)', cursor: 'pointer' }}>
-            {I18N.calendario.tuttoIlGiorno}
-          </label>
-        </div>
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+              <input
+                id="evento-data-da-definire"
+                type="checkbox"
+                checked={dataDaDefinire}
+                onChange={(e) => {
+                  const checked = (e.target as HTMLInputElement).checked;
+                  setDataDaDefinire(checked);
+                  if (checked && !titolo.trim()) {
+                    setTitolo('Prossima Riunione');
+                  }
+                }}
+                disabled={isSaving}
+                style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+              />
+              <label htmlFor="evento-data-da-definire" style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600, cursor: 'pointer', color: 'var(--color-ink)' }}>
+                Data ancora da concordare (prepara subito l'ODG)
+              </label>
+            </div>
+            <span style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-secondary)', paddingLeft: '26px' }}>
+              Ideale per scrivere i punti a fine riunione prima di aver fissato la data del prossimo incontro. Resterà in evidenza in cima al calendario.
+            </span>
+          </div>
+        )}
+
+        {/* Toggle Tutto il giorno (solo se la data è definita) */}
+        {!dataDaDefinire && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+            <input
+              id="evento-allday"
+              type="checkbox"
+              checked={tuttoIlGiorno}
+              onChange={(e) => {
+                const checked = (e.target as HTMLInputElement).checked;
+                setTuttoIlGiorno(checked);
+                if (inizio) setInizio(toInputDate(new Date(inizio).toISOString(), checked));
+                if (fine) setFine(toInputDate(new Date(fine).toISOString(), checked));
+              }}
+              disabled={isSaving}
+              style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+            />
+            <label htmlFor="evento-allday" style={{ fontSize: 'var(--font-size-sm)', cursor: 'pointer' }}>
+              {I18N.calendario.tuttoIlGiorno}
+            </label>
+          </div>
+        )}
 
         {/* SEZIONE DATE E ORA DINAMICA PER TIPOLOGIA */}
-        {tipo === 'riunione' ? (
+        {tipo === 'riunione' && dataDaDefinire ? (
+          <div
+            style={{
+              padding: 'var(--space-3)',
+              backgroundColor: 'var(--color-surface-hover)',
+              borderRadius: 'var(--radius-sm)',
+              fontSize: 'var(--font-size-xs)',
+              color: 'var(--color-text-secondary)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--space-2)',
+            }}
+          >
+            <Icon name="info" size={16} />
+            <span>Nessuna data richiesta ora. Inserisci i punti ODG in basso: resteranno pronti finché non deciderete la data.</span>
+          </div>
+        ) : tipo === 'riunione' ? (
           /* RIUNIONE: Data e ora inizio + solo ora fine */
           <div style={{ display: 'grid', gridTemplateColumns: tuttoIlGiorno ? '1fr' : '1.3fr 1fr', gap: 'var(--space-3)' }}>
             <div>
