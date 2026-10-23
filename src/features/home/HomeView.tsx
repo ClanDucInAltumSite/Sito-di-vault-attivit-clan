@@ -8,7 +8,7 @@ import { Badge } from '../../ui/Badge';
 import { BrandLogo } from '../../ui/BrandLogo';
 import { HeaderBanner } from '../../ui/HeaderBanner';
 import { SectionIcon } from '../../ui/SectionIcon';
-import { CompassSync } from '../../ui/ScoutMotifs';
+import { TheTrail, CompassSync } from '../../ui/ScoutMotifs';
 import { Icon } from '../../ui/Icon';
 import { PwaInstallGuide } from '../../ui/PwaInstallGuide';
 import {
@@ -102,6 +102,7 @@ export function HomeView() {
           <p className="home-subtitle-display">
             {I18N.app.subtitle}
           </p>
+          <TheTrail className="scout-trail-home" />
         </header>
 
         {/* 4. GUIDA DI INSTALLAZIONE PWA AL PRIMO UTILIZZO (DISMISSIBILE) */}
