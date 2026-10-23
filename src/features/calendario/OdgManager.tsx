@@ -43,8 +43,11 @@ export function OdgManager({ evento, isAdmin, onCreateMeeting, onChanged, initia
   };
 
   useEffect(() => {
+    if (initialPoints && initialPoints.length > 0) {
+      setPunti(initialPoints);
+    }
     loadPoints();
-  }, [evento.id]);
+  }, [evento.id, initialPoints]);
 
   const openCount = countOpenOdgPoints(punti);
 
