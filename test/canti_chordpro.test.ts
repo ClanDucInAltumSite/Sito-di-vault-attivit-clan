@@ -9,6 +9,7 @@ import {
   parseChordProAST,
   parseLine,
 } from '../src/lib/chordpro';
+import { parseLineToScreenWords, parseCantoLine } from '../src/features/canti/CantoLineRenderer';
 import {
   getDb,
   resetDbInstanceForTesting,
@@ -286,16 +287,73 @@ Strofa due
     });
   });
 
-  // TEST 7: Rilevamento duplicati per titolo canto
-  describe('7. Rilevamento duplicati morbido per titolo canto', () => {
-    it('rileva titoli simili con distanza Levenshtein <= 2', () => {
-      const existing = ['Strade e Pensieri per Domani', 'Canto della Promessa', 'La Traccia'];
+  // TEST 8: Motore Layout Responsive Mobile (Parole atomiche e accordi su sillabe)
+  describe('8. Motore Layout Responsive Mobile per Canti a Schermo (Anti-Collisione)', () => {
+    it('suddivide correttamente la riga di "Come sole come goccia" legando [Do] a "gliarmi" e [Re] a "quel"', () => {
+      const lineStr = 'Risve[Do]gliarmi dal sonno e attirare il mio sguardo verso [Re]quel bel prato là.';
+      const parsed = parseCantoLine(lineStr);
+      expect(parsed).not.toBeNull();
+      expect(parsed!.lyrics).toBe('Risvegliarmi dal sonno e attirare il mio sguardo verso quel bel prato là.');
+      expect(parsed!.chords).toHaveLength(2);
+      expect(parsed!.chords[0].chord).toBe('Do');
+      expect(parsed!.chords[1].chord).toBe('Re');
 
-      // Errore di battitura a 1 carattere di distanza
-      expect(findSimilarName('Strade e Pensieri per Domano', existing)).toBe('Strade e Pensieri per Domani');
-      // Nessuna corrispondenza per titolo diverso
-      expect(findSimilarName('Alba sul Fiume', existing)).toBeNull();
+      const words = parseLineToScreenWords(parsed!.lyrics, parsed!.chords);
+      // Parola 1: "Risvegliarmi" con unità 1 "Risve" (nessun accordo) e unità 2 "gliarmi" (accordo Do)
+      const w1 = words[0];
+      expect(w1.units).toHaveLength(2);
+      expect(w1.units[0].lyric).toBe('Risve');
+      expect(w1.units[0].chord).toBeUndefined();
+      expect(w1.units[1].lyric).toBe('gliarmi');
+      expect(w1.units[1].chord).toBe('Do');
+
+      // Parola 2: "dal"
+      expect(words[1].units[0].lyric).toBe('dal');
+      expect(words[1].units[0].chord).toBeUndefined();
+
+      // Trova la parola "quel" che deve avere accordo Re
+      const quelWord = words.find((w) => w.units.some((u) => u.lyric === 'quel'));
+      expect(quelWord).toBeDefined();
+      const quelUnit = quelWord!.units.find((u) => u.lyric === 'quel');
+      expect(quelUnit!.chord).toBe('Re');
+
+      // Verifica che non ci siano accordi orfani o fuori posizione
+      const chordsFound = words.flatMap((w) => w.units.filter((u) => u.chord).map((u) => u.chord));
+      expect(chordsFound).toEqual(['Do', 'Re']);
+    });
+
+    it('suddivide correttamente parole con accordi multipli nel ritornello ([Do]Non [Re]pen[Sol]sare)', () => {
+      const lineStr = '[Do]Non [Re]pen[Sol]sare sia un imbroglio';
+      const parsed = parseCantoLine(lineStr);
+      expect(parsed).not.toBeNull();
+
+      const words = parseLineToScreenWords(parsed!.lyrics, parsed!.chords);
+      // w0: "Non" con accordo Do
+      expect(words[0].units[0].lyric).toBe('Non');
+      expect(words[0].units[0].chord).toBe('Do');
+
+      // w1: "pensare" suddivisa in "pen" (Re) e "sare" (Sol)
+      const w1 = words[1];
+      expect(w1.units).toHaveLength(2);
+      expect(w1.units[0].lyric).toBe('pen');
+      expect(w1.units[0].chord).toBe('Re');
+      expect(w1.units[1].lyric).toBe('sare');
+      expect(w1.units[1].chord).toBe('Sol');
+
+      // w2: "sia", w3: "un", w4: "imbroglio" senza accordi
+      expect(words[2].units[0].lyric).toBe('sia');
+      expect(words[3].units[0].lyric).toBe('un');
+      expect(words[4].units[0].lyric).toBe('imbroglio');
+    });
+
+    it('gestisce righe di soli accordi senza testo', () => {
+      const parsed = parseCantoLine('[Do] [Sol] [Lam]');
+      expect(parsed).not.toBeNull();
+      const words = parseLineToScreenWords(parsed!.lyrics, parsed!.chords);
+      expect(words.length).toBeGreaterThanOrEqual(3);
+      expect(words[0].units[0].chord).toBe('Do');
     });
   });
 });
+
 

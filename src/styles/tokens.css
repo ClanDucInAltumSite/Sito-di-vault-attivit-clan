@@ -43,6 +43,7 @@
 }
 
 :root {
+  color-scheme: light;
   /* --- PALETTE COLORI IN OKLCH (TEMA CHIARO) --- */
   /* Campionamento reale dal logo (#462679 / #00BDFF / #FDC500 / #E8442D) */
 
@@ -206,6 +207,7 @@
 /* --- TEMA SCURO (DARK MODE) CON GRIGIO-VIOLA PROFONDO --- */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
+    color-scheme: dark;
     /* Sfondo grigio-viola molto profondo (tinta del marchio a bassissima saturazione) */
     --color-bg: oklch(0.14 0.015 305);
     --color-surface: oklch(0.20 0.02 305);
@@ -294,6 +296,7 @@
 }
 
 :root[data-theme="dark"] {
+  color-scheme: dark;
   --color-bg: oklch(0.14 0.015 305);
   --color-surface: oklch(0.20 0.02 305);
   --color-surface-hover: oklch(0.24 0.02 305);

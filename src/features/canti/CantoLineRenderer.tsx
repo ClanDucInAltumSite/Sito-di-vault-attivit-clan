@@ -83,17 +83,127 @@ export function parseCantoLine(lineStr: string): CantoLineData | null {
   };
 }
 
+export interface ScreenUnit {
+  chord?: string;
+  lyric: string;
+}
+
+export interface ScreenWord {
+  units: ScreenUnit[];
+}
+
+/**
+ * Converte riga con accordi in parole atomiche (.canto-word) composte da sillabe (.canto-unit).
+ * Ogni parola si sposta a capo come blocco unico, con accordi disposti stabilmente sopra le sillabe.
+ * Questo elimina qualsiasi possibilità di sovrapposizione tra accordi e testo su schermi stretti/mobile.
+ */
+export function parseLineToScreenWords(
+  lyrics: string,
+  chords: { chord: string; charIndex: number }[],
+  transposeDelta = 0
+): ScreenWord[] {
+  if (!lyrics && chords.length === 0) {
+    return [];
+  }
+
+  // Se non ci sono testi ma solo accordi
+  if (!lyrics.trim() && chords.length > 0) {
+    return chords.map((ch) => ({
+      units: [{ chord: transposeChord(ch.chord, transposeDelta), lyric: '\u00A0' }],
+    }));
+  }
+
+  // Mappa gli accordi per charIndex
+  const chordMap = new Map<number, string[]>();
+  for (const c of chords) {
+    const list = chordMap.get(c.charIndex) || [];
+    list.push(transposeChord(c.chord, transposeDelta));
+    chordMap.set(c.charIndex, list);
+  }
+
+  const isChordAt = (idx: number) => chordMap.has(idx) && (chordMap.get(idx)?.length || 0) > 0;
+
+  const words: ScreenWord[] = [];
+  let i = 0;
+
+  while (i < lyrics.length) {
+    // Gestione spazi tra parole
+    if (lyrics[i] === ' ') {
+      // Se c'è un accordo ancorato sullo spazio stesso
+      if (isChordAt(i)) {
+        const chordsHere = chordMap.get(i)!;
+        for (const ch of chordsHere) {
+          words.push({ units: [{ chord: ch, lyric: '\u00A0' }] });
+        }
+      }
+      i++;
+      continue;
+    }
+
+    // Inizio di una parola (fino al prossimo spazio o fine riga)
+    const wordStart = i;
+    while (i < lyrics.length && lyrics[i] !== ' ') {
+      i++;
+    }
+    const wordEnd = i;
+
+    // Accordi che cadono all'interno della parola
+    const wordChordIndices: number[] = [];
+    for (let pos = wordStart; pos < wordEnd; pos++) {
+      if (isChordAt(pos)) {
+        wordChordIndices.push(pos);
+      }
+    }
+
+    if (wordChordIndices.length === 0) {
+      // Parola priva di accordi interni
+      words.push({
+        units: [{ lyric: lyrics.slice(wordStart, wordEnd) }],
+      });
+    } else {
+      // Suddivisione della parola in sillabe in corrispondenza degli accordi
+      const cutPoints = Array.from(new Set([wordStart, ...wordChordIndices, wordEnd])).sort((a, b) => a - b);
+      const wordUnits: ScreenUnit[] = [];
+
+      for (let p = 0; p < cutPoints.length - 1; p++) {
+        const pStart = cutPoints[p]!;
+        const pEnd = cutPoints[p + 1]!;
+        const sylText = lyrics.slice(pStart, pEnd);
+        const chordsHere = chordMap.get(pStart);
+
+        if (chordsHere && chordsHere.length > 0) {
+          for (let c = 0; c < chordsHere.length - 1; c++) {
+            wordUnits.push({ chord: chordsHere[c], lyric: '' });
+          }
+          wordUnits.push({ chord: chordsHere[chordsHere.length - 1], lyric: sylText });
+        } else {
+          wordUnits.push({ lyric: sylText });
+        }
+      }
+
+      words.push({ units: wordUnits });
+    }
+  }
+
+  // Accordi alla fine esatta della riga
+  if (isChordAt(lyrics.length)) {
+    const endChords = chordMap.get(lyrics.length)!;
+    for (const ch of endChords) {
+      words.push({ units: [{ chord: ch, lyric: '\u00A0' }] });
+    }
+  }
+
+  return words;
+}
+
 /**
  * Componente universale per la resa visiva delle righe di un canto con accordi.
  * Utilizzato identicamente in Stampa A4, Modalità Lettura e Anteprima Editor.
  * 
  * Regole tipografiche:
- * - Accordi posizionati sopra il testo con ancore a larghezza zero (inline-block, width: 0).
- * - Il testo scorre in modo 100% naturale con kerning reale senza alcuno spostamento.
- * - Le righe senza accordi non riservano spazio sopra (line-height 1.5 normale).
- * - Le righe con accordi hanno margin-top: 1.5em (= 16.5 pt su font 11 pt).
- * - Risoluzione collisioni orizzontali: se due accordi distano < 0.4 em, sposta il successivo
- *   a destra del minimo necessario senza superare il successivo ancoraggio.
+ * - Lettura a schermo / Mobile: modello flex-wrap con parole atomiche (.canto-word) e sillabe (.canto-unit).
+ *   Gli accordi risiedono nel flusso naturale sopra le sillabe e non collidono MAI col testo quando la riga va a capo.
+ * - Stampa A4: modello con ancore a larghezza zero per garantire larghezze millimetriche fisse nelle 2 colonne.
  */
 export function CantoLineRenderer({
   line,
@@ -112,9 +222,9 @@ export function CantoLineRenderer({
   const { lyrics, chords, isRitLabel, isChordOnly, hasChords } = data;
   const displayChords = showChords && hasChords;
 
-  // Collision detection e prevenzione sovrapposizione accordi (< 0.4 em)
+  // Collision detection e prevenzione sovrapposizione accordi (< 0.4 em) solo per Stampa A4
   useLayoutEffect(() => {
-    if (!displayChords || chords.length <= 1 || !lineRef.current) return;
+    if (!isPrint || !displayChords || chords.length <= 1 || !lineRef.current) return;
 
     const badges = lineRef.current.querySelectorAll<HTMLElement>('.canzoniere-chord-badge');
     if (badges.length <= 1) return;
@@ -144,7 +254,7 @@ export function CantoLineRenderer({
         currentRightEdge = r.right;
       }
     }
-  }, [data, showChords, transposeDelta]);
+  }, [data, showChords, transposeDelta, isPrint]);
 
   // 1. Etichetta ritornello (RIT.)
   if (isRitLabel) {
@@ -219,7 +329,36 @@ export function CantoLineRenderer({
     );
   }
 
-  // 5. Riga con accordi ancorati a zero-width sopra le sillabe
+  // 5A. MODALITÀ LETTURA A SCHERMO / MOBILE (Responsive Flexbox): Chords sopra le parole senza sovrapposizioni
+  if (!isPrint) {
+    const words = parseLineToScreenWords(lyrics, chords, transposeDelta);
+    return (
+      <div
+        className={`canzoniere-line-item canto-screen-line has-chords ${className}`.trim()}
+        style={{ fontSize: fontSize || undefined }}
+      >
+        {words.map((w, wIdx) => (
+          <span key={wIdx} className="canto-word">
+            {w.units.map((u, uIdx) => (
+              <span key={uIdx} className="canto-unit">
+                <span
+                  className={`canto-unit-chord song-chord ${u.chord ? 'canzoniere-chord-badge' : ''}`.trim()}
+                  aria-hidden={!u.chord}
+                >
+                  {u.chord || '\u00A0'}
+                </span>
+                <span className="canto-unit-lyric">
+                  {u.lyric || '\u00A0'}
+                </span>
+              </span>
+            ))}
+          </span>
+        ))}
+      </div>
+    );
+  }
+
+  // 5B. MODALITÀ STAMPA A4: Riga con accordi ancorati a zero-width per colonne fisse
   const segments: any[] = [];
   let lastChar = 0;
 
@@ -258,7 +397,7 @@ export function CantoLineRenderer({
   return (
     <div
       ref={lineRef}
-      className={`canzoniere-line-item has-chords ${isPrint ? 'is-print' : ''} ${className}`.trim()}
+      className={`canzoniere-line-item has-chords is-print ${className}`.trim()}
       style={{ fontSize: fontSize || undefined }}
     >
       {segments}

@@ -72,6 +72,50 @@ export function CantoReadingMode({
     setIsMetronomePlaying(false);
   }, [canto?.id, canto?.tempo_bpm]);
 
+  // Helper di chiusura
+  const handleClose = () => {
+    onClose();
+  };
+
+  // Gestione Cronologia Browser / Tasto Indietro Fisico Android & Gesture
+  useEffect(() => {
+    if (!isOpen || !canto) return;
+
+    // Registra record nella cronologia affinché il tasto indietro
+    // fisico di Android o la gesture chiudano la lettura senza uscire dall'app
+    window.history.pushState({ cantoReadingModal: true, cantoId: canto.id }, '');
+
+    const handlePopState = () => {
+      onClose();
+    };
+
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      if (window.history.state?.cantoReadingModal) {
+        window.history.replaceState(null, '');
+      }
+    };
+  }, [isOpen, canto?.id, onClose]);
+
+  // Gestione dinamica colore barra di sistema Android/Chrome
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const metas = Array.from(document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]'));
+    const previous = metas.map((m) => ({ el: m, content: m.getAttribute('content') || '' }));
+
+    // Colora la barra di navigazione con un tono scuro per evitare tasti bianchi su sfondo bianco
+    metas.forEach((m) => m.setAttribute('content', '#140a1f'));
+
+    return () => {
+      previous.forEach(({ el, content }) => {
+        el.setAttribute('content', content);
+      });
+    };
+  }, [isOpen]);
+
   // Gestione WakeLock, overflow del body ed Escape
   useEffect(() => {
     if (!isOpen || !canto) return;
@@ -90,7 +134,7 @@ export function CantoReadingMode({
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose();
+        handleClose();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -387,6 +431,7 @@ export function CantoReadingMode({
         flexDirection: 'column',
         overflow: 'hidden',
         isolation: 'isolate',
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
       }}
     >
       {/* Top Bar ad alto contrasto con strumenti per la musica */}
@@ -414,7 +459,7 @@ export function CantoReadingMode({
           {/* Tasto INDIETRO con indicazione chiara e freccia */}
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             className="ios-btn ios-btn-secondary ios-sheet-close-btn"
             style={{
               display: 'inline-flex',
@@ -785,7 +830,7 @@ export function CantoReadingMode({
         style={{
           flex: 1,
           overflowY: 'auto',
-          padding: `var(--space-6) var(--space-4) ${isAutoScrolling ? 'calc(var(--space-8) + 80px)' : 'var(--space-6)'}`,
+          padding: `var(--space-6) var(--space-4) calc(var(--space-8) + env(safe-area-inset-bottom, 0px) + ${isAutoScrolling ? '80px' : '40px'})`,
           maxWidth: '850px',
           margin: '0 auto',
           width: '100%',

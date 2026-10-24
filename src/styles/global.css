@@ -16,6 +16,7 @@ html {
   background-color: var(--color-bg);
   color: var(--color-text);
   overflow-x: hidden;
+  color-scheme: light dark;
 }
 
 body {
@@ -31,6 +32,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 #app {

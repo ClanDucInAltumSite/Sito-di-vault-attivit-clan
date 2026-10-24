@@ -409,6 +409,7 @@ export function ChordProRenderer({
               line: songLineToCantoLineData(line),
               showChords,
               transposeDelta,
+              isPrint: false,
             });
           }),
         ]

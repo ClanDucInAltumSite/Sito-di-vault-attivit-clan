@@ -2622,5 +2622,55 @@ select.ios-form-input option {
   margin-bottom: 0;
 }
 
+/* --- CANTO SCREEN READING MODE (RESPONSIVE CHORD-OVER-LYRIC) --- */
+.canto-screen-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  margin-top: var(--space-2);
+  margin-bottom: var(--space-2);
+  line-height: 1;
+}
 
+.canto-word {
+  display: inline-flex;
+  white-space: nowrap;
+  vertical-align: bottom;
+  margin-right: 0.35em;
+  margin-bottom: 0.25em;
+}
 
+.canto-unit {
+  display: inline-flex;
+  flex-direction: column;
+  vertical-align: bottom;
+  position: relative;
+  white-space: pre;
+}
+
+.canto-unit-chord {
+  font-family: 'Roboto', var(--font-sans), sans-serif;
+  font-weight: 700;
+  font-size: 0.85em;
+  line-height: 1.25;
+  color: var(--color-chord, var(--color-interactive));
+  min-height: 1.25em;
+  white-space: nowrap;
+  user-select: none;
+  padding-right: 0.12em;
+}
+
+.canto-unit-lyric {
+  font-family: inherit;
+  font-size: 1em;
+  line-height: 1.45;
+  color: var(--color-text);
+  white-space: pre;
+}
+
+.canto-screen-line .canzoniere-chord-badge {
+  position: static !important;
+  display: block;
+  bottom: auto !important;
+  left: auto !important;
+}
