@@ -93,12 +93,25 @@ export function CantiView() {
       }
     }
 
-    // Aggiunge tutte le canzoni di default predefinite se non ancora presenti
+    // Aggiunge o aggiorna tutte le canzoni di default predefinite
     const toSeed: Canto[] = [];
     for (const defSong of DEFAULT_PARSED_SONGS) {
-      if (!enriched.some((c) => c.id === defSong.id || c.titolo.toLowerCase() === defSong.titolo.toLowerCase())) {
+      const existingIdx = enriched.findIndex((c) => c.id === defSong.id || c.titolo.toLowerCase() === defSong.titolo.toLowerCase());
+      if (existingIdx === -1) {
         enriched.push(defSong);
         toSeed.push(defSong);
+      } else {
+        const existing = enriched[existingIdx];
+        if (existing && existing.testo_chordpro.length < defSong.testo_chordpro.length) {
+          enriched[existingIdx] = {
+            ...existing,
+            ...defSong,
+            id: existing.id,
+            created_at: existing.created_at,
+            updated_at: new Date().toISOString(),
+          };
+          toSeed.push(enriched[existingIdx]);
+        }
       }
     }
 

@@ -93,8 +93,14 @@ export function StampaView() {
           return c;
         });
         for (const defSong of DEFAULT_PARSED_SONGS) {
-          if (!enrichedCanti.some((c) => c.id === defSong.id || c.titolo.toLowerCase() === defSong.titolo.toLowerCase())) {
+          const existingIdx = enrichedCanti.findIndex((c) => c.id === defSong.id || c.titolo.toLowerCase() === defSong.titolo.toLowerCase());
+          if (existingIdx === -1) {
             enrichedCanti.push(defSong as any);
+          } else {
+            const existing = enrichedCanti[existingIdx];
+            if (existing && existing.testo_chordpro.length < defSong.testo_chordpro.length) {
+              enrichedCanti[existingIdx] = { ...existing, ...defSong };
+            }
           }
         }
         enrichedCanti.sort((a, b) => a.titolo.localeCompare(b.titolo, 'it'));

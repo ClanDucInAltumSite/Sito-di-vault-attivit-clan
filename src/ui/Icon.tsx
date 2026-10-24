@@ -42,7 +42,10 @@ export type IconName =
   | 'x'
   | 'calendar'
   | 'print'
-  | 'warning';
+  | 'warning'
+  | 'play'
+  | 'pause'
+  | 'rotate-ccw';
 
 export interface IconProps extends JSX.SVGAttributes<SVGSVGElement> {
   name: IconName;
@@ -378,6 +381,26 @@ export function Icon({
         <svg {...commonProps}>
           <line x1="18" y1="6" x2="6" y2="18" />
           <line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
+      );
+    case 'play':
+      return (
+        <svg {...commonProps}>
+          <polygon points="5 3 19 12 5 21 5 3" />
+        </svg>
+      );
+    case 'pause':
+      return (
+        <svg {...commonProps}>
+          <rect x="6" y="4" width="4" height="16" rx="1" />
+          <rect x="14" y="4" width="4" height="16" rx="1" />
+        </svg>
+      );
+    case 'rotate-ccw':
+      return (
+        <svg {...commonProps}>
+          <polyline points="1 4 1 10 7 10" />
+          <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
         </svg>
       );
     default:

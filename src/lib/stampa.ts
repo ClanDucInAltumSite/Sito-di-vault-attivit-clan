@@ -270,7 +270,10 @@ export function measureSongPageOverflow(
 
   for (const section of ast.sections) {
     const sectionEl = document.createElement('div');
-    if (section.type === 'chorus') {
+    const isChorus = section.type === 'chorus';
+    const displayLabel = isChorus && (section.label === 'RITORNELLO' || section.label === 'RIT.') ? 'RIT:' : section.label;
+
+    if (isChorus) {
       sectionEl.className = 'song-chorus-block';
       sectionEl.style.borderLeft = '2pt solid black';
       sectionEl.style.paddingLeft = '8pt';
@@ -279,13 +282,23 @@ export function measureSongPageOverflow(
       label.className = 'song-chorus-label';
       label.style.fontWeight = '700';
       label.style.fontSize = '0.85em';
-      label.textContent = section.label || 'RITORNELLO';
+      label.textContent = displayLabel || 'RIT:';
       sectionEl.appendChild(label);
     } else {
       sectionEl.style.margin = '6pt 0';
     }
 
-    for (const line of section.lines) {
+    const linesToPrint = section.lines.filter((line, lIdx) => {
+      if (isChorus && lIdx === 0 && displayLabel) {
+        const textOnly = line.units.map((u) => u.lyric || '').join('').trim();
+        if (/^RIT[.:]?$/i.test(textOnly)) {
+          return false;
+        }
+      }
+      return true;
+    });
+
+    for (const line of linesToPrint) {
       const lineEl = document.createElement('div');
       lineEl.className = 'song-line';
       lineEl.style.minHeight = '1.2em';

@@ -360,6 +360,20 @@ export function ChordProRenderer({
         ? 'song-bridge-block'
         : 'song-verse-block';
 
+      // Standard Canzoniere Scout: mostra solo 'RIT:' invece di 'RITORNELLO'
+      const displayLabel = isChorus && (section.label === 'RITORNELLO' || section.label === 'RIT.') ? 'RIT:' : section.label;
+
+      // Filtra eventuale riga iniziale ridondante che contenga solo 'RIT.' se displayLabel è già presente
+      const linesToRender = section.lines.filter((line, lIdx) => {
+        if (isChorus && lIdx === 0 && displayLabel) {
+          const textOnly = line.units.map((u) => u.lyric || '').join('').trim();
+          if (/^RIT[.:]?$/i.test(textOnly)) {
+            return false;
+          }
+        }
+        return true;
+      });
+
       return h(
         'div',
         {
@@ -370,7 +384,7 @@ export function ChordProRenderer({
           },
         },
         [
-          section.label
+          displayLabel
             ? h(
                 'span',
                 {
@@ -386,10 +400,10 @@ export function ChordProRenderer({
                     letterSpacing: isChorus ? 'normal' : '0.05em',
                   },
                 },
-                section.label
+                displayLabel
               )
             : null,
-          ...section.lines.map((line, lIdx) => {
+          ...linesToRender.map((line, lIdx) => {
             return h(CantoLineRenderer, {
               key: `l-${lIdx}`,
               line: songLineToCantoLineData(line),

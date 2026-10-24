@@ -49,6 +49,18 @@ export function CantoReadingMode({
   const metronomeTimerRef = useRef<any>(null);
   const beatCountRef = useRef<number>(0);
 
+  // --- STATO AUTO-SCROLL AL BEAT (MOBILE-FIRST) ---
+  const [isAutoScrolling, setIsAutoScrolling] = useState<boolean>(false);
+  const [isPausedByTouch, setIsPausedByTouch] = useState<boolean>(false);
+  const [speedMultiplier, setSpeedMultiplier] = useState<number>(1.0);
+  const scrollContainerRef = useRef<HTMLElement | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const touchResumeTimerRef = useRef<any>(null);
+  const isPausedByTouchRef = useRef<boolean>(false);
+  const speedMultiplierRef = useRef<number>(1.0);
+  const bpmRef = useRef<number>(100);
+  const fontSizeRef = useRef<number>(18);
+
   // Inizializza o aggiorna BPM quando cambia il canto
   useEffect(() => {
     if (canto?.tempo_bpm) {
@@ -172,8 +184,164 @@ export function CantoReadingMode({
         } catch {}
         audioCtxRef.current = null;
       }
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+      if (touchResumeTimerRef.current) {
+        clearTimeout(touchResumeTimerRef.current);
+        touchResumeTimerRef.current = null;
+      }
     };
   }, []);
+
+  // Sincronizza i riferimenti mutabili per evitare stale closures nel loop RAF
+  useEffect(() => {
+    bpmRef.current = bpm;
+    speedMultiplierRef.current = speedMultiplier;
+    fontSizeRef.current = fontSize;
+    isPausedByTouchRef.current = isPausedByTouch;
+  }, [bpm, speedMultiplier, fontSize, isPausedByTouch]);
+
+  // Reset auto-scroll al cambio di canto o chiusura
+  useEffect(() => {
+    setIsAutoScrolling(false);
+    setIsPausedByTouch(false);
+    isPausedByTouchRef.current = false;
+    if (touchResumeTimerRef.current) {
+      clearTimeout(touchResumeTimerRef.current);
+      touchResumeTimerRef.current = null;
+    }
+  }, [canto?.id, isOpen]);
+
+  // Loop di scorrimento automatico fluido 60 FPS allineato al BPM
+  useEffect(() => {
+    if (!isAutoScrolling || !isOpen) {
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+      return;
+    }
+
+    let lastTime = performance.now();
+    let subpixelAccumulator = 0;
+
+    const loop = (now: number) => {
+      const dt = Math.min((now - lastTime) / 1000, 0.1);
+      lastTime = now;
+
+      if (!isPausedByTouchRef.current && scrollContainerRef.current) {
+        const el = scrollContainerRef.current;
+        const currentBpm = bpmRef.current || 100;
+        const currentMult = speedMultiplierRef.current || 1.0;
+        const currentFont = fontSizeRef.current || 18;
+
+        // Base: 8px a battito (beat) calibrato su font 18px per una lettura canzoniere ideale
+        const pixelsPerSecond = (currentBpm / 60) * 8 * (currentFont / 18) * currentMult;
+        subpixelAccumulator += pixelsPerSecond * dt;
+
+        if (subpixelAccumulator >= 1) {
+          const pxToScroll = Math.floor(subpixelAccumulator);
+          subpixelAccumulator -= pxToScroll;
+
+          const maxScroll = el.scrollHeight - el.clientHeight;
+          if (el.scrollTop >= maxScroll - 2) {
+            setIsAutoScrolling(false);
+          } else {
+            el.scrollTop += pxToScroll;
+          }
+        }
+      }
+
+      rafRef.current = requestAnimationFrame(loop);
+    };
+
+    rafRef.current = requestAnimationFrame(loop);
+
+    return () => {
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+    };
+  }, [isAutoScrolling, isOpen]);
+
+  // Pausa intelligente al tocco/swipe manuale su mobile
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el || !isAutoScrolling) return;
+
+    const handleTouchStart = () => {
+      isPausedByTouchRef.current = true;
+      setIsPausedByTouch(true);
+      if (touchResumeTimerRef.current) {
+        clearTimeout(touchResumeTimerRef.current);
+        touchResumeTimerRef.current = null;
+      }
+    };
+
+    const handleTouchEnd = () => {
+      if (touchResumeTimerRef.current) {
+        clearTimeout(touchResumeTimerRef.current);
+      }
+      // Riprende dolcemente dopo 2.5 secondi di inattività dal tocco
+      touchResumeTimerRef.current = setTimeout(() => {
+        isPausedByTouchRef.current = false;
+        setIsPausedByTouch(false);
+      }, 2500);
+    };
+
+    const handleWheel = () => {
+      handleTouchStart();
+      handleTouchEnd();
+    };
+
+    el.addEventListener('touchstart', handleTouchStart, { passive: true });
+    el.addEventListener('touchend', handleTouchEnd, { passive: true });
+    el.addEventListener('wheel', handleWheel, { passive: true });
+
+    return () => {
+      el.removeEventListener('touchstart', handleTouchStart);
+      el.removeEventListener('touchend', handleTouchEnd);
+      el.removeEventListener('wheel', handleWheel);
+      if (touchResumeTimerRef.current) {
+        clearTimeout(touchResumeTimerRef.current);
+        touchResumeTimerRef.current = null;
+      }
+    };
+  }, [isAutoScrolling]);
+
+  const toggleAutoScroll = () => {
+    setIsAutoScrolling((prev) => {
+      const next = !prev;
+      if (!next) {
+        setIsPausedByTouch(false);
+        isPausedByTouchRef.current = false;
+        if (touchResumeTimerRef.current) {
+          clearTimeout(touchResumeTimerRef.current);
+          touchResumeTimerRef.current = null;
+        }
+      }
+      return next;
+    });
+  };
+
+  const rewindToTop = () => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const handleSpeedChange = (delta: number) => {
+    setSpeedMultiplier((prev) => {
+      return Math.max(0.5, Math.min(2.5, Math.round((prev + delta) * 10) / 10));
+    });
+  };
+
+  const resetSpeed = () => {
+    setSpeedMultiplier(1.0);
+  };
 
   if (!isOpen || !canto) return null;
 
@@ -212,7 +380,7 @@ export function CantoReadingMode({
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: 'var(--z-sticky, 100)',
+        zIndex: 'var(--z-modal, 2000)',
         backgroundColor: 'var(--color-bg)',
         color: 'var(--color-text)',
         display: 'flex',
@@ -372,6 +540,31 @@ export function CantoReadingMode({
           >
             <Icon name="canti" size={16} />
             <span>{showChords ? I18N.canti.mostraAccordi : I18N.canti.nascondiAccordi}</span>
+          </button>
+
+          {/* Toggle Auto-Scroll a tempo (BPM) */}
+          <button
+            type="button"
+            onClick={toggleAutoScroll}
+            className={`ios-btn ${isAutoScrolling ? 'ios-btn-primary' : 'ios-btn-ghost'}`}
+            style={{
+              minHeight: '34px',
+              padding: '0 var(--space-3)',
+              fontSize: 'var(--font-size-xs)',
+              fontWeight: 600,
+              borderRadius: 'var(--radius-full)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              whiteSpace: 'nowrap',
+              backgroundColor: isAutoScrolling ? 'var(--color-interactive)' : undefined,
+              color: isAutoScrolling ? '#ffffff' : undefined,
+            }}
+            aria-label={isAutoScrolling ? 'Ferma scorrimento automatico' : 'Avvia scorrimento automatico al beat'}
+            title="Scorrimento automatico al Beat (BPM)"
+          >
+            <Icon name={isAutoScrolling ? 'pause' : 'play'} size={14} />
+            <span>{isAutoScrolling ? 'Auto-scroll On' : 'Auto-scroll'}</span>
           </button>
 
           {/* Controlli Trasposizione Semitonale */}
@@ -586,11 +779,13 @@ export function CantoReadingMode({
 
       {/* Contenuto scorrevole per la lettura del canto */}
       <main
+        id="reading-mode-scroll-container"
+        ref={scrollContainerRef}
         className="canto-reading-scrollable"
         style={{
           flex: 1,
           overflowY: 'auto',
-          padding: 'var(--space-6) var(--space-4)',
+          padding: `var(--space-6) var(--space-4) ${isAutoScrolling ? 'calc(var(--space-8) + 80px)' : 'var(--space-6)'}`,
           maxWidth: '850px',
           margin: '0 auto',
           width: '100%',
@@ -709,6 +904,200 @@ export function CantoReadingMode({
           )}
         </div>
       </main>
+
+      {/* Dock mobile floating per lo scorrimento automatico al Beat */}
+      {isAutoScrolling && (
+        <div
+          className="reading-autoscroll-dock"
+          style={{
+            position: 'fixed',
+            bottom: 'calc(var(--space-3) + env(safe-area-inset-bottom, 0px))',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 100,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--space-2)',
+            padding: '6px 10px',
+            backgroundColor: 'var(--color-surface)',
+            border: isPausedByTouch
+              ? '1.5px solid var(--color-bans)'
+              : '1.5px solid var(--color-interactive)',
+            borderRadius: 'var(--radius-full)',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.28)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            maxWidth: 'min(440px, calc(100vw - 20px))',
+            width: 'max-content',
+            transition: 'border-color 200ms ease, box-shadow 200ms ease',
+          }}
+        >
+          {/* Pulsante Riavvolgi in cima */}
+          <button
+            type="button"
+            onClick={rewindToTop}
+            className="ios-btn ios-btn-ghost"
+            style={{
+              minWidth: '34px',
+              minHeight: '34px',
+              padding: '0 6px',
+              borderRadius: 'var(--radius-full)',
+            }}
+            title="Riavvolgi all'inizio"
+            aria-label="Torna all'inizio del canto"
+          >
+            <Icon name="rotate-ccw" size={16} />
+          </button>
+
+          {/* Pulsante Play / Pausa */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsPausedByTouch((prev) => {
+                const next = !prev;
+                isPausedByTouchRef.current = next;
+                if (!next && touchResumeTimerRef.current) {
+                  clearTimeout(touchResumeTimerRef.current);
+                  touchResumeTimerRef.current = null;
+                }
+                return next;
+              });
+            }}
+            className={`ios-btn ${isPausedByTouch ? 'ios-btn-secondary' : 'ios-btn-primary'}`}
+            style={{
+              minHeight: '34px',
+              padding: '0 var(--space-3)',
+              borderRadius: 'var(--radius-full)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontWeight: 700,
+              fontSize: 'var(--font-size-xs)',
+              whiteSpace: 'nowrap',
+              backgroundColor: isPausedByTouch ? undefined : 'var(--color-interactive)',
+              color: isPausedByTouch ? undefined : '#ffffff',
+            }}
+            aria-label={isPausedByTouch ? 'Riprendi scorrimento' : 'Metti in pausa'}
+            title={isPausedByTouch ? 'Tocca per riprendere' : 'Metti in pausa'}
+          >
+            <Icon name={isPausedByTouch ? 'play' : 'pause'} size={14} />
+            <span>{isPausedByTouch ? 'Riprendi' : 'Pausa'}</span>
+          </button>
+
+          {/* Regolatore velocità moltiplicatore */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              backgroundColor: 'var(--color-surface-hover)',
+              borderRadius: 'var(--radius-full)',
+              border: '1px solid var(--color-border)',
+              padding: '1px 3px',
+              gap: '2px',
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => handleSpeedChange(-0.1)}
+              className="ios-btn ios-btn-ghost"
+              style={{
+                minWidth: '24px',
+                minHeight: '28px',
+                padding: 0,
+                fontSize: 'var(--font-size-xs)',
+                fontWeight: 700,
+              }}
+              aria-label="Rallenta velocità scorrimento"
+              title="Rallenta (-0.1x)"
+            >
+              -
+            </button>
+            <button
+              type="button"
+              onClick={resetSpeed}
+              className="ios-btn ios-btn-ghost"
+              style={{
+                fontSize: 'var(--font-size-xs)',
+                fontWeight: 700,
+                minWidth: '38px',
+                textAlign: 'center',
+                padding: '0 2px',
+                color: speedMultiplier !== 1.0 ? 'var(--color-interactive)' : 'var(--color-text)',
+              }}
+              title="Clicca per ripristinare a 1.0x"
+            >
+              {speedMultiplier.toFixed(1)}x
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSpeedChange(0.1)}
+              className="ios-btn ios-btn-ghost"
+              style={{
+                minWidth: '24px',
+                minHeight: '28px',
+                padding: 0,
+                fontSize: 'var(--font-size-xs)',
+                fontWeight: 700,
+              }}
+              aria-label="Accelera velocità scorrimento"
+              title="Accelera (+0.1x)"
+            >
+              +
+            </button>
+          </div>
+
+          {/* Indicatore Beat & BPM */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+              padding: '0 4px',
+            }}
+            title={`Sincronizzato al ritmo di ${bpm} BPM`}
+          >
+            <span
+              style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                backgroundColor: pulse ? 'var(--color-bans)' : 'var(--color-canti)',
+                transform: pulse ? 'scale(1.5)' : 'scale(1)',
+                transition: 'transform 80ms ease',
+                display: 'inline-block',
+              }}
+            />
+            <span
+              style={{
+                fontSize: 'var(--font-size-xs)',
+                fontWeight: 700,
+                color: 'var(--color-text-secondary)',
+              }}
+            >
+              {bpm}
+            </span>
+          </div>
+
+          {/* Pulsante Chiudi Auto-Scroll */}
+          <button
+            type="button"
+            onClick={toggleAutoScroll}
+            className="ios-btn ios-btn-ghost"
+            style={{
+              minWidth: '28px',
+              minHeight: '28px',
+              padding: '0 4px',
+              borderRadius: 'var(--radius-full)',
+              color: 'var(--color-text-secondary)',
+            }}
+            title="Chiudi scorrimento automatico"
+            aria-label="Chiudi barra scorrimento"
+          >
+            <Icon name="x" size={14} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
