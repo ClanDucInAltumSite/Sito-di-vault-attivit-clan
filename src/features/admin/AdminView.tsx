@@ -20,6 +20,8 @@ import {
 import { getDetailedCounts } from '../../lib/db';
 import { getStorageUsageInfo, findOrphanStorageFiles, purgeOrphanStorageFiles, OrphanFileInfo } from '../../lib/attachments';
 import { downloadAllAttachmentsForOffline, getOfflineAttachmentStats } from '../../lib/storage-cache';
+import { supabase } from '../../lib/supabase';
+import { DEFAULT_PARSED_SONGS } from '../../data/parsed_songs';
 import { AdminLoginModal } from './AdminLoginModal';
 import { TrashSheet } from './TrashSheet';
 
@@ -55,6 +57,7 @@ export function AdminView() {
   const [offlineStats, setOfflineStats] = useState<{ cached: number; total: number }>({ cached: 0, total: 0 });
   const [isDownloadingOffline, setIsDownloadingOffline] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState<number>(0);
+  const [isSeedingCanti, setIsSeedingCanti] = useState(false);
 
   const loadData = async () => {
     if (isAdmin) {
@@ -156,6 +159,33 @@ export function AdminView() {
       alert(err.message || 'Errore durante l\'esportazione del manifest allegati');
     } finally {
       setIsExportingManifest(false);
+    }
+  };
+
+  const handleSeedCanti = async () => {
+    if (!isAdmin) return;
+    if (!confirm('Vuoi caricare o aggiornare i 21 canti completi del Canzoniere direttamente nel database remoto Supabase?')) return;
+    setIsSeedingCanti(true);
+    try {
+      const now = new Date().toISOString();
+      const payload = DEFAULT_PARSED_SONGS.map((s) => ({
+        ...s,
+        updated_at: now,
+        deleted_at: null,
+      }));
+      const { error } = await supabase.from('canti').upsert(payload);
+      if (error) throw new Error(error.message);
+      try {
+        await supabase.rpc('bump_sync_epoch');
+      } catch {
+        // bump_sync_epoch opzionale
+      }
+      alert('21 canti caricati e aggiornati con successo nel database Supabase!');
+      await loadData();
+    } catch (err: any) {
+      alert(`Errore caricamento canti su Supabase: ${err.message}`);
+    } finally {
+      setIsSeedingCanti(false);
     }
   };
 
@@ -359,6 +389,22 @@ export function AdminView() {
                 >
                   <Icon name="upload" size={14} />
                   <span>Importa</span>
+                </Button>
+              }
+            />
+            <GroupedRow
+              leading={<Icon name="canti" size={20} />}
+              title="Carica 21 Canti nel Cloud (Supabase)"
+              subtitle="Sincronizza i 21 canti completi del canzoniere con accordi, ritmi e BPM nel database remoto"
+              trailing={
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={handleSeedCanti}
+                  isLoading={isSeedingCanti}
+                >
+                  <Icon name="upload" size={14} />
+                  <span>Carica Canti</span>
                 </Button>
               }
             />

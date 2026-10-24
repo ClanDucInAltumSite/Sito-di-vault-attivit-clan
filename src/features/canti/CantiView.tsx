@@ -102,15 +102,26 @@ export function CantiView() {
         toSeed.push(defSong);
       } else {
         const existing = enriched[existingIdx];
-        if (existing && existing.testo_chordpro.length < defSong.testo_chordpro.length) {
-          enriched[existingIdx] = {
-            ...existing,
-            ...defSong,
-            id: existing.id,
-            created_at: existing.created_at,
-            updated_at: new Date().toISOString(),
-          };
-          toSeed.push(enriched[existingIdx]);
+        if (existing) {
+          const existingChordsCount = (existing.testo_chordpro.match(/\[/g) || []).length;
+          const defChordsCount = (defSong.testo_chordpro.match(/\[/g) || []).length;
+          const shouldUpdate =
+            existing.testo_chordpro.length < defSong.testo_chordpro.length ||
+            existingChordsCount < defChordsCount ||
+            (Boolean(defSong.ritmo) && !existing.ritmo) ||
+            (Boolean(defSong.tempo_bpm) && !existing.tempo_bpm) ||
+            (!existing.testo_chordpro.includes('RIT:') && defSong.testo_chordpro.includes('RIT:'));
+
+          if (shouldUpdate) {
+            enriched[existingIdx] = {
+              ...existing,
+              ...defSong,
+              id: existing.id,
+              created_at: existing.created_at,
+              updated_at: new Date().toISOString(),
+            };
+            toSeed.push(enriched[existingIdx]);
+          }
         }
       }
     }

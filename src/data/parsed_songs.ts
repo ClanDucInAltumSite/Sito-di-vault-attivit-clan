@@ -256,7 +256,7 @@ export const WONDERWALL_PARSED: Canto = {
 };
 
 export const SCOUTING_FOR_BOYS_PARSED: Canto = {
-  "id": "7f139042-3e4b-4a57-8901-29cf9017a021",
+  "id": "3676dfa4-ffda-4348-99d3-6c2d2c78656a",
   "titolo": "Scouting For Boys",
   "autore": "Canto scout",
   "categoria": "scout",
@@ -275,7 +275,7 @@ export const SCOUTING_FOR_BOYS_PARSED: Canto = {
 };
 
 export const STRADE_DI_CORAGGIO_PARSED: Canto = {
-  "id": "b8429e71-92e1-4c17-9c98-1e967a50e901",
+  "id": "bd6e7fbf-c50f-4f65-9607-037c7b788f99",
   "titolo": "Strade di coraggio",
   "autore": "Marco Costantini, Marco Lodi",
   "categoria": "scout",
