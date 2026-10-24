@@ -9,7 +9,7 @@ import { HeaderBanner } from '../../ui/HeaderBanner';
 import { Badge } from '../../ui/Badge';
 import { Button } from '../../ui/Button';
 import { Icon } from '../../ui/Icon';
-import { Canto, getCanti } from '../../lib/db';
+import { Canto, getCanti, upsertRecords } from '../../lib/db';
 import { useAdmin } from '../../lib/auth';
 import { matchesQuery, HighlightText } from '../../lib/search';
 import { softDeleteRecord } from '../../lib/admin_actions';
@@ -22,7 +22,7 @@ import { ImportCantoModal, ImportedSongData } from './ImportCantoModal';
 import { CantoReviewModal } from './CantoReviewModal';
 import { QuickCategoryAssignModal } from './QuickCategoryAssignModal';
 import { DeleteConfirmModal } from '../../ui/DeleteConfirmModal';
-import { DANZA_LA_VITA_PARSED } from '../../data/parsed_songs';
+import { DANZA_LA_VITA_PARSED, DEFAULT_PARSED_SONGS } from '../../data/parsed_songs';
 
 type SortOption = 'az' | 'za' | 'recenti' | 'vecchi';
 export type CategoryFilter = 'tutti' | 'scout' | 'chiesa' | 'esterni' | 'senza_categoria';
@@ -76,29 +76,39 @@ export function CantiView() {
   // Caricamento dati da IndexedDB
   const loadData = async () => {
     const list = await getCanti(false);
-    const enriched = list.map((c) => {
-      if (c.id === DANZA_LA_VITA_PARSED.id && !c.testo_chordpro.includes('Cammina sulle [Fa]orme')) {
-        return {
-          ...c,
+    const enriched = [...list];
+
+    // Aggiorna o arricchisce DANZA LA VITA se versione precedente parziale
+    const dvIdx = enriched.findIndex((c) => c.id === DANZA_LA_VITA_PARSED.id);
+    if (dvIdx >= 0) {
+      const existingDv = enriched[dvIdx];
+      if (existingDv && !existingDv.testo_chordpro.includes('Cammina sulle [Fa]orme')) {
+        enriched[dvIdx] = {
+          ...existingDv,
           ...DANZA_LA_VITA_PARSED,
-          updated_at: c.updated_at,
-          created_at: c.created_at,
+          updated_at: existingDv.updated_at,
+          created_at: existingDv.created_at,
           deleted_at: null,
         } as Canto;
       }
-      return c;
-    });
-
-    if (!enriched.some((c) => c.id === DANZA_LA_VITA_PARSED.id)) {
-      enriched.push({
-        ...DANZA_LA_VITA_PARSED,
-        created_at: '2026-10-19T18:21:42.924Z',
-        updated_at: new Date().toISOString(),
-        deleted_at: null,
-      } as Canto);
     }
 
+    // Aggiunge tutte le canzoni di default predefinite se non ancora presenti
+    const toSeed: Canto[] = [];
+    for (const defSong of DEFAULT_PARSED_SONGS) {
+      if (!enriched.some((c) => c.id === defSong.id || c.titolo.toLowerCase() === defSong.titolo.toLowerCase())) {
+        enriched.push(defSong);
+        toSeed.push(defSong);
+      }
+    }
+
+    enriched.sort((a, b) => a.titolo.localeCompare(b.titolo, 'it'));
+
     setCanti(enriched);
+
+    if (toSeed.length > 0) {
+      upsertRecords('canti', toSeed).catch((err) => console.warn('Canti seeding error:', err));
+    }
   };
 
   // Conteggi categorie (Fase 11F)

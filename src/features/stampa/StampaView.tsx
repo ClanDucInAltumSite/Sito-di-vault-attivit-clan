@@ -20,7 +20,7 @@ import {
   Evento,
   OdgPunto,
 } from '../../lib/db';
-import { DANZA_LA_VITA_PARSED } from '../../data/parsed_songs';
+import { DANZA_LA_VITA_PARSED, DEFAULT_PARSED_SONGS } from '../../data/parsed_songs';
 import {
   StampaConfig,
   loadStampaConfig,
@@ -92,9 +92,12 @@ export function StampaView() {
           }
           return c;
         });
-        if (!enrichedCanti.some((c) => c.id === DANZA_LA_VITA_PARSED.id)) {
-          enrichedCanti.push(DANZA_LA_VITA_PARSED as any);
+        for (const defSong of DEFAULT_PARSED_SONGS) {
+          if (!enrichedCanti.some((c) => c.id === defSong.id || c.titolo.toLowerCase() === defSong.titolo.toLowerCase())) {
+            enrichedCanti.push(defSong as any);
+          }
         }
+        enrichedCanti.sort((a, b) => a.titolo.localeCompare(b.titolo, 'it'));
 
         // Rimuove gli eventi passati: sono stampabili solo gli eventi futuri o in corso
         const todayTime = new Date().setHours(0, 0, 0, 0);
