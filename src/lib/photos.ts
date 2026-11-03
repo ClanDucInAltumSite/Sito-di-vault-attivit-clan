@@ -5,7 +5,7 @@
  */
 
 export interface HeaderPhotoConfig {
-  id: 'home' | 'giochi' | 'bans' | 'canti' | 'calendario';
+  id: 'home' | 'giochi' | 'bans' | 'canti' | 'calendario' | 'quaderno';
   title: string;
   alt: string;
   src: string;
@@ -96,6 +96,20 @@ export const HEADER_PHOTOS: Record<HeaderPhotoConfig['id'], HeaderPhotoConfig> =
     height: 600,
     author: 'Luca Bravo',
     subject: 'Sentiero nel bosco illuminato dal sole',
+  },
+  quaderno: {
+    id: 'quaderno',
+    title: 'Quaderno di Clan',
+    alt: 'Diario e quaderno scout in cuoio aperto su tavolo in legno con bussola e mappa topografica',
+    src: photoUrl('quaderno-400.webp'),
+    srcMobile: photoUrl('quaderno-400.webp'),
+    srcset: `${photoUrl('quaderno-400.webp')} 400w, ${photoUrl('quaderno-800.webp')} 800w, ${photoUrl('quaderno-1200.webp')} 1200w`,
+    sizes: '(max-width: 600px) 400px, (max-width: 1024px) 800px, 1200px',
+    placeholder: 'data:image/webp;base64,UklGRpYAAABXRUJQVlA4IIoAAAAQBACdASoYAA4APzmEuVOvKKWisAgB4CcJQBOmUAA4JsyHzIu10fmeAAD+qNAyI9xE80m7sC5lNJC02ijLr5GqkzRuLsIPOulqc3qJVC9rrDK8jhskpgWCuNJ7je7y1TwOeSBX6ZyqfAL7Bf1Zs3/SyW8ua5e/DQLrmAusGThzBKbyJUUYeCgFsAA=',
+    width: 1200,
+    height: 675,
+    author: 'Duc In Altum',
+    subject: 'Diario di bordo e verbali scout',
   },
 };
 

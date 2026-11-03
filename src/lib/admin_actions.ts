@@ -9,6 +9,8 @@ import {
   OdgPunto,
   TipoEvento,
   Allegato,
+  QuadernoPagina,
+  QuadernoCategoria,
   getDb,
   getEventi,
   getOdgPunti,
@@ -131,6 +133,7 @@ export async function saveBan(input: {
   nome: string;
   testo: string;
   note_gesti?: string;
+  link?: string | null;
 }): Promise<Ban> {
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
     throw new Error(I18N.status.offlineNotice);
@@ -139,39 +142,79 @@ export async function saveBan(input: {
   const now = new Date().toISOString();
   let savedRecord: Ban;
 
-  if (input.id) {
-    const { data, error } = await supabase
-      .from('bans')
-      .update({
-        nome: input.nome.trim(),
-        testo: input.testo.trim(),
-        note_gesti: (input.note_gesti || '').trim(),
-        updated_at: now,
-      })
-      .eq('id', input.id)
-      .select()
-      .single();
+  let cleanLink = (input.link || '').trim();
+  if (cleanLink && !/^https?:\/\//i.test(cleanLink)) {
+    cleanLink = `https://${cleanLink}`;
+  }
+  const linkToSave = cleanLink || null;
 
-    if (error) throw new Error(error.message);
-    savedRecord = data;
-  } else {
-    const newId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `b_${Date.now()}`;
-    const { data, error } = await supabase
-      .from('bans')
-      .insert({
-        id: newId,
-        nome: input.nome.trim(),
-        testo: input.testo.trim(),
-        note_gesti: (input.note_gesti || '').trim(),
-        created_at: now,
-        updated_at: now,
-        deleted_at: null,
-      })
-      .select()
-      .single();
+  const payload: Record<string, any> = {
+    nome: input.nome.trim(),
+    testo: input.testo.trim(),
+    note_gesti: (input.note_gesti || '').trim(),
+    updated_at: now,
+  };
 
-    if (error) throw new Error(error.message);
-    savedRecord = data;
+  if (input.link !== undefined) {
+    payload.link = linkToSave;
+  }
+
+  const newId = input.id || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `b_${Date.now()}`);
+
+  const executeSupabaseSave = async (includeLink: boolean) => {
+    const currentPayload = { ...payload };
+    if (!includeLink) {
+      delete currentPayload.link;
+    }
+
+    if (input.id) {
+      return await supabase
+        .from('bans')
+        .update(currentPayload)
+        .eq('id', input.id)
+        .select()
+        .single();
+    } else {
+      return await supabase
+        .from('bans')
+        .insert({
+          ...currentPayload,
+          id: newId,
+          created_at: now,
+          deleted_at: null,
+        })
+        .select()
+        .single();
+    }
+  };
+
+  let { data, error } = await executeSupabaseSave(payload.link !== undefined);
+
+  if (error) {
+    const msg = error.message || '';
+    if (
+      payload.link !== undefined &&
+      (msg.includes('link') || (error as any).code === 'PGRST204' || (error as any).code === '42703')
+    ) {
+      if (!linkToSave) {
+        const retryResult = await executeSupabaseSave(false);
+        if (retryResult.error) {
+          throw new Error(retryResult.error.message);
+        }
+        data = retryResult.data;
+        error = null;
+      } else {
+        throw new Error("Migrazione 0012 non applicata: la colonna 'link' non esiste nel database Supabase. Esegui 0012_bans_link.sql nel SQL Editor di Supabase.");
+      }
+    } else {
+      throw new Error(error.message);
+    }
+  }
+
+  savedRecord = data;
+
+  if (linkToSave && !savedRecord.link) {
+    savedRecord.link = linkToSave;
   }
 
   await upsertRecords('bans', [savedRecord]);
@@ -307,6 +350,7 @@ export async function saveEvento(input: {
   descrizione?: string | null;
   responsabile?: string | null;
   cosa_portare?: string | null;
+  appunti?: string | null;
 }): Promise<Evento> {
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
     throw new Error(I18N.status.offlineNotice);
@@ -324,7 +368,7 @@ export async function saveEvento(input: {
   const now = new Date().toISOString();
   let savedRecord: Evento;
 
-  const payload = {
+  const payload: Record<string, unknown> = {
     titolo,
     tipo: input.tipo,
     inizio: input.inizio,
@@ -336,6 +380,10 @@ export async function saveEvento(input: {
     cosa_portare: (input.cosa_portare || '').trim() || null,
     updated_at: now,
   };
+
+  if (input.appunti !== undefined) {
+    payload.appunti = input.appunti ? input.appunti.trim() || null : null;
+  }
 
   if (input.id) {
     const { data, error } = await supabase
@@ -366,6 +414,40 @@ export async function saveEvento(input: {
 
   await upsertRecords('eventi', [savedRecord]);
   return savedRecord;
+}
+
+/**
+ * Salva o aggiorna gli appunti / verbale di una riunione (online-only, riservato ad admin).
+ * Aggiorna sia Supabase che la cache IndexedDB locale.
+ */
+export async function saveAppuntiRiunione(
+  eventoId: string,
+  appunti: string
+): Promise<Evento> {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    throw new Error(I18N.status.offlineNotice);
+  }
+
+  const cleanId = (eventoId || '').trim();
+  if (!cleanId) {
+    throw new Error('ID riunione non valido.');
+  }
+
+  const now = new Date().toISOString();
+  const cleanAppunti = (appunti || '').trim() || null;
+
+  const { data, error } = await supabase
+    .from('eventi')
+    .update({ appunti: cleanAppunti, updated_at: now })
+    .eq('id', cleanId)
+    .select()
+    .single();
+
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error('Evento non trovato o operazione non autorizzata.');
+
+  await upsertRecords('eventi', [data]);
+  return data;
 }
 
 /**
@@ -502,13 +584,21 @@ export async function reorderOdgPunti(_eventoId: string, orderedIds: string[]): 
 /**
  * Trova la prossima riunione futura programmata rispetto alla data inizio specificata.
  */
-export async function findNextFutureMeeting(currentInizio: string): Promise<Evento | null> {
+export async function findNextFutureMeeting(
+  currentInizio: string,
+  excludeId?: string
+): Promise<Evento | null> {
   const allEvents = await getEventi(false);
-  const currentTime = new Date(currentInizio).getTime();
+  const isCurrentTbd = currentInizio.startsWith('2099');
+  const currentTime = isCurrentTbd ? Date.now() : new Date(currentInizio).getTime();
 
   // 1. Prima controlla se c'è una riunione aperta "data da definire" creata appositamente per la prossima riunione
   const tbdMeeting = allEvents.find(
-    (e) => e.tipo === 'riunione' && isEventoDataDaDefinire(e) && e.deleted_at === null
+    (e) =>
+      e.tipo === 'riunione' &&
+      isEventoDataDaDefinire(e) &&
+      e.deleted_at === null &&
+      (!excludeId || e.id !== excludeId)
   );
   if (tbdMeeting) {
     return tbdMeeting;
@@ -516,7 +606,12 @@ export async function findNextFutureMeeting(currentInizio: string): Promise<Even
 
   // 2. Altrimenti cerca la prossima riunione futura programmata
   const futureMeetings = allEvents.filter(
-    (e) => e.tipo === 'riunione' && !isEventoDataDaDefinire(e) && new Date(e.inizio).getTime() > currentTime && e.deleted_at === null
+    (e) =>
+      e.tipo === 'riunione' &&
+      !isEventoDataDaDefinire(e) &&
+      new Date(e.inizio).getTime() > currentTime &&
+      e.deleted_at === null &&
+      (!excludeId || e.id !== excludeId)
   );
 
   futureMeetings.sort((a, b) => new Date(a.inizio).getTime() - new Date(b.inizio).getTime());
@@ -702,6 +797,9 @@ export async function getTrashItems(): Promise<TrashItem[]> {
         } else if (table === 'allegati') {
           title = record.nome_file;
           subtitle = `Allegato • ${record.mime}`;
+        } else if (table === 'quaderno') {
+          title = record.titolo;
+          subtitle = `Quaderno • ${record.categoria || 'appunto'}`;
         }
 
         items.push({
@@ -1028,3 +1126,140 @@ export async function executeBackupImport(diff: BackupPreviewDiff): Promise<{ in
     skipped: diff.skippedOlder.length,
   };
 }
+
+export interface SaveQuadernoPaginaInput {
+  id?: string;
+  data: string; // YYYY-MM-DD
+  titolo: string;
+  categoria?: QuadernoCategoria;
+  contenuto: string;
+  evento_id?: string | null;
+}
+
+/**
+ * Salva o aggiorna una pagina nel Quaderno di Clan (online-only verso Supabase + cache IndexedDB).
+ */
+export async function saveQuadernoPagina(input: SaveQuadernoPaginaInput): Promise<QuadernoPagina> {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    throw new Error(I18N.status.offlineNotice);
+  }
+
+  const titolo = input.titolo.trim();
+  if (!titolo) {
+    throw new Error('Il titolo della pagina del quaderno è obbligatorio.');
+  }
+
+  const data = (input.data || '').trim();
+  if (!data) {
+    throw new Error('La data della pagina del quaderno è obbligatoria.');
+  }
+
+  const now = new Date().toISOString();
+  let savedRecord: QuadernoPagina;
+
+  const payload: Record<string, unknown> = {
+    data,
+    titolo,
+    categoria: input.categoria || 'riunione',
+    contenuto: input.contenuto ? input.contenuto.trim() : '',
+    evento_id: input.evento_id || null,
+    updated_at: now,
+  };
+
+  if (input.id) {
+    const selQuery = supabase.from('quaderno').update(payload).eq('id', input.id).select();
+    const { data: resData, error } = typeof (selQuery as any).maybeSingle === 'function'
+      ? await (selQuery as any).maybeSingle()
+      : await selQuery.single();
+
+    if (error) {
+      const msg = error.message || '';
+      if (msg.includes('Could not find the table') || msg.includes('schema cache') || (error as any).code === 'PGRST204') {
+        throw new Error(
+          "La tabella 'quaderno' non è ancora stata creata nel database Supabase. Esegui il file SQL 'supabase/APPLICA_QUADERNO_PRODUZIONE.sql' nel SQL Editor di Supabase per attivarla."
+        );
+      }
+      if ((error as any).code === 'PGRST116' || msg.includes('Cannot coerce')) {
+        const { data: insData, error: insError } = await supabase
+          .from('quaderno')
+          .insert({
+            ...payload,
+            id: input.id,
+            created_at: now,
+            deleted_at: null,
+          })
+          .select()
+          .single();
+        if (insError) throw new Error(insError.message);
+        savedRecord = { ...insData, deleted_at: insData.deleted_at ?? null };
+      } else {
+        throw new Error(error.message);
+      }
+    } else if (!resData) {
+      const { data: insData, error: insError } = await supabase
+        .from('quaderno')
+        .insert({
+          ...payload,
+          id: input.id,
+          created_at: now,
+          deleted_at: null,
+        })
+        .select()
+        .single();
+      if (insError) throw new Error(insError.message);
+      savedRecord = { ...insData, deleted_at: insData.deleted_at ?? null };
+    } else {
+      savedRecord = { ...resData, deleted_at: resData.deleted_at ?? null };
+    }
+  } else {
+    const newId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `q_${Date.now()}`;
+    const { data: resData, error } = await supabase
+      .from('quaderno')
+      .insert({
+        ...payload,
+        id: newId,
+        created_at: now,
+        deleted_at: null,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      const msg = error.message || '';
+      if (msg.includes('Could not find the table') || msg.includes('schema cache') || (error as any).code === 'PGRST204') {
+        throw new Error(
+          "La tabella 'quaderno' non è ancora stata creata nel database Supabase. Esegui il file SQL 'supabase/APPLICA_QUADERNO_PRODUZIONE.sql' nel SQL Editor di Supabase per attivarla."
+        );
+      }
+      throw new Error(error.message);
+    }
+    savedRecord = resData;
+  }
+
+  await upsertRecords('quaderno', [savedRecord]);
+  return savedRecord;
+}
+
+/**
+ * Esegue il soft-delete di una pagina del Quaderno.
+ */
+export async function deleteQuadernoPagina(id: string): Promise<void> {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    throw new Error(I18N.status.offlineNotice);
+  }
+
+  const now = new Date().toISOString();
+  const { error } = await supabase
+    .from('quaderno')
+    .update({ deleted_at: now, updated_at: now })
+    .eq('id', id);
+
+  if (error) throw new Error(error.message);
+
+  const db = await getDb();
+  const existing = (await db.get('quaderno', id)) as QuadernoPagina | undefined;
+  if (existing) {
+    await upsertRecords('quaderno', [{ ...existing, deleted_at: now, updated_at: now }]);
+  }
+}
+

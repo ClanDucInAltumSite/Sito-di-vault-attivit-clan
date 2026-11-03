@@ -22,6 +22,8 @@ import {
   getWallCalendarDate,
   getEventCountdownText,
   getEventTypeInfo,
+  isEventoOrariDaDefinire,
+  formatEventDateTimeRange,
 } from '../../lib/calendario';
 import {
   subscribeSyncState,
@@ -34,7 +36,7 @@ import { useAdmin } from '../../lib/auth';
 export function HomeView() {
   const { isAdmin } = useAdmin();
   const [searchQuery, setSearchQuery] = useState('');
-  const [counts, setCounts] = useState({ giochi: 0, bans: 0, canti: 0, calendario: 0 });
+  const [counts, setCounts] = useState({ giochi: 0, bans: 0, canti: 0, calendario: 0, quaderno: 0 });
   const [recentItems, setRecentItems] = useState<RecentItem[]>([]);
   const [nextEventData, setNextEventData] = useState<{
     evento: Evento;
@@ -121,13 +123,15 @@ export function HomeView() {
         {/* 6. CARD PROSSIMO EVENTO (CALENDARIO DA PARETE) CON STATO VUOTO CURATO */}
         {nextEventData ? (
           (() => {
-            const dateInfo = getWallCalendarDate(nextEventData.evento.inizio);
+            const dateInfo = getWallCalendarDate(nextEventData.evento.inizio, false, nextEventData.evento.tipo);
             const countdown = getEventCountdownText(nextEventData.evento);
             const typeInfo = getEventTypeInfo(nextEventData.evento.tipo);
             const openOdg = nextEventData.openOdgCount ?? 0;
-            const timeStr = nextEventData.evento.tutto_il_giorno
-              ? 'Tutto il giorno'
+            const isDateOnly = isEventoOrariDaDefinire(nextEventData.evento) || nextEventData.evento.tutto_il_giorno;
+            const timeStr = isDateOnly
+              ? formatEventDateTimeRange(nextEventData.evento)
               : `Ore ${new Date(nextEventData.evento.inizio).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`;
+            const hasLuogo = Boolean(nextEventData.evento.luogo && nextEventData.evento.luogo.trim());
 
             return (
               <div
@@ -156,16 +160,16 @@ export function HomeView() {
                     <span className={typeInfo.chipClass}>{typeInfo.label}</span>
                     <span
                       className="home-event-countdown"
-                      style={dateInfo.isToday ? { color: 'var(--color-bans)' } : undefined}
+                      style={dateInfo.isToday ? { color: typeInfo.colorVar, fontWeight: 700 } : undefined}
                     >
                       {countdown}
                     </span>
                   </div>
                   <div className="home-event-title">{nextEventData.evento.titolo}</div>
                   <div className="home-event-meta">
-                    <span>
+                    <span style={dateInfo.isToday ? { color: typeInfo.colorVar, fontWeight: 600 } : undefined}>
                       {timeStr}
-                      {nextEventData.evento.luogo ? ` • ${nextEventData.evento.luogo}` : ''}
+                      {hasLuogo ? ` • ${nextEventData.evento.luogo}` : ''}
                     </span>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                       {openOdg > 0 ? (
@@ -319,6 +323,34 @@ export function HomeView() {
               <h2 className="home-tile-title">{I18N.nav.calendario}</h2>
               <p style={{ margin: '2px 0 0', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
                 Attività e punti ODG
+              </p>
+            </div>
+          </div>
+
+          {/* TESSERA QUADERNO DI CLAN */}
+          <div
+            className="home-tile"
+            role="button"
+            tabIndex={0}
+            onClick={() => navigate('quaderno')}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                navigate('quaderno');
+              }
+            }}
+            style={{ gridColumn: 'span 2' }}
+          >
+            <div className="home-tile-header">
+              <SectionIcon section="quaderno" size="md" />
+              <span className="home-tile-count tabular-nums">
+                {isLoading ? '…' : counts.quaderno}
+              </span>
+            </div>
+            <div>
+              <h2 className="home-tile-title">{I18N.quaderno.title}</h2>
+              <p style={{ margin: '2px 0 0', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
+                {I18N.quaderno.subtitle}
               </p>
             </div>
           </div>

@@ -11,6 +11,7 @@ import {
   hardDeleteRecord,
   purgeTrash,
 } from '../../lib/admin_actions';
+import { DeleteConfirmModal } from '../../ui/DeleteConfirmModal';
 
 export interface TrashSheetProps {
   isOpen: boolean;
@@ -22,6 +23,11 @@ export function TrashSheet({ isOpen, onClose, onItemsChanged }: TrashSheetProps)
   const [items, setItems] = useState<TrashItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+
+  // Modale per eliminazione definitiva a due passaggi
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [deletingItem, setDeletingItem] = useState<TrashItem | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const loadTrash = async () => {
     setIsLoading(true);
@@ -45,30 +51,31 @@ export function TrashSheet({ isOpen, onClose, onItemsChanged }: TrashSheetProps)
       await restoreRecord(item.table, item.id);
       await loadTrash();
       onItemsChanged?.();
-    } catch (err: any) {
-      alert(err.message || 'Errore durante il ripristino');
+    } catch {
+      // Ripristino silenzioso
     } finally {
       setActionLoadingId(null);
     }
   };
 
-  const handleHardDelete = async (item: TrashItem) => {
-    if (
-      !confirm(
-        `Sei sicuro di voler eliminare DEFINITIVAMENTE «${item.title}»?\n\nAttenzione: gli altri dispositivi potrebbero mostrarlo fino al prossimo aggiornamento completo. L'operazione non può essere annullata.`
-      )
-    ) {
-      return;
-    }
-    setActionLoadingId(item.id);
+  const handleHardDeleteRequest = (item: TrashItem) => {
+    setDeletingItem(item);
+    setIsDeleteOpen(true);
+  };
+
+  const handleHardDeleteConfirm = async () => {
+    if (!deletingItem) return;
+    setIsDeleting(true);
     try {
-      await hardDeleteRecord(item.table, item.id);
+      await hardDeleteRecord(deletingItem.table, deletingItem.id);
       await loadTrash();
       onItemsChanged?.();
-    } catch (err: any) {
-      alert(err.message || 'Errore durante l\'eliminazione');
+      setIsDeleteOpen(false);
+      setDeletingItem(null);
+    } catch {
+      // Eliminazione silenziosa
     } finally {
-      setActionLoadingId(null);
+      setIsDeleting(false);
     }
   };
 
@@ -81,8 +88,8 @@ export function TrashSheet({ isOpen, onClose, onItemsChanged }: TrashSheetProps)
       await purgeTrash(); // Svuota tutto
       await loadTrash();
       onItemsChanged?.();
-    } catch (err: any) {
-      alert(err.message || 'Errore durante lo svuotamento del cestino');
+    } catch {
+      // Svuotamento silenzioso
     } finally {
       setIsLoading(false);
     }
@@ -206,7 +213,7 @@ export function TrashSheet({ isOpen, onClose, onItemsChanged }: TrashSheetProps)
                   <Button
                     variant="danger"
                     size="sm"
-                    onClick={() => handleHardDelete(item)}
+                    onClick={() => handleHardDeleteRequest(item)}
                     disabled={actionLoadingId !== null}
                     aria-label={`Elimina definitivamente ${item.title}`}
                   >
@@ -218,6 +225,18 @@ export function TrashSheet({ isOpen, onClose, onItemsChanged }: TrashSheetProps)
           })}
         </div>
       )}
+
+      {/* Modal Conferma Eliminazione definitiva in due passaggi (Admin) */}
+      <DeleteConfirmModal
+        isOpen={isDeleteOpen}
+        onClose={() => {
+          setIsDeleteOpen(false);
+          setDeletingItem(null);
+        }}
+        onConfirm={handleHardDeleteConfirm}
+        itemName={deletingItem?.title || ''}
+        isLoading={isDeleting}
+      />
     </BottomSheet>
   );
 }

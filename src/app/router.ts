@@ -6,6 +6,7 @@ export type RouteName =
   | 'bans'
   | 'canti'
   | 'calendario'
+  | 'quaderno'
   | 'stampa'
   | 'admin'
   | 'design'
@@ -35,6 +36,7 @@ function parseHash(hashString: string): RouteState {
   else if (path === 'bans' || path.startsWith('bans/')) route = 'bans';
   else if (path === 'canti' || path.startsWith('canti/')) route = 'canti';
   else if (path === 'calendario' || path.startsWith('calendario/')) route = 'calendario';
+  else if (path === 'quaderno' || path.startsWith('quaderno/')) route = 'quaderno';
   else if (path === 'stampa') route = 'stampa';
   else if (path === 'admin') route = 'admin';
   else if (path === 'design') route = 'design';

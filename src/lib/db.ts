@@ -7,9 +7,24 @@ export const CONTENT_TABLES = [
   'eventi',
   'odg_punti',
   'allegati',
+  'quaderno',
 ] as const;
 
 export type ContentTableName = (typeof CONTENT_TABLES)[number];
+
+export type QuadernoCategoria = 'riunione' | 'punto_strada' | 'verifica' | 'libero';
+
+export interface QuadernoPagina {
+  id: string;
+  data: string; // YYYY-MM-DD
+  titolo: string;
+  categoria: QuadernoCategoria;
+  contenuto: string;
+  evento_id?: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
 
 export interface Gioco {
   id: string;
@@ -26,6 +41,7 @@ export interface Ban {
   nome: string;
   testo: string;
   note_gesti: string;
+  link?: string | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -65,6 +81,7 @@ export interface Evento {
   descrizione: string | null;
   responsabile: string | null;
   cosa_portare: string | null;
+  appunti?: string | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -119,7 +136,7 @@ export interface RecentItem {
 }
 
 const DB_NAME = 'vault_scout_db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let dbPromise: Promise<IDBPDatabase> | null = null;
 
@@ -145,6 +162,9 @@ export function getDb(): Promise<IDBPDatabase> {
               store.createIndex('ban_id', 'ban_id');
               store.createIndex('canto_id', 'canto_id');
               store.createIndex('evento_id', 'evento_id');
+            } else if (table === 'quaderno') {
+              store.createIndex('data', 'data');
+              store.createIndex('categoria', 'categoria');
             }
           }
         }
@@ -314,7 +334,7 @@ export async function getOdgPunti(eventoId?: string, includeDeleted = false): Pr
 
   return allPoints
     .filter((p) => {
-      if (eventoId && p.evento_id !== eventoId) return false;
+      if (eventoId !== undefined && p.evento_id !== eventoId) return false;
       if (!includeDeleted && p.deleted_at !== null) return false;
       const parent = activeEventoMap.get(p.evento_id);
       if (!includeDeleted && parent && parent.deleted_at !== null) return false;
@@ -359,6 +379,17 @@ export async function getAllegati(
   });
 }
 
+export async function getQuadernoPagine(includeDeleted = false): Promise<QuadernoPagina[]> {
+  const db = await getDb();
+  const all = (await db.getAll('quaderno')) as QuadernoPagina[];
+  const filtered = includeDeleted ? all : all.filter((item) => item.deleted_at === null);
+  return filtered.sort((a, b) => {
+    const dateCmp = b.data.localeCompare(a.data);
+    if (dateCmp !== 0) return dateCmp;
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
+}
+
 /**
  * Conteggio record attivi (non eliminati) per ciascuna sezione principale.
  */
@@ -367,12 +398,14 @@ export async function getSectionCounts(): Promise<{
   bans: number;
   canti: number;
   calendario: number;
+  quaderno: number;
 }> {
-  const [giochi, bans, canti, eventi] = await Promise.all([
+  const [giochi, bans, canti, eventi, quaderno] = await Promise.all([
     getGiochi(false),
     getBans(false),
     getCanti(false),
     getEventi(false),
+    getQuadernoPagine(false),
   ]);
 
   return {
@@ -380,6 +413,7 @@ export async function getSectionCounts(): Promise<{
     bans: bans.length,
     canti: canti.length,
     calendario: eventi.length,
+    quaderno: quaderno.length,
   };
 }
 
@@ -480,6 +514,7 @@ export async function getNextUpcomingEvent(): Promise<{
   const now = new Date();
   // Considera eventi che finiscono nel futuro, oppure che iniziano da oggi in poi
   const upcoming = eventi.filter((e) => {
+    if (e.inizio.startsWith('2099') || e.descrizione?.includes('[DATA_DA_DEFINIRE]')) return false;
     const start = new Date(e.inizio);
     const end = e.fine ? new Date(e.fine) : null;
     return end ? end >= now : start >= new Date(now.getFullYear(), now.getMonth(), now.getDate());

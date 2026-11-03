@@ -49,6 +49,7 @@ export function formatDateKey(date: Date): string {
 
 export const SENTINEL_DATA_DA_DEFINIRE = '2099-12-31T20:45:00.000Z';
 export const TAG_DATA_DA_DEFINIRE = '[DATA_DA_DEFINIRE]';
+export const TAG_ORARI_DA_DEFINIRE = '[ORARI_DA_DEFINIRE]';
 
 /**
  * Verifica se un evento ha la data ancora da concordare/definire (es. per preparare l'ODG in anticipo).
@@ -62,11 +63,24 @@ export function isEventoDataDaDefinire(evento: Evento | null | undefined): boole
 }
 
 /**
- * Rimuove il tag [DATA_DA_DEFINIRE] dalla descrizione visibile all'utente.
+ * Verifica se un evento non ha orari precisi (lavora su giorni o ha orari ancora da definire nelle note).
+ */
+export function isEventoOrariDaDefinire(evento: Evento | null | undefined): boolean {
+  if (!evento) return false;
+  if (isEventoDataDaDefinire(evento)) return false;
+  return Boolean(
+    evento.tutto_il_giorno ||
+    (evento.descrizione && evento.descrizione.includes(TAG_ORARI_DA_DEFINIRE)) ||
+    evento.inizio.endsWith('T12:00:00.000Z')
+  );
+}
+
+/**
+ * Rimuove i tag di stato ([DATA_DA_DEFINIRE], [ORARI_DA_DEFINIRE]) dalla descrizione visibile all'utente.
  */
 export function getCleanDescrizione(descrizione: string | null | undefined): string {
   if (!descrizione) return '';
-  return descrizione.replace(/\[DATA_DA_DEFINIRE\]\s*/g, '').trim();
+  return descrizione.replace(/\[(?:DATA_DA_DEFINIRE|ORARI_DA_DEFINIRE)\]\s*/g, '').trim();
 }
 
 /**
@@ -207,7 +221,11 @@ export function buildMonthGrid(year: number, month: number, eventi: Evento[] = [
 /**
  * Restituisce i dettagli per il blocco data calendario da parete (.calendar-date-block).
  */
-export function getWallCalendarDate(isoString: string, isDataDaDefinire?: boolean): {
+export function getWallCalendarDate(
+  isoString: string,
+  isDataDaDefinire?: boolean,
+  tipo?: TipoEvento
+): {
   month: string;
   day: string;
   weekday: string;
@@ -215,14 +233,14 @@ export function getWallCalendarDate(isoString: string, isDataDaDefinire?: boolea
 } {
   if (isDataDaDefinire || isoString.startsWith('2099')) {
     return {
-      month: 'ODG',
+      month: tipo && tipo !== 'riunione' ? 'DATA' : 'ODG',
       day: '?',
       weekday: 'DA DEFINIRE',
       isToday: false,
     };
   }
 
-  const d = new Date(isoString);
+  const d = parseDateOnly(isoString);
   const today = new Date();
   const isToday =
     d.getDate() === today.getDate() &&
@@ -266,15 +284,15 @@ export function getEventCountdownText(evento: Evento): string {
 }
 
 /**
- * Formattazione testuale completa dell'intervallo data/ora in italiano.
+ * Formattazione testuale dell'intervallo data in italiano.
+ * Non include orari se l'evento è tutto il giorno o marcato senza orari.
  */
 export function formatEventDateTimeRange(evento: Evento): string {
   if (isEventoDataDaDefinire(evento)) {
-    return 'Data e ora da concordare';
+    return 'Data da concordare';
   }
 
-  const start = new Date(evento.inizio);
-  const isMultiDay = evento.fine && parseDateOnly(evento.inizio).getTime() !== parseDateOnly(evento.fine).getTime();
+  const isMultiDay = Boolean(evento.fine && parseDateOnly(evento.inizio).getTime() !== parseDateOnly(evento.fine).getTime());
 
   const optionsDate: Intl.DateTimeFormatOptions = {
     weekday: 'short',
@@ -287,28 +305,36 @@ export function formatEventDateTimeRange(evento: Evento): string {
     minute: '2-digit',
   };
 
-  if (evento.tutto_il_giorno) {
+  const formatCapitalized = (d: Date) => {
+    const str = d.toLocaleDateString('it-IT', optionsDate);
+    return str.charAt(0).toUpperCase() + str.slice(1);
+  };
+
+  if (isEventoOrariDaDefinire(evento) || evento.tutto_il_giorno) {
+    const startDateOnly = parseDateOnly(evento.inizio);
     if (!evento.fine || !isMultiDay) {
-      return `${start.toLocaleDateString('it-IT', optionsDate)} • Tutto il giorno`;
+      return formatCapitalized(startDateOnly);
     }
-    const end = new Date(evento.fine);
-    return `${start.toLocaleDateString('it-IT', optionsDate)} – ${end.toLocaleDateString('it-IT', optionsDate)} • Tutto il giorno`;
+    const endDateOnly = parseDateOnly(evento.fine);
+    return `${formatCapitalized(startDateOnly)} – ${formatCapitalized(endDateOnly)}`;
   }
 
+  // Retrocompatibilità per record esistenti con orari espliciti
+  const start = new Date(evento.inizio);
   const startTimeStr = start.toLocaleTimeString('it-IT', optionsTime);
 
   if (!evento.fine) {
-    return `${start.toLocaleDateString('it-IT', optionsDate)}, ${startTimeStr}`;
+    return `${formatCapitalized(start)}, ${startTimeStr}`;
   }
 
   const end = new Date(evento.fine);
   const endTimeStr = end.toLocaleTimeString('it-IT', optionsTime);
 
   if (!isMultiDay) {
-    return `${start.toLocaleDateString('it-IT', optionsDate)}, ${startTimeStr} – ${endTimeStr}`;
+    return `${formatCapitalized(start)}, ${startTimeStr} – ${endTimeStr}`;
   }
 
-  return `${start.toLocaleDateString('it-IT', optionsDate)} ${startTimeStr} – ${end.toLocaleDateString('it-IT', optionsDate)} ${endTimeStr}`;
+  return `${formatCapitalized(start)} ${startTimeStr} – ${formatCapitalized(end)} ${endTimeStr}`;
 }
 
 /**
@@ -318,6 +344,7 @@ export function getEventTypeInfo(tipo: TipoEvento): {
   chipClass: string;
   dotColorClass: string;
   label: string;
+  colorVar: string;
 } {
   switch (tipo) {
     case 'riunione':
@@ -325,24 +352,28 @@ export function getEventTypeInfo(tipo: TipoEvento): {
         chipClass: 'event-type-chip event-chip-riunione',
         dotColorClass: 'event-dot-riunione',
         label: 'Riunione',
+        colorVar: 'var(--color-quaderno)',
       };
     case 'uscita':
       return {
         chipClass: 'event-type-chip event-chip-uscita',
         dotColorClass: 'event-dot-uscita',
         label: 'Uscita',
+        colorVar: 'var(--color-uscita)',
       };
     case 'scadenza':
       return {
         chipClass: 'event-type-chip event-chip-scadenza',
         dotColorClass: 'event-dot-scadenza',
         label: 'Scadenza',
+        colorVar: 'var(--color-bans)',
       };
     case 'evento':
       return {
         chipClass: 'event-type-chip event-chip-evento',
         dotColorClass: 'event-dot-evento',
         label: 'Evento',
+        colorVar: 'var(--color-interactive)',
       };
     case 'altro':
     default:
@@ -350,6 +381,7 @@ export function getEventTypeInfo(tipo: TipoEvento): {
         chipClass: 'event-type-chip event-chip-altro',
         dotColorClass: 'event-dot-altro',
         label: 'Altro',
+        colorVar: 'var(--color-neutral)',
       };
   }
 }

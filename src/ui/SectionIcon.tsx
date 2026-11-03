@@ -1,6 +1,6 @@
 import { Icon, IconName } from './Icon';
 
-export type SectionType = 'giochi' | 'bans' | 'canti' | 'calendario' | 'stampa' | 'admin';
+export type SectionType = 'giochi' | 'bans' | 'canti' | 'calendario' | 'quaderno' | 'stampa' | 'admin';
 
 export interface SectionIconProps {
   section: SectionType;

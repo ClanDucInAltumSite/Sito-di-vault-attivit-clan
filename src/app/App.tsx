@@ -15,6 +15,7 @@ const GiochiView = lazy(() => import('../features/giochi/GiochiView').then((m) =
 const BansView = lazy(() => import('../features/bans/BansView').then((m) => ({ default: m.BansView })));
 const CantiView = lazy(() => import('../features/canti/CantiView').then((m) => ({ default: m.CantiView })));
 const CalendarioView = lazy(() => import('../features/calendario/CalendarioView').then((m) => ({ default: m.CalendarioView })));
+const QuadernoView = lazy(() => import('../features/quaderno/QuadernoView').then((m) => ({ default: m.QuadernoView })));
 const StampaView = lazy(() => import('../features/stampa/StampaView').then((m) => ({ default: m.StampaView })));
 const AdminView = lazy(() => import('../features/admin/AdminView').then((m) => ({ default: m.AdminView })));
 const DesignSystemView = lazy(() => import('../features/design/DesignSystemView').then((m) => ({ default: m.DesignSystemView })));
@@ -92,6 +93,7 @@ export function App() {
   else if (route === 'bans') CurrentView = BansView;
   else if (route === 'canti') CurrentView = CantiView;
   else if (route === 'calendario') CurrentView = CalendarioView;
+  else if (route === 'quaderno') CurrentView = QuadernoView;
   else if (route === 'stampa') CurrentView = StampaView;
   else if (route === 'admin') CurrentView = AdminView;
   else if (route === 'design') CurrentView = DesignSystemView;

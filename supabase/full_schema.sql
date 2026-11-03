@@ -93,6 +93,7 @@ CREATE TABLE IF NOT EXISTS public.eventi (
   descrizione text NULL,
   responsabile text NULL,
   cosa_portare text NULL,
+  appunti text NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   deleted_at timestamptz NULL,
@@ -138,6 +139,20 @@ CREATE TABLE IF NOT EXISTS public.allegati (
   )
 );
 
+-- Tabella Quaderno di Clan
+CREATE TABLE IF NOT EXISTS public.quaderno (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  data date NOT NULL DEFAULT CURRENT_DATE,
+  titolo text NOT NULL,
+  categoria text NOT NULL DEFAULT 'riunione',
+  contenuto text NOT NULL DEFAULT '',
+  evento_id uuid NULL REFERENCES public.eventi(id) ON DELETE SET NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  deleted_at timestamptz NULL,
+  CONSTRAINT check_quaderno_categoria CHECK (categoria IN ('riunione', 'punto_strada', 'verifica', 'libero'))
+);
+
 -- Trigger per updated_at
 DROP TRIGGER IF EXISTS trg_giochi_updated ON public.giochi;
 CREATE TRIGGER trg_giochi_updated BEFORE UPDATE ON public.giochi FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
@@ -157,11 +172,17 @@ CREATE TRIGGER trg_odg_punti_updated BEFORE UPDATE ON public.odg_punti FOR EACH 
 DROP TRIGGER IF EXISTS trg_allegati_updated ON public.allegati;
 CREATE TRIGGER trg_allegati_updated BEFORE UPDATE ON public.allegati FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
+DROP TRIGGER IF EXISTS trg_quaderno_updated ON public.quaderno;
+CREATE TRIGGER trg_quaderno_updated BEFORE UPDATE ON public.quaderno FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
 -- Indici
 CREATE INDEX IF NOT EXISTS idx_giochi_updated_at ON public.giochi(updated_at);
 CREATE INDEX IF NOT EXISTS idx_bans_updated_at ON public.bans(updated_at);
 CREATE INDEX IF NOT EXISTS idx_canti_updated_at ON public.canti(updated_at);
 CREATE INDEX IF NOT EXISTS idx_eventi_updated_at ON public.eventi(updated_at);
+CREATE INDEX IF NOT EXISTS idx_quaderno_updated_at ON public.quaderno(updated_at);
+CREATE INDEX IF NOT EXISTS idx_quaderno_data ON public.quaderno(data DESC);
+CREATE INDEX IF NOT EXISTS idx_quaderno_categoria ON public.quaderno(categoria);
 CREATE INDEX IF NOT EXISTS idx_odg_punti_updated_at ON public.odg_punti(updated_at);
 CREATE INDEX IF NOT EXISTS idx_allegati_updated_at ON public.allegati(updated_at);
 
@@ -261,6 +282,17 @@ CREATE POLICY "allegati_update_admin" ON public.allegati FOR UPDATE USING (publi
 DROP POLICY IF EXISTS "allegati_delete_admin" ON public.allegati;
 CREATE POLICY "allegati_delete_admin" ON public.allegati FOR DELETE USING (public.is_admin());
 
+-- Policy quaderno
+ALTER TABLE public.quaderno ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "quaderno_select_public" ON public.quaderno;
+CREATE POLICY "quaderno_select_public" ON public.quaderno FOR SELECT USING (true);
+DROP POLICY IF EXISTS "quaderno_insert_admin" ON public.quaderno;
+CREATE POLICY "quaderno_insert_admin" ON public.quaderno FOR INSERT WITH CHECK (public.is_admin());
+DROP POLICY IF EXISTS "quaderno_update_admin" ON public.quaderno;
+CREATE POLICY "quaderno_update_admin" ON public.quaderno FOR UPDATE USING (public.is_admin()) WITH CHECK (public.is_admin());
+DROP POLICY IF EXISTS "quaderno_delete_admin" ON public.quaderno;
+CREATE POLICY "quaderno_delete_admin" ON public.quaderno FOR DELETE USING (public.is_admin());
+
 -- Pubblicazione Realtime
 DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
@@ -270,6 +302,7 @@ DO $$ BEGIN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.eventi;
     ALTER PUBLICATION supabase_realtime ADD TABLE public.odg_punti;
     ALTER PUBLICATION supabase_realtime ADD TABLE public.allegati;
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.quaderno;
   END IF;
 EXCEPTION
   WHEN duplicate_object THEN NULL;
