@@ -396,10 +396,11 @@ test.describe('CORREZIONE 2 - Verifica Stress UI con Dati Sporchi, Viewport Rist
 
     // 8. Verifica che l'ultimo elemento della lista NON sia coperto dalla barra di navigazione inferiore
     await searchInput.fill('');
-    await page.waitForTimeout(300);
+    await page.waitForFunction(() => document.querySelectorAll('.ios-grouped-row').length >= 200);
+    await page.waitForTimeout(200);
 
     // Scroll fino in fondo alla pagina
-    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await page.evaluate(() => window.scrollTo(0, Math.max(document.body.scrollHeight, document.documentElement.scrollHeight)));
     await page.waitForTimeout(200);
 
     const tabBounding = await page.locator('.ios-tab-bar').boundingBox();
@@ -759,7 +760,10 @@ test.describe('Audit Finale Completo: Responsività su 10 Viste (320px SE, 390px
 
   const TEST_VIEWPORTS = [
     { name: 'iPhone SE (320x568)', width: 320, height: 568 },
+    { name: 'iPhone Standard (375x667)', width: 375, height: 667 },
     { name: 'iPhone 13/14/15 (390x844)', width: 390, height: 844 },
+    { name: 'Mobile Landscape (844x390)', width: 844, height: 390 },
+    { name: 'Tablet iPad (768x1024)', width: 768, height: 1024 },
     { name: 'Desktop (1440x900)', width: 1440, height: 900 },
   ];
 

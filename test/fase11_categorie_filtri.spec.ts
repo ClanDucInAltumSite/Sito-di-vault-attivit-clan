@@ -68,7 +68,7 @@ test.describe('FASE 11F — Categorie Canti, Filtri, Badge e Assegnazione Rapida
     await expect(page.locator('.container').first()).toBeVisible();
 
     // Verifica presenza sezione Canti
-    const cantiHeading = page.getByRole('heading', { name: /Canti/i });
+    const cantiHeading = page.getByRole('heading', { name: /Canti/i }).first();
     await expect(cantiHeading).toBeVisible();
 
     // Verifica presenza pulsanti rapidi selezione categoria nel Centro Stampa

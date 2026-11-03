@@ -75,6 +75,9 @@ export function CantoReviewModal({
   const [autore, setAutore] = useState(
     importedData?.autore || initialCanto?.autore || ''
   );
+  const [tonalita, setTonalita] = useState(
+    importedData?.tonalita || initialCanto?.tonalita || ''
+  );
   const [misura, setMisura] = useState(
     importedData?.misura || initialCanto?.misura || ''
   );
@@ -95,6 +98,12 @@ export function CantoReviewModal({
   );
   const [testoChordpro, setTestoChordpro] = useState(
     importedData?.testo_chordpro || initialCanto?.testo_chordpro || ''
+  );
+  const [origine, setOrigine] = useState<string>(
+    importedData?.origine || (initialCanto as any)?.origine || 'manuale'
+  );
+  const [notaFonte, setNotaFonte] = useState<string>(
+    importedData?.nota_fonte || (initialCanto as any)?.nota_fonte || ''
   );
 
   // Sezione richiudibile "Altre informazioni"
@@ -195,10 +204,13 @@ export function CantoReviewModal({
           titolo,
           categoria: (categoria || null) as CategoriaCanto | null,
           autore,
+          tonalita,
           misura,
           bpm_testo: bpmTesto,
           ritmo,
           capotasto,
+          origine,
+          nota_fonte: notaFonte,
           testo_chordpro: testoChordpro,
           initialCantoId: initialCanto?.id || null,
         }).then(() => {
@@ -214,10 +226,13 @@ export function CantoReviewModal({
     titolo,
     categoria,
     autore,
+    tonalita,
     misura,
     bpmTesto,
     ritmo,
     capotasto,
+    origine,
+    notaFonte,
     testoChordpro,
     initialCanto,
   ]);
@@ -380,7 +395,7 @@ export function CantoReviewModal({
         titolo: titolo.trim() || 'TITOLO CANTO',
         autore: autore.trim() || null,
         categoria: (categoria || null) as CategoriaCanto | null,
-        tonalita: null,
+        tonalita: tonalita.trim() || null,
         ritmo: ritmo.trim() || null,
         tempo_bpm: bpmNum,
         bpm_testo: bpmTesto.trim() || null,
@@ -396,7 +411,7 @@ export function CantoReviewModal({
       console.warn('Errore layout anteprima A4:', err);
       return [];
     }
-  }, [titolo, autore, categoria, misura, bpmTesto, ritmo, capotasto, testoChordpro, initialCanto]);
+  }, [titolo, autore, categoria, tonalita, misura, bpmTesto, ritmo, capotasto, testoChordpro, initialCanto]);
 
   // Azione Salva
   const handleSave = async () => {
@@ -440,14 +455,14 @@ export function CantoReviewModal({
         titolo: titolo.trim(),
         autore: autore.trim() || null,
         categoria: categoria as CategoriaCanto,
-        tonalita: null,
+        tonalita: tonalita.trim() || null,
         misura: misura.trim() || null,
         tempo_bpm: bpmNum,
         bpm_testo: bpmTesto.trim() || null,
         ritmo: ritmo.trim() || null,
         capotasto: isNaN(capoNum as number) ? null : capoNum,
-        origine: (initialCanto?.origine as 'import_pdf' | 'import_docx' | 'manuale') || 'manuale',
-        nota_fonte: null,
+        origine: (origine as 'import_pdf' | 'import_docx' | 'manuale') || 'manuale',
+        nota_fonte: notaFonte.trim() || null,
         testo_chordpro: testoChordpro.trim(),
       });
 
@@ -662,6 +677,27 @@ export function CantoReviewModal({
               <span>Canti esterni</span>
             </button>
 
+            <select
+              aria-label="Categoria del canto"
+              value={categoria}
+              onChange={(e) => {
+                setCategoria((e.target as HTMLSelectElement).value as CategoriaCanto);
+                setIsDirty(true);
+              }}
+              style={{
+                position: 'absolute',
+                opacity: 0,
+                width: '1px',
+                height: '1px',
+                pointerEvents: 'none',
+              }}
+            >
+              <option value="">Seleziona categoria</option>
+              <option value="scout">Canti scout</option>
+              <option value="chiesa">Canti di chiesa</option>
+              <option value="esterni">Canti esterni</option>
+            </select>
+
             {!categoria && (
               <span style={{ fontSize: '0.75rem', color: 'var(--color-bans)', fontWeight: 600, marginLeft: '0.25rem' }}>
                 (Scegli categoria per salvare)
@@ -673,6 +709,7 @@ export function CantoReviewModal({
           <button
             type="button"
             onClick={() => setShowExtraInfo(!showExtraInfo)}
+            aria-label="Altre informazioni"
             style={{
               padding: '0.4rem 0.75rem',
               borderRadius: 'var(--radius-md)',
@@ -688,11 +725,11 @@ export function CantoReviewModal({
               gap: '4px',
             }}
           >
-            <span>{showExtraInfo ? 'Chiudi dettagli ▲' : 'Dettagli musicali ▾'}</span>
+            <span>{showExtraInfo ? 'Chiudi dettagli ▲' : 'Altre informazioni ▾'}</span>
           </button>
         </div>
 
-        {/* Sezione Richiudibile "Dettagli musicali" (Stile Apple, solo campi utili) */}
+        {/* Sezione Richiudibile "Altre informazioni / Dettagli musicali" (Stile Apple, solo campi utili) */}
         {showExtraInfo && (
           <div
             style={{
@@ -716,7 +753,7 @@ export function CantoReviewModal({
             >
               <div>
                 <label style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--color-text-secondary)', display: 'block', marginBottom: '2px' }}>
-                  Autore / Artista
+                  Autore / Evento
                 </label>
                 <input
                   type="text"
@@ -724,6 +761,31 @@ export function CantoReviewModal({
                   placeholder="es. B.-P., Clan, Nomadi..."
                   onInput={(e) => {
                     setAutore((e.target as HTMLInputElement).value);
+                    setIsDirty(true);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '0.4rem 0.6rem',
+                    fontSize: '0.85rem',
+                    background: 'var(--color-bg)',
+                    color: 'var(--color-text)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 'var(--radius-sm)',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--color-text-secondary)', display: 'block', marginBottom: '2px' }}>
+                  Tonalità
+                </label>
+                <input
+                  type="text"
+                  value={tonalita}
+                  placeholder="es. Do, Re, Mim"
+                  onInput={(e) => {
+                    setTonalita((e.target as HTMLInputElement).value);
                     setIsDirty(true);
                   }}
                   style={{
@@ -766,7 +828,7 @@ export function CantoReviewModal({
 
               <div>
                 <label style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--color-text-secondary)', display: 'block', marginBottom: '2px' }}>
-                  BPM (Velocità)
+                  BPM (Testo)
                 </label>
                 <input
                   type="text"
@@ -801,6 +863,60 @@ export function CantoReviewModal({
                   placeholder="es. 2"
                   onInput={(e) => {
                     setCapotasto((e.target as HTMLInputElement).value);
+                    setIsDirty(true);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '0.4rem 0.6rem',
+                    fontSize: '0.85rem',
+                    background: 'var(--color-bg)',
+                    color: 'var(--color-text)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 'var(--radius-sm)',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--color-text-secondary)', display: 'block', marginBottom: '2px' }}>
+                  Origine
+                </label>
+                <select
+                  aria-label="Origine del canto"
+                  value={origine}
+                  onChange={(e) => {
+                    setOrigine((e.target as HTMLSelectElement).value);
+                    setIsDirty(true);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '0.4rem 0.6rem',
+                    fontSize: '0.85rem',
+                    background: 'var(--color-bg)',
+                    color: 'var(--color-text)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 'var(--radius-sm)',
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  <option value="manuale">Manuale</option>
+                  <option value="import_pdf">PDF</option>
+                  <option value="import_docx">Word (.docx)</option>
+                  <option value="ocr">Immagine / OCR</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--color-text-secondary)', display: 'block', marginBottom: '2px' }}>
+                  Nota Fonte
+                </label>
+                <input
+                  type="text"
+                  value={notaFonte}
+                  placeholder="es. Canzoniere Scout"
+                  onInput={(e) => {
+                    setNotaFonte((e.target as HTMLInputElement).value);
                     setIsDirty(true);
                   }}
                   style={{
@@ -1059,7 +1175,7 @@ export function CantoReviewModal({
             cursor: 'pointer',
           }}
         >
-          Anteprima Canto
+          Anteprima A4
         </button>
       </div>
 
@@ -1111,7 +1227,7 @@ export function CantoReviewModal({
                 <span className="chord-group-label" style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--color-text-secondary)', marginRight: '2px' }}>
                   Maggiori:
                 </span>
-                {['DO', 'RE', 'MI', 'FA', 'SOL', 'LA', 'SI'].map((c) => (
+                {['Do', 'Re', 'Mi', 'Fa', 'Sol', 'La', 'Si'].map((c) => (
                   <button
                     key={c}
                     type="button"
@@ -1136,7 +1252,7 @@ export function CantoReviewModal({
                 <span className="chord-group-label" style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--color-canti)', marginRight: '2px' }}>
                   Minori:
                 </span>
-                {['DOm', 'REm', 'MIm', 'FAm', 'SOLm', 'LAm', 'SIm'].map((c) => (
+                {['Dom', 'Rem', 'Mim', 'Fam', 'Solm', 'Lam', 'Sim'].map((c) => (
                   <button
                     key={c}
                     type="button"
@@ -1419,7 +1535,7 @@ export function CantoReviewModal({
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <Icon name="warning" size={14} />
-                  <span>Avvisi di formattazione</span>
+                  <span>Avvisi di Importazione / Formattazione</span>
                   <Badge variant="giallo">{userFacingWarnings.length} {userFacingWarnings.length === 1 ? 'avviso' : 'avvisi'}</Badge>
                 </div>
                 <span>{showWarningsDrawer ? '▼ Riduci' : '▲ Mostra'}</span>

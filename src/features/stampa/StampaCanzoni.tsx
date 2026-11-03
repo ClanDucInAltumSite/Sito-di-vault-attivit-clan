@@ -335,12 +335,51 @@ export function StampaCanzoni() {
             <Icon name="info" size={14} />
             <span>Ordine di stampa: per settore, poi alfabetico (come l'indice).</span>
           </div>
-          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+          <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
             <Button variant="ghost" size="sm" onClick={selectAll}>
               Seleziona tutti ({canti.length})
             </Button>
             <Button variant="ghost" size="sm" onClick={deselectAll}>
               Nessuno
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                const scoutIds = canti.filter((c) => getSectorKey(c.categoria) === 'scout').map((c) => c.id);
+                updateConfig({
+                  ...config,
+                  selectedCantiIds: Array.from(new Set([...config.selectedCantiIds, ...scoutIds])),
+                });
+              }}
+            >
+              + Tutti Scout
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                const chiesaIds = canti.filter((c) => getSectorKey(c.categoria) === 'chiesa').map((c) => c.id);
+                updateConfig({
+                  ...config,
+                  selectedCantiIds: Array.from(new Set([...config.selectedCantiIds, ...chiesaIds])),
+                });
+              }}
+            >
+              + Tutti Chiesa
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                const esterniIds = canti.filter((c) => getSectorKey(c.categoria) === 'esterni').map((c) => c.id);
+                updateConfig({
+                  ...config,
+                  selectedCantiIds: Array.from(new Set([...config.selectedCantiIds, ...esterniIds])),
+                });
+              }}
+            >
+              + Tutti Esterni
             </Button>
           </div>
         </div>
@@ -507,7 +546,7 @@ export function StampaCanzoni() {
               dataset.items.map((item) => (
                 <div key={item.canto.id} className="print-song-book-item">
                   {item.layoutResult.pages.map((page, pIdx) => (
-                    <div key={`${item.canto.id}-p${pIdx}`} className="stampa-a4-sheet-card">
+                    <div key={`${item.canto.id}-p${pIdx}`} className="stampa-a4-sheet-card canzoniere-page">
                       <CanzonierePageRenderer
                         page={page}
                         isScreenPreview={false}

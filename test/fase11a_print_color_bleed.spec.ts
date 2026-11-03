@@ -7,6 +7,9 @@ test.describe('FASE 11A — Regressione: Stili di stampa non devono inquinare le
     test(`I colori calcolati di lettura e dettaglio canti restano identici prima e dopo visita a #/stampa (Tema: ${theme})`, async ({
       page,
     }) => {
+      // Blocca chiamate Supabase per isolare il database locale ed evitare che il full resync sovrascriva i record di test
+      await page.route('**/*.supabase.co/**', (route) => route.abort());
+
       // 1. Inizializza contesto su #/
       await page.goto('#/');
       await page.waitForLoadState('domcontentloaded');
@@ -162,7 +165,7 @@ test.describe('FASE 11A — Regressione: Stili di stampa non devono inquinare le
       });
 
       // Attendi che il canto sia presente nell'elenco
-      const songItemAfter = page.locator('.grouped-row-title, .grouped-row, main').locator('text=CANTO SINTETICO COLLINA VERDE').first();
+      const songItemAfter = page.locator('text=CANTO SINTETICO COLLINA VERDE').first();
       await expect(songItemAfter).toBeVisible({ timeout: 10000 });
 
       // Riapri il Dettaglio
