@@ -6,14 +6,17 @@
      - Azzurro (#00BDFF): Colore interattivo (link, selezione, pulsante primario, tab)
      - Giallo (#FDC500): Sezione Giochi, evidenziazioni ricerca, badge Nuovo, ritornelli
      - Rosso (#E8442D / #FD3000): Sezione Bans, scadenze, oggi, distruttivo
-     - Azzurro Scuro: Sezione Calendario
+     - Verde Bosco Scout / Smeraldo: Sezione Calendario
    ============================================================================== */
 
-@import '@fontsource/roboto/400.css';
-@import '@fontsource/roboto/400-italic.css';
-@import '@fontsource/roboto/700.css';
-@import '@fontsource/roboto/700-italic.css';
-@import '@fontsource/nova-mono/400.css';
+@import '@fontsource/roboto/latin-400.css';
+@import '@fontsource/roboto/latin-400-italic.css';
+@import '@fontsource/roboto/latin-700.css';
+@import '@fontsource/roboto/latin-700-italic.css';
+@import '@fontsource/roboto/latin-ext-400.css';
+@import '@fontsource/roboto/latin-ext-700.css';
+@import '@fontsource/nova-mono/latin-400.css';
+@import '@fontsource/nova-mono/latin-ext-400.css';
 
 @font-face {
   font-family: 'Nova Mono';
@@ -113,11 +116,11 @@
   --color-canti-text: oklch(0.38 0.16 245);
   --color-chord: oklch(0.42 0.18 245);
 
-  /* 4. Calendario = Azzurro Scuro */
-  --color-calendario: oklch(0.42 0.15 255);
-  --color-calendario-hover: oklch(0.37 0.16 255);
-  --color-calendario-tenue: oklch(0.94 0.03 255);
-  --color-calendario-text: oklch(0.28 0.14 255);
+  /* 4. Calendario = Verde Bosco Scout / Smeraldo */
+  --color-calendario: oklch(0.54 0.16 155);
+  --color-calendario-hover: oklch(0.48 0.17 155);
+  --color-calendario-tenue: oklch(0.95 0.04 155);
+  --color-calendario-text: oklch(0.32 0.14 155);
 
   /* 5. Stampa / Admin / Neutro */
   --color-neutral: oklch(0.48 0.02 260);
@@ -129,6 +132,22 @@
   --color-uscita-hover: oklch(0.47 0.16 145);
   --color-uscita-tenue: oklch(0.95 0.04 145);
   --color-uscita-text: oklch(0.30 0.12 145);
+
+  /* 7. Quaderno di Clan = Viola Nobile del Marchio */
+  --color-quaderno: oklch(0.52 0.22 310);
+  --color-quaderno-hover: oklch(0.46 0.23 310);
+  --color-quaderno-tenue: oklch(0.95 0.04 310);
+  --color-quaderno-text: oklch(0.35 0.18 310);
+
+  /* Evidenziatori Documenti Quaderno */
+  --color-highlight-yellow: oklch(0.95 0.12 95);
+  --color-highlight-yellow-text: oklch(0.22 0.08 95);
+  --color-highlight-green: oklch(0.94 0.10 150);
+  --color-highlight-green-text: oklch(0.20 0.08 150);
+  --color-highlight-blue: oklch(0.93 0.08 235);
+  --color-highlight-blue-text: oklch(0.20 0.08 235);
+  --color-highlight-coral: oklch(0.93 0.10 25);
+  --color-highlight-coral-text: oklch(0.25 0.10 25);
 
   /* Targa Bianca del Logo (fondamentale per logo sempre su fondo chiaro) */
   --color-targa-bg: oklch(1 0 0);
@@ -261,10 +280,10 @@
     --color-canti-text: oklch(0.88 0.08 240);
     --color-chord: oklch(0.72 0.16 240);
 
-    --color-calendario: oklch(0.62 0.15 255);
-    --color-calendario-hover: oklch(0.66 0.14 255);
-    --color-calendario-tenue: oklch(0.25 0.035 255);
-    --color-calendario-text: oklch(0.88 0.08 255);
+    --color-calendario: oklch(0.68 0.15 155);
+    --color-calendario-hover: oklch(0.72 0.14 155);
+    --color-calendario-tenue: oklch(0.26 0.045 155);
+    --color-calendario-text: oklch(0.92 0.06 155);
 
     --color-neutral: oklch(0.70 0.015 260);
     --color-neutral-tenue: oklch(0.24 0.01 260);
@@ -275,6 +294,22 @@
     --color-uscita-hover: oklch(0.72 0.14 145);
     --color-uscita-tenue: oklch(0.26 0.045 145);
     --color-uscita-text: oklch(0.92 0.06 145);
+
+    /* 7. Quaderno di Clan */
+    --color-quaderno: oklch(0.64 0.24 310);
+    --color-quaderno-hover: oklch(0.70 0.25 310);
+    --color-quaderno-tenue: oklch(0.26 0.08 310);
+    --color-quaderno-text: oklch(0.92 0.08 310);
+
+    /* Evidenziatori Documenti Quaderno (Dark Mode) */
+    --color-highlight-yellow: oklch(0.35 0.10 95);
+    --color-highlight-yellow-text: oklch(0.96 0.05 95);
+    --color-highlight-green: oklch(0.32 0.08 150);
+    --color-highlight-green-text: oklch(0.95 0.05 150);
+    --color-highlight-blue: oklch(0.32 0.08 235);
+    --color-highlight-blue-text: oklch(0.95 0.05 235);
+    --color-highlight-coral: oklch(0.34 0.09 25);
+    --color-highlight-coral-text: oklch(0.96 0.05 25);
 
     /* Targa Bianca del Logo: resta BIANCA OPACA anche in tema scuro */
     --color-targa-bg: oklch(1 0 0);
@@ -346,10 +381,10 @@
   --color-canti-text: oklch(0.88 0.08 240);
   --color-chord: oklch(0.72 0.16 240);
 
-  --color-calendario: oklch(0.62 0.15 255);
-  --color-calendario-hover: oklch(0.66 0.14 255);
-  --color-calendario-tenue: oklch(0.25 0.035 255);
-  --color-calendario-text: oklch(0.88 0.08 255);
+  --color-calendario: oklch(0.68 0.15 155);
+  --color-calendario-hover: oklch(0.72 0.14 155);
+  --color-calendario-tenue: oklch(0.26 0.045 155);
+  --color-calendario-text: oklch(0.92 0.06 155);
 
   --color-neutral: oklch(0.70 0.015 260);
   --color-neutral-tenue: oklch(0.24 0.01 260);
@@ -360,6 +395,22 @@
   --color-uscita-hover: oklch(0.72 0.14 145);
   --color-uscita-tenue: oklch(0.26 0.045 145);
   --color-uscita-text: oklch(0.92 0.06 145);
+
+  /* 7. Quaderno di Clan */
+  --color-quaderno: oklch(0.64 0.24 310);
+  --color-quaderno-hover: oklch(0.70 0.25 310);
+  --color-quaderno-tenue: oklch(0.26 0.08 310);
+  --color-quaderno-text: oklch(0.92 0.08 310);
+
+  /* Evidenziatori Documenti Quaderno (Dark Mode) */
+  --color-highlight-yellow: oklch(0.35 0.10 95);
+  --color-highlight-yellow-text: oklch(0.96 0.05 95);
+  --color-highlight-green: oklch(0.32 0.08 150);
+  --color-highlight-green-text: oklch(0.95 0.05 150);
+  --color-highlight-blue: oklch(0.32 0.08 235);
+  --color-highlight-blue-text: oklch(0.95 0.05 235);
+  --color-highlight-coral: oklch(0.34 0.09 25);
+  --color-highlight-coral-text: oklch(0.96 0.05 25);
 
   --color-targa-bg: oklch(1 0 0);
   --color-targa-border: oklch(0.90 0.005 80);

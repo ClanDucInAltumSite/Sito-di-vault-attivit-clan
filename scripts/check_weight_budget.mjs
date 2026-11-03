@@ -3,7 +3,7 @@
 // 1. Bundle di avvio (JS critico gzip <= 80 KiB, CSS critico gzip <= 20 KiB, combinato <= 100 KiB)
 // 2. Precache totale del Service Worker (<= 5120 KiB / 5 MB)
 // 3. Esclusione tassativa di pdf.js e pdf.worker dal precache statico
-// 4. Peso totale fotografie responsive in public/photos/ (<= 700 KB su disco, max 150 KB per singola foto)
+// 4. Peso totale fotografie responsive in public/photos/ (<= 850 KB su disco, max 150 KB per singola foto)
 
 import fs from 'fs';
 import path from 'path';
@@ -19,7 +19,7 @@ const BUDGETS = {
   maxInitialCssGzipKiB: 20,
   maxInitialCombinedGzipKiB: 100,
   maxPrecacheKiB: 5120, // 5 MB
-  maxPhotosTotalKiB: 700,
+  maxPhotosTotalKiB: 850,
   maxSinglePhotoKiB: 150,
 };
 

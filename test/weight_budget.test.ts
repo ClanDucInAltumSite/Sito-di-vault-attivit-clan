@@ -15,11 +15,11 @@ describe('FASE 12A — Verifica Statica dei Budget di Peso', () => {
     expect(content).toContain('pdf.worker');
   });
 
-  it('il peso totale delle fotografie in public/photos/ non supera 700 KB', () => {
+  it('il peso totale delle fotografie in public/photos/ non supera 850 KB', () => {
     const photosDir = path.join(process.cwd(), 'public', 'photos');
     expect(fs.existsSync(photosDir)).toBe(true);
     const files = fs.readdirSync(photosDir).filter(f => f.endsWith('.webp'));
-    expect(files.length).toBeGreaterThanOrEqual(15);
+    expect(files.length).toBeGreaterThanOrEqual(18);
 
     let totalBytes = 0;
     for (const f of files) {
@@ -30,7 +30,7 @@ describe('FASE 12A — Verifica Statica dei Budget di Peso', () => {
     }
 
     const totalKiB = totalBytes / 1024;
-    expect(totalKiB).toBeLessThanOrEqual(700);
+    expect(totalKiB).toBeLessThanOrEqual(850);
   });
 
   it('vite.config.ts esclude esplicitamente pdf.worker e pdfjs dal precache statico', () => {

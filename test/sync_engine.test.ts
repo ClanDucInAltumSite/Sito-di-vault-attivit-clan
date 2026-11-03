@@ -57,7 +57,7 @@ describe('FASE 2 - Test di Sicurezza, Sincronizzazione e Offline (Sync Engine)',
     // Pulisce e ricrea il database per ogni test
     resetDbInstanceForTesting();
     const db = await getDb();
-    const stores = ['giochi', 'bans', 'canti', 'eventi', 'odg_punti', 'allegati', 'sync_meta'];
+    const stores = ['giochi', 'bans', 'canti', 'eventi', 'odg_punti', 'allegati', 'quaderno', 'sync_meta'];
     const tx = db.transaction(stores, 'readwrite');
     for (const s of stores) {
       await tx.objectStore(s).clear();
