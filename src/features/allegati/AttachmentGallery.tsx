@@ -8,6 +8,7 @@ import { getAttachmentPublicUrl, softDeleteAttachment } from '../../lib/attachme
 import { resolveAttachmentSource } from '../../lib/storage-cache';
 import { Icon } from '../../ui/Icon';
 import { Button } from '../../ui/Button';
+import { DeleteConfirmModal } from '../../ui/DeleteConfirmModal';
 
 export interface AttachmentGalleryProps {
   parentType: 'gioco' | 'ban' | 'canto' | 'evento';
@@ -25,7 +26,9 @@ export function AttachmentGallery({
   const [allegati, setAllegati] = useState<Allegato[]>([]);
   const [sources, setSources] = useState<Record<string, { src: string | null; isOffline: boolean }>>({});
   const [zoomedImage, setZoomedImage] = useState<{ src: string; title: string } | null>(null);
-  const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [deletingAllegato, setDeletingAllegato] = useState<Allegato | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const loadAttachments = async () => {
     try {
@@ -45,8 +48,8 @@ export function AttachmentGallery({
         };
       }
       setSources(srcMap);
-    } catch (err) {
-      console.warn('[AttachmentGallery] Errore caricamento allegati:', err);
+    } catch {
+      // Caricamento silenzioso
     }
   };
 
@@ -54,17 +57,24 @@ export function AttachmentGallery({
     loadAttachments();
   }, [parentType, parentId]);
 
-  const handleDelete = async (item: Allegato) => {
-    if (!confirm(`Vuoi rimuovere l'allegato "${item.nome_file}"?`)) return;
-    setIsDeletingId(item.id);
+  const handleDeleteRequest = (item: Allegato) => {
+    setDeletingAllegato(item);
+    setIsDeleteOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deletingAllegato) return;
+    setIsDeleting(true);
     try {
-      await softDeleteAttachment(item.id);
+      await softDeleteAttachment(deletingAllegato.id);
       await loadAttachments();
       if (onChanged) onChanged();
-    } catch (err: any) {
-      alert(err.message || 'Errore durante la cancellazione dell\'allegato');
+      setIsDeleteOpen(false);
+      setDeletingAllegato(null);
+    } catch {
+      // Cancellazione silenziosa
     } finally {
-      setIsDeletingId(null);
+      setIsDeleting(false);
     }
   };
 
@@ -151,9 +161,8 @@ export function AttachmentGallery({
                     className="attachment-delete-btn"
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleDelete(img);
+                      handleDeleteRequest(img);
                     }}
-                    disabled={isDeletingId === img.id}
                     aria-label={`Elimina ${img.nome_file}`}
                   >
                     <Icon name="trash" size={14} />
@@ -220,8 +229,7 @@ export function AttachmentGallery({
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleDelete(pdf)}
-                      isLoading={isDeletingId === pdf.id}
+                      onClick={() => handleDeleteRequest(pdf)}
                       aria-label={`Elimina ${pdf.nome_file}`}
                       style={{ color: 'var(--color-bans)', padding: '6px' }}
                     >
@@ -270,6 +278,18 @@ export function AttachmentGallery({
           />
         </div>
       )}
+
+      {/* Modal Conferma Eliminazione in due passaggi (Admin) */}
+      <DeleteConfirmModal
+        isOpen={isDeleteOpen}
+        onClose={() => {
+          setIsDeleteOpen(false);
+          setDeletingAllegato(null);
+        }}
+        onConfirm={handleDeleteConfirm}
+        itemName={deletingAllegato?.nome_file || ''}
+        isLoading={isDeleting}
+      />
     </div>
   );
 }

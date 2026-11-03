@@ -11,6 +11,7 @@ import { AttachmentGallery } from '../allegati/AttachmentGallery';
 import { AttachmentUploadManager } from '../allegati/AttachmentUploadManager';
 import { OdgManager } from './OdgManager';
 import { Evento, OdgPunto } from '../../lib/db';
+import { navigate } from '../../app/router';
 import { I18N } from '../../lib/i18n';
 import { useAdmin } from '../../lib/auth';
 import {
@@ -49,7 +50,7 @@ export function EventoDetailSheet({
   if (!isOpen || !evento) return null;
 
   const isTbd = isEventoDataDaDefinire(evento);
-  const dateBlock = getWallCalendarDate(evento.inizio, isTbd);
+  const dateBlock = getWallCalendarDate(evento.inizio, isTbd, evento.tipo);
   const countdown = getEventCountdownText(evento);
   const timeRange = formatEventDateTimeRange(evento);
   const typeInfo = getEventTypeInfo(evento.tipo);
@@ -121,20 +122,26 @@ export function EventoDetailSheet({
                 style={{
                   fontSize: 'var(--font-size-xs)',
                   fontWeight: 600,
-                  color: dateBlock.isToday ? 'var(--color-bans)' : 'var(--color-text-secondary)',
+                  color: dateBlock.isToday ? typeInfo.colorVar : 'var(--color-text-secondary)',
                 }}
               >
                 {countdown}
               </span>
             </div>
-            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text)', fontWeight: 500 }}>
+            <div
+              style={{
+                fontSize: 'var(--font-size-sm)',
+                color: dateBlock.isToday ? typeInfo.colorVar : 'var(--color-text)',
+                fontWeight: dateBlock.isToday ? 600 : 500,
+              }}
+            >
               {timeRange}
             </div>
           </div>
         </div>
 
-        {/* Luogo */}
-        {evento.luogo && (
+        {/* Luogo: mostrato se valorizzato (senza forzature se non necessario) */}
+        {Boolean(evento.luogo && evento.luogo.trim()) && (
           <div
             style={{
               display: 'flex',
@@ -149,15 +156,15 @@ export function EventoDetailSheet({
             </span>
             <div>
               <strong style={{ display: 'block', fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>
-                {I18N.calendario.luogo}
+                {evento.tipo === 'uscita' ? 'Destinazione / Luogo' : I18N.calendario.luogo}
               </strong>
               {evento.luogo}
             </div>
           </div>
         )}
 
-        {/* Cosa Portare */}
-        {evento.cosa_portare && (
+        {/* Cosa Portare: mostrato se presente */}
+        {Boolean(evento.cosa_portare && evento.cosa_portare.trim()) && (
           <div
             style={{
               padding: 'var(--space-3)',
@@ -200,7 +207,9 @@ export function EventoDetailSheet({
             }}
           >
             <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-interactive)', fontWeight: 600 }}>
-              Questa riunione ha la data ancora da concordare. Puoi già aggiungere tutti i punti ODG in basso!
+              {evento.tipo === 'riunione'
+                ? 'Questa riunione ha la data ancora da concordare. Puoi già aggiungere tutti i punti ODG in basso!'
+                : 'Questa attività ha la data ancora da concordare.'}
             </div>
             {isAdmin && (
               <Button
@@ -209,7 +218,7 @@ export function EventoDetailSheet({
                 onClick={() => onEdit?.(evento)}
               >
                 <Icon name="calendar" size={14} />
-                <span>Fissa data e ora</span>
+                <span>Fissa la data</span>
               </Button>
             )}
           </div>
@@ -252,6 +261,61 @@ export function EventoDetailSheet({
             onChanged={onChanged}
             initialPoints={initialOdgPoints}
           />
+        )}
+
+        {/* Collegamento al Quaderno di Clan per Verbali e Verifiche */}
+        {evento.tipo === 'riunione' && (
+          <div
+            style={{
+              padding: 'var(--space-3) var(--space-4)',
+              backgroundColor: 'var(--color-surface)',
+              borderRadius: 'var(--radius-lg)',
+              border: '1px solid var(--color-border)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 'var(--space-3)',
+              flexWrap: 'wrap',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+              <div
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: 'var(--radius-md)',
+                  backgroundColor: 'var(--color-brand-purple-tenue)',
+                  color: 'var(--color-brand-purple-text)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                <Icon name="book-open" size={20} />
+              </div>
+              <div>
+                <strong style={{ display: 'block', fontSize: 'var(--font-size-sm)', color: 'var(--color-text)' }}>
+                  {I18N.quaderno.title}
+                </strong>
+                <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
+                  {I18N.quaderno.subtitle}
+                </span>
+              </div>
+            </div>
+
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                onClose();
+                navigate('quaderno');
+              }}
+            >
+              <span>Apri Quaderno</span>
+              <Icon name="chevron-right" size={14} />
+            </Button>
+          </div>
         )}
 
         {/* Galleria Allegati (Fase 5) */}

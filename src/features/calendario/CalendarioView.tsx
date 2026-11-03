@@ -11,6 +11,7 @@ import { Icon } from '../../ui/Icon';
 import { I18N } from '../../lib/i18n';
 import { Evento, OdgPunto, getEventi, getOdgPunti } from '../../lib/db';
 import { softDeleteRecord } from '../../lib/admin_actions';
+import { DeleteConfirmModal } from '../../ui/DeleteConfirmModal';
 import { useAdmin } from '../../lib/auth';
 import { useRoute } from '../../app/router';
 import { CalendarioMonthView } from './CalendarioMonthView';
@@ -39,6 +40,11 @@ export function CalendarioView() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingEvento, setEditingEvento] = useState<Evento | null>(null);
 
+  // Modale per eliminazione a due passaggi
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [deletingEvento, setDeletingEvento] = useState<Evento | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const loadData = async () => {
     try {
       const [evList, allOdg] = await Promise.all([
@@ -64,8 +70,8 @@ export function CalendarioView() {
           setIsDetailOpen(true);
         }
       }
-    } catch (err) {
-      console.error('Errore caricamento calendario:', err);
+    } catch {
+      // Caricamento silenzioso
     } finally {
       setIsLoading(false);
     }
@@ -101,8 +107,8 @@ export function CalendarioView() {
       tipo: 'riunione',
       inizio: SENTINEL_DATA_DA_DEFINIRE,
       fine: null,
-      tutto_il_giorno: false,
-      luogo: 'Sede',
+      tutto_il_giorno: true,
+      luogo: '',
       descrizione: TAG_DATA_DA_DEFINIRE,
       responsabile: null,
       cosa_portare: null,
@@ -119,19 +125,26 @@ export function CalendarioView() {
     setIsFormOpen(true);
   };
 
-  const handleDeleteEvento = async (evento: Evento) => {
-    const confirmed = window.confirm(
-      `Sei sicuro di voler eliminare l'evento "${evento.titolo}"? Verrà spostato nel cestino.`
-    );
-    if (!confirmed) return;
+  // Gestione eliminazione a due passaggi (soft delete)
+  const handleDeleteRequest = (evento: Evento) => {
+    setDeletingEvento(evento);
+    setIsDeleteOpen(true);
+  };
 
+  const handleDeleteConfirm = async () => {
+    if (!deletingEvento) return;
+    setIsDeleting(true);
     try {
-      await softDeleteRecord('eventi', evento.id);
-      setIsDetailOpen(false);
-      setSelectedEvento(null);
+      await softDeleteRecord('eventi', deletingEvento.id);
       await loadData();
-    } catch (err: any) {
-      alert(err.message || 'Errore durante l\'eliminazione dell\'evento.');
+      setIsDeleteOpen(false);
+      setDeletingEvento(null);
+      if (selectedEvento?.id === deletingEvento.id) {
+        setIsDetailOpen(false);
+        setSelectedEvento(null);
+      }
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -253,7 +266,7 @@ export function CalendarioView() {
                 }}
               >
                 <Icon name="edit" size={14} />
-                <span>Fissa data e ora</span>
+                <span>Fissa la data</span>
               </Button>
             )}
           </div>
@@ -285,7 +298,7 @@ export function CalendarioView() {
           setSelectedEvento(null);
         }}
         onEdit={handleEditEvento}
-        onDelete={handleDeleteEvento}
+        onDelete={handleDeleteRequest}
         onCreateMeeting={handleCreateNewMeeting}
         onChanged={loadData}
         initialOdgPoints={selectedEvento ? odgMap[selectedEvento.id] : undefined}
@@ -303,6 +316,18 @@ export function CalendarioView() {
           initialEvento={editingEvento}
         />
       )}
+
+      {/* 6. MODAL CONFERMA ELIMINAZIONE IN DUE PASSAGGI (ADMIN) */}
+      <DeleteConfirmModal
+        isOpen={isDeleteOpen}
+        onClose={() => {
+          setIsDeleteOpen(false);
+          setDeletingEvento(null);
+        }}
+        onConfirm={handleDeleteConfirm}
+        itemName={deletingEvento?.titolo || ''}
+        isLoading={isDeleting}
+      />
     </div>
   );
 }

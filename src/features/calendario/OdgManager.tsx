@@ -3,7 +3,7 @@
 // Spunta animata, riordino su/giù e aggiunta RISERVATI AGLI AMMINISTRATORI.
 // Gli utenti anonimi possono solo consultare in sola lettura con checkbox disabilitate.
 
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useRef } from 'preact/hooks';
 import { OdgPunto, Evento, getOdgPunti } from '../../lib/db';
 import {
   saveOdgPunto,
@@ -31,7 +31,17 @@ export function OdgManager({ evento, isAdmin, onCreateMeeting, onChanged, initia
   const [newPointText, setNewPointText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isForwarding, setIsForwarding] = useState(false);
+  const [editingPointId, setEditingPointId] = useState<string | null>(null);
+  const [editingPointText, setEditingPointText] = useState('');
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const editInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editingPointId && editInputRef.current) {
+      editInputRef.current.focus();
+    }
+  }, [editingPointId]);
 
   const loadPoints = async () => {
     try {
@@ -124,6 +134,46 @@ export function OdgManager({ evento, isAdmin, onCreateMeeting, onChanged, initia
     }
   };
 
+  // Modifica testo punto ODG (Admin only)
+  const handleStartEdit = (point: OdgPunto) => {
+    if (!isAdmin) return;
+    setEditingPointId(point.id);
+    setEditingPointText(point.testo);
+  };
+
+  const handleSaveEdit = async (point: OdgPunto) => {
+    if (!isAdmin || isSavingEdit) return;
+    const trimmed = editingPointText.trim();
+    if (!trimmed) {
+      setMessage({ text: 'Il testo del punto non può essere vuoto.', type: 'error' });
+      return;
+    }
+
+    setIsSavingEdit(true);
+    setMessage(null);
+    try {
+      await saveOdgPunto({
+        id: point.id,
+        evento_id: evento.id,
+        testo: trimmed,
+        completato: point.completato,
+      });
+      setEditingPointId(null);
+      setEditingPointText('');
+      await loadPoints();
+      onChanged?.();
+    } catch (err: any) {
+      setMessage({ text: err.message || 'Errore durante la modifica del punto', type: 'error' });
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingPointId(null);
+    setEditingPointText('');
+  };
+
   // Riporto punti non conclusi alla prossima riunione (Admin only)
   const handleForwardPoints = async () => {
     if (!isAdmin || isForwarding) return;
@@ -136,7 +186,7 @@ export function OdgManager({ evento, isAdmin, onCreateMeeting, onChanged, initia
     setMessage(null);
 
     try {
-      const nextMeeting = await findNextFutureMeeting(evento.inizio);
+      const nextMeeting = await findNextFutureMeeting(evento.inizio, evento.id);
       if (!nextMeeting) {
         const createNow = window.confirm(
           `${I18N.calendario.nessunaRiunioneFutura}\n\n${I18N.calendario.creaRiunioneOra}`
@@ -255,7 +305,10 @@ export function OdgManager({ evento, isAdmin, onCreateMeeting, onChanged, initia
               className={`odg-item ${point.completato ? 'odg-item-completed' : ''}`}
               role="listitem"
             >
-              <div className="odg-item-left">
+              <div
+                className="odg-item-left"
+                style={editingPointId === point.id ? { alignItems: 'center', width: '100%' } : undefined}
+              >
                 {/* Spunta animata con permessi rigorosi: disabilitata per visitatori anonimi */}
                 <button
                   type="button"
@@ -278,22 +331,89 @@ export function OdgManager({ evento, isAdmin, onCreateMeeting, onChanged, initia
                   )}
                 </button>
 
-                <div className="odg-content">
-                  <span className={`odg-text ${point.completato ? 'odg-text-completed' : ''}`}>
-                    {point.testo}
-                  </span>
-                  {point.riportato_da && (
-                    <span className="odg-reported-pill" title="Punto riportato da una riunione precedente">
-                      <Icon name="refresh" size={10} />
-                      <span>Riportato da riunione precedente</span>
+                {editingPointId === point.id ? (
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      handleSaveEdit(point);
+                    }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flex: 1, minWidth: 0 }}
+                  >
+                    <input
+                      ref={editInputRef}
+                      type="text"
+                      className="ios-form-input"
+                      style={{
+                        flex: 1,
+                        height: '36px',
+                        minHeight: '36px',
+                        fontSize: '16px',
+                        padding: '0 10px',
+                      }}
+                      value={editingPointText}
+                      onInput={(e) => setEditingPointText((e.target as HTMLInputElement).value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Escape') {
+                          e.preventDefault();
+                          handleCancelEdit();
+                        }
+                      }}
+                      autoFocus
+                      disabled={isSavingEdit}
+                    />
+                    <button
+                      type="submit"
+                      disabled={!editingPointText.trim() || isSavingEdit}
+                      className="ios-btn ios-btn-primary"
+                      style={{ minHeight: '36px', height: '36px', minWidth: '36px', padding: '0 8px', flexShrink: 0 }}
+                      title="Salva modifica"
+                      aria-label="Salva modifica punto ODG"
+                    >
+                      <Icon name="check" size={16} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCancelEdit}
+                      className="ios-btn ios-btn-ghost"
+                      style={{ minHeight: '36px', height: '36px', minWidth: '36px', padding: '0 8px', color: 'var(--color-text-secondary)', flexShrink: 0 }}
+                      title="Annulla"
+                      aria-label="Annulla modifica"
+                    >
+                      <Icon name="close" size={16} />
+                    </button>
+                  </form>
+                ) : (
+                  <div
+                    className="odg-content"
+                    onClick={() => isAdmin && handleStartEdit(point)}
+                    style={{ cursor: isAdmin ? 'pointer' : 'default', WebkitTapHighlightColor: 'transparent' }}
+                    title={isAdmin ? 'Clicca o tocca per modificare' : undefined}
+                  >
+                    <span className={`odg-text ${point.completato ? 'odg-text-completed' : ''}`}>
+                      {point.testo}
                     </span>
-                  )}
-                </div>
+                    {point.riportato_da && (
+                      <span className="odg-reported-pill" title="Punto riportato da una riunione precedente">
+                        <Icon name="refresh" size={10} />
+                        <span>Riportato da riunione precedente</span>
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
 
-              {/* Azioni Admin: Riordino su/giù ed eliminazione */}
-              {isAdmin && (
+              {/* Azioni Admin: Modifica, Riordino su/giù ed eliminazione (nascoste durante l'editing per lasciare spazio su smartphone) */}
+              {isAdmin && editingPointId !== point.id && (
                 <div className="odg-item-actions">
+                  <button
+                    type="button"
+                    className="odg-icon-btn"
+                    onClick={() => handleStartEdit(point)}
+                    aria-label="Modifica punto ODG"
+                    title="Modifica punto ODG"
+                  >
+                    <Icon name="edit" size={14} />
+                  </button>
                   <button
                     type="button"
                     className="odg-icon-btn"

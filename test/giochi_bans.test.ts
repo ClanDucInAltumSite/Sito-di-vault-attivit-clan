@@ -352,4 +352,61 @@ describe('FASE 3 - GIOCHI E BANS', () => {
       expect(() => getHighlightParts(longTitle, 'lungo')).not.toThrow();
     });
   });
+
+  describe('7. Gestione Link Opzionale per i Bans', () => {
+    beforeEach(async () => {
+      resetDbInstanceForTesting();
+      const db = await getDb();
+      for (const t of ['giochi', 'bans', 'canti', 'eventi', 'odg_punti', 'allegati', 'sync_meta']) {
+        await db.clear(t as any);
+      }
+    });
+
+    it('permette di salvare un ban con un link opzionale', async () => {
+      const banConLink: Ban = {
+        id: 'ban-link-1',
+        nome: 'La Macchina del Capo',
+        testo: 'Testo del ban...',
+        note_gesti: 'Gesti...',
+        link: 'https://youtu.be/dQw4w9WgXcQ',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        deleted_at: null,
+      };
+
+      await upsertRecords('bans', [banConLink]);
+      const list = await getBans(false);
+      expect(list).toHaveLength(1);
+      expect(list[0].link).toBe('https://youtu.be/dQw4w9WgXcQ');
+    });
+
+    it('permette di salvare un ban senza link (opzionale)', async () => {
+      const banSenzaLink: Ban = {
+        id: 'ban-nolink-1',
+        nome: 'Ban Semplice',
+        testo: 'Solo parole...',
+        note_gesti: '',
+        link: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        deleted_at: null,
+      };
+
+      await upsertRecords('bans', [banSenzaLink]);
+      const list = await getBans(false);
+      expect(list).toHaveLength(1);
+      expect(list[0].link).toBeNull();
+    });
+
+    it('trova il ban tramite ricerca anche usando parole o domini nel link', () => {
+      const nome = 'Il Ballo dell Orso';
+      const testo = 'Gira l orso gira...';
+      const noteGesti = 'Mima l orso che balla';
+      const link = 'https://www.youtube.com/watch?v=scoutvideo';
+
+      expect(matchesQuery('youtube', nome, testo, noteGesti, link)).toBe(true);
+      expect(matchesQuery('scoutvideo', nome, testo, noteGesti, link)).toBe(true);
+      expect(matchesQuery('vimeo', nome, testo, noteGesti, link)).toBe(false);
+    });
+  });
 });

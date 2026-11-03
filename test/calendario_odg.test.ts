@@ -17,12 +17,15 @@ import {
   getEventTypeInfo,
   countOpenOdgPoints,
   isEventoDataDaDefinire,
+  isEventoOrariDaDefinire,
   getCleanDescrizione,
   SENTINEL_DATA_DA_DEFINIRE,
   TAG_DATA_DA_DEFINIRE,
+  TAG_ORARI_DA_DEFINIRE,
 } from '../src/lib/calendario';
 import { Evento, OdgPunto, getDb, resetDbInstanceForTesting, getOdgPunti, upsertRecords } from '../src/lib/db';
-import { saveEvento, forwardUnfinishedOdgPunti, findNextFutureMeeting } from '../src/lib/admin_actions';
+import { saveEvento, saveOdgPunto, forwardUnfinishedOdgPunti, findNextFutureMeeting, saveAppuntiRiunione } from '../src/lib/admin_actions';
+import { loadPrintableODGData } from '../src/lib/stampa_odg';
 import { supabase } from '../src/lib/supabase';
 
 describe('Calendario & ODG - Test Logica di Dominio', () => {
@@ -161,22 +164,23 @@ describe('Calendario & ODG - Test Logica di Dominio', () => {
       expect(isEventOnDate(crossMonthEvent, '2026-11-03')).toBe(false);
     });
 
-    it('formatEventDateTimeRange gestisce correttamente tutto_il_giorno', () => {
+    it('formatEventDateTimeRange gestisce correttamente date senza orari (tutto il giorno)', () => {
       const allDaySingle: Evento = {
         ...multiDayEvent,
         fine: null,
         tutto_il_giorno: true,
       };
       const textSingle = formatEventDateTimeRange(allDaySingle);
-      expect(textSingle).toContain('Tutto il giorno');
+      expect(textSingle).not.toContain('Tutto il giorno');
+      expect(textSingle).toContain('18');
 
       const allDayMulti: Evento = {
         ...multiDayEvent,
         tutto_il_giorno: true,
       };
       const textMulti = formatEventDateTimeRange(allDayMulti);
-      expect(textMulti).toContain('Tutto il giorno');
       expect(textMulti).toContain('–');
+      expect(textMulti).not.toContain('Tutto il giorno');
     });
 
     it('CORREZIONE 6: buildMonthGrid include l\'evento multi-day in tutte le rispettive celle giornaliere', () => {
@@ -530,13 +534,77 @@ describe('Calendario & ODG - Test Logica di Dominio', () => {
         deleted_at: null,
       };
 
-      const dateBlock = getWallCalendarDate(tbdEvent.inizio, true);
+      const dateBlock = getWallCalendarDate(tbdEvent.inizio, true, 'riunione');
       expect(dateBlock.month).toBe('ODG');
       expect(dateBlock.day).toBe('?');
       expect(dateBlock.weekday).toBe('DA DEFINIRE');
 
       expect(getEventCountdownText(tbdEvent)).toBe('Data da concordare');
-      expect(formatEventDateTimeRange(tbdEvent)).toBe('Data e ora da concordare');
+      expect(formatEventDateTimeRange(tbdEvent)).toBe('Data da concordare');
+    });
+
+    it('getWallCalendarDate genera blocco ODG per riunioni e blocco DATA per uscite ed altri eventi da definire', () => {
+      const blockRiunione = getWallCalendarDate(SENTINEL_DATA_DA_DEFINIRE, true, 'riunione');
+      expect(blockRiunione.month).toBe('ODG');
+      expect(blockRiunione.day).toBe('?');
+      expect(blockRiunione.weekday).toBe('DA DEFINIRE');
+
+      const blockUscita = getWallCalendarDate(SENTINEL_DATA_DA_DEFINIRE, true, 'uscita');
+      expect(blockUscita.month).toBe('DATA');
+      expect(blockUscita.day).toBe('?');
+      expect(blockUscita.weekday).toBe('DA DEFINIRE');
+
+      const blockEvento = getWallCalendarDate(SENTINEL_DATA_DA_DEFINIRE, true, 'evento');
+      expect(blockEvento.month).toBe('DATA');
+      expect(blockEvento.day).toBe('?');
+      expect(blockEvento.weekday).toBe('DA DEFINIRE');
+    });
+
+    it('getCleanDescrizione rimuove correttamente sia [DATA_DA_DEFINIRE] sia [ORARI_DA_DEFINIRE]', () => {
+      expect(getCleanDescrizione('[DATA_DA_DEFINIRE] Ordine del giorno')).toBe('Ordine del giorno');
+      expect(getCleanDescrizione('[ORARI_DA_DEFINIRE] Partenza indicativa')).toBe('Partenza indicativa');
+      expect(getCleanDescrizione('[DATA_DA_DEFINIRE] [ORARI_DA_DEFINIRE] Dettagli')).toBe('Dettagli');
+    });
+
+    it('creazione eventi a giorni interi a 12:00:00 UTC previene slittamenti di fuso orario', async () => {
+      vi.spyOn(supabase, 'from').mockImplementation((table: string) => {
+        if (table === 'eventi') {
+          return {
+            insert: (payload: any) => ({
+              select: () => ({
+                single: async () => ({ data: payload, error: null }),
+              }),
+            }),
+          } as any;
+        }
+        return {} as any;
+      });
+
+      const meeting = await saveEvento({
+        titolo: 'Consiglio di Clan',
+        tipo: 'riunione',
+        inizio: '2026-11-20T12:00:00.000Z',
+        tutto_il_giorno: true,
+      });
+
+      expect(meeting.inizio).toBe('2026-11-20T12:00:00.000Z');
+      expect(meeting.fine).toBeNull();
+
+      const outing = await saveEvento({
+        titolo: 'Uscita sui Simbruini',
+        tipo: 'uscita',
+        inizio: '2026-11-21T12:00:00.000Z',
+        fine: '2026-11-22T12:00:00.000Z',
+        tutto_il_giorno: true,
+      });
+
+      expect(outing.inizio).toBe('2026-11-21T12:00:00.000Z');
+      expect(outing.fine).toBe('2026-11-22T12:00:00.000Z');
+
+      const dateStrOuting = formatEventDateTimeRange(outing);
+      expect(dateStrOuting).toContain('21');
+      expect(dateStrOuting).toContain('22');
+      expect(dateStrOuting).not.toContain('Tutto il giorno');
     });
 
     it('findNextFutureMeeting assegna prioritariamente la riunione aperta con data da definire', async () => {
@@ -578,5 +646,338 @@ describe('Calendario & ODG - Test Logica di Dominio', () => {
       expect(target).not.toBeNull();
       expect(target?.id).toBe('ev_next_tbd');
     });
+
+    it('getNextUpcomingEvent esclude eventi sentinella con data ancora da concordare', async () => {
+      const { getNextUpcomingEvent } = await import('../src/lib/db');
+      const tbdEvent: Evento = {
+        id: 'ev_solo_tbd',
+        titolo: 'Prossima Riunione Futura Da Definire',
+        tipo: 'riunione',
+        inizio: SENTINEL_DATA_DA_DEFINIRE,
+        fine: null,
+        tutto_il_giorno: true,
+        luogo: '',
+        descrizione: TAG_DATA_DA_DEFINIRE,
+        responsabile: null,
+        cosa_portare: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        deleted_at: null,
+      };
+
+      await upsertRecords('eventi', [tbdEvent]);
+      const next = await getNextUpcomingEvent();
+      expect(next).toBeNull();
+    });
+
+    it('saveAppuntiRiunione aggiorna supabase e sincronizza la cache IndexedDB', async () => {
+      const db = await getDb();
+      const existingMeeting: Evento = {
+        id: 'ev_meet_notes',
+        titolo: 'Riunione con Appunti',
+        tipo: 'riunione',
+        inizio: '2026-11-10T20:45:00Z',
+        fine: null,
+        tutto_il_giorno: false,
+        luogo: 'Sede',
+        descrizione: null,
+        responsabile: null,
+        cosa_portare: null,
+        appunti: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        deleted_at: null,
+      };
+      await db.put('eventi', existingMeeting);
+
+      vi.spyOn(supabase, 'from').mockImplementation((table: string) => {
+        if (table === 'eventi') {
+          return {
+            update: (payload: any) => ({
+              eq: (_col: string, val: string) => ({
+                select: () => ({
+                  single: async () => ({
+                    data: { ...existingMeeting, ...payload, id: val },
+                    error: null,
+                  }),
+                }),
+              }),
+            }),
+          } as any;
+        }
+        return {} as any;
+      });
+
+      const updated = await saveAppuntiRiunione('ev_meet_notes', '  Decisioni prese per la route.  ');
+      expect(updated.appunti).toBe('Decisioni prese per la route.');
+
+      const inDb = (await db.get('eventi', 'ev_meet_notes')) as Evento;
+      expect(inDb.appunti).toBe('Decisioni prese per la route.');
+    });
+
+    it('findNextFutureMeeting rispetta il parametro excludeId', async () => {
+      const currentMeeting: Evento = {
+        id: 'ev_current_tbd',
+        titolo: 'Riunione Corrente Data da Concordare',
+        tipo: 'riunione',
+        inizio: SENTINEL_DATA_DA_DEFINIRE,
+        fine: null,
+        tutto_il_giorno: false,
+        luogo: null,
+        descrizione: TAG_DATA_DA_DEFINIRE,
+        responsabile: null,
+        cosa_portare: null,
+        created_at: '',
+        updated_at: '',
+        deleted_at: null,
+      };
+
+      const anotherFutureMeeting: Evento = {
+        id: 'ev_next_fixed',
+        titolo: 'Riunione Successiva',
+        tipo: 'riunione',
+        inizio: '2026-11-30T20:45:00Z',
+        fine: null,
+        tutto_il_giorno: false,
+        luogo: null,
+        descrizione: null,
+        responsabile: null,
+        cosa_portare: null,
+        created_at: '',
+        updated_at: '',
+        deleted_at: null,
+      };
+
+      await upsertRecords('eventi', [currentMeeting, anotherFutureMeeting]);
+
+      // Se escludiamo la riunione corrente, non deve restituire se stessa
+      const found = await findNextFutureMeeting(currentMeeting.inizio, currentMeeting.id);
+      expect(found).not.toBeNull();
+      expect(found?.id).toBe('ev_next_fixed');
+    });
+
+    it('isEventoOrariDaDefinire identifica correttamente eventi senza orari precisi', () => {
+      const normalTimeEvent: Evento = {
+        id: 'ev_precise',
+        titolo: 'Riunione Ore 20:45',
+        tipo: 'riunione',
+        inizio: '2026-11-20T20:45:00.000Z',
+        fine: null,
+        tutto_il_giorno: false,
+        luogo: 'Sede',
+        descrizione: '',
+        responsabile: null,
+        cosa_portare: null,
+        created_at: '',
+        updated_at: '',
+        deleted_at: null,
+      };
+
+      const allDayEvent: Evento = {
+        ...normalTimeEvent,
+        tutto_il_giorno: true,
+      };
+
+      const tagEvent: Evento = {
+        ...normalTimeEvent,
+        descrizione: `${TAG_ORARI_DA_DEFINIRE} Ritrovo da concordare`,
+      };
+
+      const noonSentinelEvent: Evento = {
+        ...normalTimeEvent,
+        inizio: '2026-11-20T12:00:00.000Z',
+      };
+
+      const tbdEvent: Evento = {
+        ...normalTimeEvent,
+        inizio: SENTINEL_DATA_DA_DEFINIRE,
+        descrizione: TAG_DATA_DA_DEFINIRE,
+      };
+
+      expect(isEventoOrariDaDefinire(normalTimeEvent)).toBe(false);
+      expect(isEventoOrariDaDefinire(allDayEvent)).toBe(true);
+      expect(isEventoOrariDaDefinire(tagEvent)).toBe(true);
+      expect(isEventoOrariDaDefinire(noonSentinelEvent)).toBe(true);
+      expect(isEventoOrariDaDefinire(tbdEvent)).toBe(false); // Data da concordare ha priorità
+    });
+
+    it('getOdgPunti con stringa vuota "" non restituisce tutti i punti ma array vuoto', async () => {
+      const p1: OdgPunto = {
+        id: 'odg_1',
+        evento_id: 'ev_existing',
+        testo: 'Punto Riunione Esistente',
+        ordine: 0,
+        completato: false,
+        riportato_da: null,
+        created_at: '',
+        updated_at: '',
+        deleted_at: null,
+      };
+      await upsertRecords('odg_punti', [p1]);
+
+      // Con eventoId specificato vuoto (es. nuova riunione bozza con id '') deve restituire []
+      const emptyResult = await getOdgPunti('', false);
+      expect(emptyResult).toEqual([]);
+
+      // Senza eventoId (undefined) restituisce tutti i punti
+      const allResult = await getOdgPunti(undefined, false);
+      expect(allResult.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('loadPrintableODGData rimuove tag dalla descrizione e azzera orarioFormattato per eventi giornalieri', async () => {
+      const db = await getDb();
+      const evDateOnly: Evento = {
+        id: 'ev_print_date_only',
+        titolo: 'Uscita Majella',
+        tipo: 'uscita',
+        inizio: '2026-11-20T12:00:00.000Z',
+        fine: '2026-11-22T12:00:00.000Z',
+        tutto_il_giorno: true,
+        luogo: 'Roccamorice',
+        descrizione: `${TAG_ORARI_DA_DEFINIRE} Orari in definizione nelle note`,
+        responsabile: null,
+        cosa_portare: null,
+        created_at: '',
+        updated_at: '',
+        deleted_at: null,
+      };
+      await db.put('eventi', evDateOnly);
+
+      const dataset = await loadPrintableODGData({
+        selectedEventiIds: ['ev_print_date_only'],
+        includePresenze: false,
+        includeScadenze: false,
+        includeNoteVerbale: false,
+      });
+
+      expect(dataset.eventi.length).toBe(1);
+      const printable = dataset.eventi[0]!;
+      expect(printable.orarioFormattato).toBeNull(); // Niente "Orario: Ven 20 nov" su foglio A4
+      expect(printable.cleanDescrizione).toBe('Orari in definizione nelle note');
+      expect(printable.cleanDescrizione).not.toContain('[ORARI_DA_DEFINIRE]');
+    });
+
+    it('formatEventDateTimeRange su eventi salvati a mezzogiorno UTC non mostra orari fittizi (13:00)', () => {
+      const progressiveEvent: Evento = {
+        id: 'ev_prog',
+        titolo: 'Riunione Settimanale',
+        tipo: 'riunione',
+        inizio: '2026-11-20T12:00:00.000Z',
+        fine: null,
+        tutto_il_giorno: false, // Anche se tutto_il_giorno fosse false per legacy/db column
+        luogo: '',
+        descrizione: '',
+        responsabile: null,
+        cosa_portare: null,
+        created_at: '',
+        updated_at: '',
+        deleted_at: null,
+      };
+
+      const text = formatEventDateTimeRange(progressiveEvent);
+      expect(text).not.toContain('13:00');
+      expect(text).not.toContain('12:00');
+      expect(text).not.toContain('14:00');
+      expect(text).toContain('20');
+    });
+
+    it('preserva i campi secondari (responsabile, luogo, cosa_portare) e non li cancella su salvataggio', async () => {
+      const validUuid = '11111111-2222-3333-4444-555555555555';
+      const existing: Evento = {
+        id: validUuid,
+        titolo: 'Riunione con Luogo Storico',
+        tipo: 'riunione',
+        inizio: '2026-11-20T12:00:00.000Z',
+        fine: null,
+        tutto_il_giorno: true,
+        luogo: 'Sede Clan Santa Maria',
+        descrizione: 'Note varie',
+        responsabile: 'Marco',
+        cosa_portare: 'Quaderno di Clan',
+        created_at: '2026-11-01T00:00:00.000Z',
+        updated_at: '2026-11-01T00:00:00.000Z',
+        deleted_at: null,
+      };
+
+      vi.spyOn(supabase, 'from').mockImplementation((table: string) => {
+        if (table === 'eventi') {
+          return {
+            update: (payload: any) => ({
+              eq: () => ({
+                select: () => ({
+                  single: async () => ({
+                    data: { ...existing, ...payload, id: validUuid },
+                    error: null,
+                  }),
+                }),
+              }),
+            }),
+          } as any;
+        }
+        return {} as any;
+      });
+
+      // Salvataggio aggiornato mantenendo i campi
+      const updated = await saveEvento({
+        id: existing.id,
+        titolo: 'Riunione Aggiornata',
+        tipo: 'riunione',
+        inizio: '2026-11-20T12:00:00.000Z',
+        fine: null,
+        tutto_il_giorno: true,
+        luogo: existing.luogo, // Preservato
+        responsabile: existing.responsabile, // Preservato
+        cosa_portare: existing.cosa_portare, // Preservato
+        descrizione: 'Note aggiornate',
+      });
+
+      expect(updated.luogo).toBe('Sede Clan Santa Maria');
+      expect(updated.responsabile).toBe('Marco');
+      expect(updated.cosa_portare).toBe('Quaderno di Clan');
+    });
+
+    it('permette la modifica del testo di un punto ODG esistente tramite saveOdgPunto', async () => {
+      const validPointId = '22222222-3333-4444-5555-666666666666';
+      const initialPoint: OdgPunto = {
+        id: validPointId,
+        evento_id: '11111111-2222-3333-4444-555555555555',
+        testo: 'Testo Originale ODG',
+        ordine: 0,
+        completato: false,
+        riportato_da: null,
+        created_at: '2026-11-01T00:00:00.000Z',
+        updated_at: '2026-11-01T00:00:00.000Z',
+        deleted_at: null,
+      };
+
+      vi.spyOn(supabase, 'from').mockImplementation((table: string) => {
+        if (table === 'odg_punti') {
+          return {
+            update: (payload: any) => ({
+              eq: () => ({
+                select: () => ({
+                  single: async () => ({
+                    data: { ...initialPoint, ...payload, id: validPointId },
+                    error: null,
+                  }),
+                }),
+              }),
+            }),
+          } as any;
+        }
+        return {} as any;
+      });
+
+      const updated = await saveOdgPunto({
+        id: validPointId,
+        evento_id: initialPoint.evento_id,
+        testo: 'Testo Modificato ODG',
+        completato: false,
+      });
+
+      expect(updated.id).toBe(validPointId);
+      expect(updated.testo).toBe('Testo Modificato ODG');
+    });
   });
 });
+

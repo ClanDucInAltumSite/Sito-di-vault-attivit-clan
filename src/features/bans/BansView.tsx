@@ -93,7 +93,7 @@ export function BansView() {
   // Filtraggio deterministico multi-campo con tolleranza ai typo
   const filteredList = useMemo(() => {
     let result = bans.filter((b) =>
-      matchesQuery(debouncedSearch, b.nome, b.testo, b.note_gesti)
+      matchesQuery(debouncedSearch, b.nome, b.testo, b.note_gesti, b.link)
     );
 
     const collator = new Intl.Collator('it', { sensitivity: 'base' });
@@ -302,11 +302,26 @@ export function BansView() {
                     />
                   }
                   trailing={
-                    isNew ? (
-                      <Badge variant="nuovo" size="sm">
-                        Nuovo
-                      </Badge>
-                    ) : null
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                      {ban.link ? (
+                        <span
+                          title="Link esterno disponibile"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            color: 'var(--color-bans)',
+                          }}
+                          aria-label="Link esterno disponibile"
+                        >
+                          <Icon name="link" size={14} />
+                        </span>
+                      ) : null}
+                      {isNew ? (
+                        <Badge variant="nuovo" size="sm">
+                          Nuovo
+                        </Badge>
+                      ) : null}
+                    </div>
                   }
                   chevron
                   onClick={() => {

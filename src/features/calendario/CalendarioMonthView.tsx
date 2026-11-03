@@ -11,6 +11,7 @@ import {
   CalendarDayCell,
   getEventTypeInfo,
   formatEventDateTimeRange,
+  isEventOnDate,
 } from '../../lib/calendario';
 import { I18N } from '../../lib/i18n';
 import { Button } from '../../ui/Button';
@@ -65,12 +66,8 @@ export function CalendarioMonthView({
     setSelectedDateKey(formatDateKey(now));
   };
 
-  // Trova gli eventi della data selezionata
-  const selectedEvents = eventi.filter((e) => {
-    const s = e.inizio.slice(0, 10);
-    const f = e.fine ? e.fine.slice(0, 10) : s;
-    return selectedDateKey >= s && selectedDateKey <= f && e.deleted_at === null;
-  });
+  // Trova gli eventi della data selezionata usando la funzione canonica isEventOnDate
+  const selectedEvents = eventi.filter((e) => isEventOnDate(e, selectedDateKey));
 
   const selectedDateFormatted = (() => {
     const parts = selectedDateKey.split('-');

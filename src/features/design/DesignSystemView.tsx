@@ -622,14 +622,14 @@ export function DesignSystemView() {
               <div className="calendar-date-weekday">SAB</div>
             </div>
 
-            <div className="calendar-date-block calendar-date-block-today" aria-hidden="true">
+            <div className="calendar-date-block calendar-date-block-riunione calendar-date-block-today" aria-hidden="true">
               <div className="calendar-date-month">OTT</div>
               <div className="calendar-date-day">15</div>
               <div className="calendar-date-weekday">OGGI</div>
             </div>
 
             <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', lineHeight: 1.4 }}>
-              Data standard (testata blu inchiostro) vs Data odierna (testata e numero in rosso accento)
+              Data standard vs Data odierna (testata e data dinamica col colore dell'attività, es. viola per riunione o verde per uscita)
             </div>
           </div>
 

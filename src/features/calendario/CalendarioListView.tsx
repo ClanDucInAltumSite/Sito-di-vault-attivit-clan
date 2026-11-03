@@ -9,6 +9,7 @@ import {
   getEventTypeInfo,
   parseDateOnly,
   isEventoDataDaDefinire,
+  getEventCountdownText,
 } from '../../lib/calendario';
 import { I18N } from '../../lib/i18n';
 import { GroupedList } from '../../ui/GroupedList';
@@ -55,6 +56,9 @@ export function CalendarioListView({
     const bTbd = isEventoDataDaDefinire(b);
     if (aTbd && !bTbd) return -1;
     if (!aTbd && bTbd) return 1;
+    if (aTbd && bTbd) {
+      return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+    }
 
     const timeA = new Date(a.inizio).getTime();
     const timeB = new Date(b.inizio).getTime();
@@ -89,17 +93,43 @@ export function CalendarioListView({
       ) : (
         filtered.map((evento) => {
           const isTbd = isEventoDataDaDefinire(evento);
-          const dateBlock = getWallCalendarDate(evento.inizio, isTbd);
+          const dateBlock = getWallCalendarDate(evento.inizio, isTbd, evento.tipo);
           const typeInfo = getEventTypeInfo(evento.tipo);
           const timeRange = formatEventDateTimeRange(evento);
           const evOdg = odgMap[evento.id] || [];
           const openOdg = evOdg.filter((p) => !p.completato && p.deleted_at === null).length;
 
           const subtitleParts: string[] = [timeRange];
-          if (evento.luogo) subtitleParts.push(evento.luogo);
+          if (evento.luogo && evento.luogo.trim()) {
+            subtitleParts.push(evento.luogo);
+          }
           if (openOdg > 0) {
             subtitleParts.push(`${openOdg} ODG apert${openOdg === 1 ? 'o' : 'i'}`);
           }
+
+          const countdownText = getEventCountdownText(evento);
+          let countdownModifier = 'calendar-row-countdown-future';
+          if (countdownText === 'Oggi') {
+            countdownModifier = `calendar-row-countdown-today calendar-row-countdown-today-${evento.tipo || 'altro'}`;
+          } else if (countdownText === 'Domani') {
+            countdownModifier = 'calendar-row-countdown-tomorrow';
+          } else if (countdownText === 'In corso') {
+            countdownModifier = 'calendar-row-countdown-ongoing';
+          } else if (isTbd || countdownText === 'Data da concordare') {
+            countdownModifier = 'calendar-row-countdown-tbd';
+          }
+
+          const showCountdown = mode !== 'passati';
+
+          const subtitleContent = (
+            <span>
+              <span style={dateBlock.isToday ? { color: typeInfo.colorVar, fontWeight: 600 } : undefined}>
+                {timeRange}
+              </span>
+              {evento.luogo && evento.luogo.trim() ? ` • ${evento.luogo}` : ''}
+              {openOdg > 0 ? ` • ${openOdg} ODG apert${openOdg === 1 ? 'o' : 'i'}` : ''}
+            </span>
+          );
 
           return (
             <GroupedRow
@@ -117,15 +147,16 @@ export function CalendarioListView({
                 </div>
               }
               title={evento.titolo}
-              subtitle={subtitleParts.join(' • ')}
+              subtitle={subtitleContent}
               trailing={
-                isTbd ? (
-                  <span className="event-type-chip event-chip-riunione" style={{ fontWeight: 600 }}>
-                    Data da concordare
-                  </span>
-                ) : (
+                <div className="calendar-row-trailing">
                   <span className={typeInfo.chipClass}>{typeInfo.label}</span>
-                )
+                  {showCountdown && countdownText && (
+                    <span className={`calendar-row-countdown ${countdownModifier}`}>
+                      {countdownText}
+                    </span>
+                  )}
+                </div>
               }
               chevron
               onClick={() => onSelectEvento(evento)}

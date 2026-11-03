@@ -263,6 +263,33 @@ export function BanReadingMode({ ban, isOpen, onClose }: BanReadingModeProps) {
           </aside>
         ) : null}
 
+        {ban.link ? (
+          <div style={{ marginBottom: 'var(--space-6)' }}>
+            <a
+              href={ban.link.startsWith('http://') || ban.link.startsWith('https://') ? ban.link : `https://${ban.link}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 'var(--space-2)',
+                padding: 'var(--space-2) var(--space-4)',
+                backgroundColor: 'var(--color-surface)',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-full)',
+                color: 'var(--color-interactive)',
+                fontSize: 'var(--font-size-sm)',
+                fontWeight: 600,
+                textDecoration: 'none',
+              }}
+            >
+              <Icon name="link" size={16} />
+              <span>{I18N.bans.apriLink}</span>
+              <Icon name="external-link" size={14} />
+            </a>
+          </div>
+        ) : null}
+
         {/* Testo del ban ad altissimo contrasto */}
         <section
           style={{

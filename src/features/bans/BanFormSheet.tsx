@@ -5,6 +5,7 @@ import { I18N } from '../../lib/i18n';
 import { Ban } from '../../lib/db';
 import { saveBan } from '../../lib/admin_actions';
 import { findSimilarName } from '../../lib/search';
+import { Icon } from '../../ui/Icon';
 
 export interface BanFormSheetProps {
   isOpen: boolean;
@@ -24,6 +25,7 @@ export function BanFormSheet({
   const [nome, setNome] = useState('');
   const [testo, setTesto] = useState('');
   const [noteGesti, setNoteGesti] = useState('');
+  const [link, setLink] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -32,6 +34,7 @@ export function BanFormSheet({
       setNome(initialBan?.nome || '');
       setTesto(initialBan?.testo || '');
       setNoteGesti(initialBan?.note_gesti || '');
+      setLink(initialBan?.link || '');
       setErrorMessage(null);
     }
   }, [isOpen, initialBan]);
@@ -55,6 +58,7 @@ export function BanFormSheet({
         nome,
         testo,
         note_gesti: noteGesti,
+        link: link.trim() || null,
       });
       setIsSaving(false);
       onSaved(saved);
@@ -172,6 +176,48 @@ export function BanFormSheet({
             onInput={(e) => setNoteGesti((e.target as HTMLTextAreaElement).value)}
             disabled={isSaving}
           />
+        </div>
+
+        <div className="ios-form-group">
+          <label className="ios-form-label" htmlFor="ban-link">
+            {I18N.bans.link} <span style={{ fontWeight: 400, color: 'var(--color-text-secondary)', textTransform: 'none' }}>(opzionale)</span>
+          </label>
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <input
+              id="ban-link"
+              type="url"
+              inputMode="url"
+              className="ios-form-input"
+              placeholder={I18N.bans.linkPlaceholder}
+              value={link}
+              onInput={(e) => setLink((e.target as HTMLInputElement).value)}
+              disabled={isSaving}
+              style={{ paddingLeft: '38px' }}
+            />
+            <div
+              style={{
+                position: 'absolute',
+                left: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                pointerEvents: 'none',
+                color: 'var(--color-text-secondary)',
+              }}
+              aria-hidden="true"
+            >
+              <Icon name="link" size={16} />
+            </div>
+          </div>
+          <span
+            style={{
+              display: 'block',
+              fontSize: 'var(--font-size-2xs)',
+              color: 'var(--color-text-secondary)',
+              marginTop: 'var(--space-1)',
+            }}
+          >
+            {I18N.bans.linkHelper}
+          </span>
         </div>
       </form>
     </BottomSheet>

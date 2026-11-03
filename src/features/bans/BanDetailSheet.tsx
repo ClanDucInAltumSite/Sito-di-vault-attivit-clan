@@ -113,6 +113,72 @@ export function BanDetailSheet({
           </div>
         ) : null}
 
+        {ban.link ? (
+          <div
+            style={{
+              padding: 'var(--space-3) var(--space-4)',
+              backgroundColor: 'var(--color-surface)',
+              border: '1px solid var(--color-border)',
+              borderRadius: 'var(--radius-md)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 'var(--space-3)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', minWidth: 0, flex: 1 }}>
+              <div
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: 'var(--radius-full)',
+                  backgroundColor: 'var(--color-bans-subtle)',
+                  color: 'var(--color-bans)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                <Icon name="link" size={18} />
+              </div>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div
+                  style={{
+                    fontSize: 'var(--font-size-xs)',
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    color: 'var(--color-bans)',
+                    letterSpacing: '0.04em',
+                    marginBottom: '2px',
+                  }}
+                >
+                  {I18N.bans.link}
+                </div>
+                <a
+                  href={ban.link.startsWith('http://') || ban.link.startsWith('https://') ? ban.link : `https://${ban.link}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    fontSize: 'var(--font-size-sm)',
+                    fontWeight: 600,
+                    color: 'var(--color-interactive)',
+                    textDecoration: 'none',
+                    wordBreak: 'break-all',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                  title={I18N.bans.apriLink}
+                >
+                  <span>{ban.link}</span>
+                  <Icon name="external-link" size={14} />
+                </a>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         <div>
           <div
             style={{
