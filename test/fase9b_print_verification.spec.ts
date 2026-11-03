@@ -14,7 +14,7 @@ test.describe('FASE 9B — Verifica Finale Stampa PDF, Font Incorporati e Geomet
     await page.evaluate(async () => {
       const DB_NAME = 'vault_scout_db';
       return new Promise<void>((resolve, reject) => {
-        const req = indexedDB.open(DB_NAME, 1);
+        const req = indexedDB.open(DB_NAME);
         req.onerror = () => reject(req.error);
         req.onsuccess = () => {
           const db = req.result;

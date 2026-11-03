@@ -18,7 +18,7 @@ test.describe('FASE 11A — Regressione: Stili di stampa non devono inquinare le
 
         const DB_NAME = 'vault_scout_db';
         return new Promise<any>((resolve, reject) => {
-          const req = indexedDB.open(DB_NAME, 1);
+          const req = indexedDB.open(DB_NAME);
           req.onerror = () => reject(req.error);
           req.onsuccess = () => {
             const db = req.result;

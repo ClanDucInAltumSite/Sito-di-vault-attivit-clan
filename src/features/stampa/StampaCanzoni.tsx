@@ -309,6 +309,15 @@ export function StampaCanzoni() {
         </div>
       </div>
 
+      {dataset.hasAnyOverflow && (
+        <div className="stampa-overflow-alert no-print">
+          <Icon name="info" size={18} />
+          <span>
+            Questa pagina non entra: alcuni canti selezionati superano l'altezza A4 e richiedono più pagine o riduzione margini.
+          </span>
+        </div>
+      )}
+
       {/* 4. SELEZIONE CANTI A COLONNA SINGOLA RAGGRUPPATA PER SETTORE */}
       <div className="no-print" style={{ width: '100%' }}>
         {/* Barra di ricerca e comandi globali */}

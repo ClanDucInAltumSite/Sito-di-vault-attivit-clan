@@ -173,7 +173,9 @@ export function parseLineToScreenWords(
 
         if (chordsHere && chordsHere.length > 0) {
           for (let c = 0; c < chordsHere.length - 1; c++) {
-            wordUnits.push({ chord: chordsHere[c], lyric: '' });
+            words.push({
+              units: [{ chord: chordsHere[c], lyric: '\u00A0' }],
+            });
           }
           wordUnits.push({ chord: chordsHere[chordsHere.length - 1], lyric: sylText });
         } else {
@@ -312,6 +314,13 @@ export function CantoLineRenderer({
         <span key={wIdx} className="canto-word">
           {w.units.map((u, uIdx) => (
             <span key={uIdx} className="canto-unit">
+              {u.chord && (
+                <span
+                  className="canzoniere-chord-anchor"
+                  aria-hidden="true"
+                  style={{ width: 0, height: 0, display: 'inline-block', overflow: 'hidden' }}
+                />
+              )}
               <span
                 className={`canto-unit-chord song-chord ${u.chord ? 'canzoniere-chord-badge' : ''}`.trim()}
                 aria-hidden={!u.chord}

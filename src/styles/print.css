@@ -768,6 +768,10 @@
     margin-bottom: 0 !important;
   }
 
+  .canzoniere-line-item.has-chords {
+    margin-top: 1.5em !important;
+  }
+
   /* Modello ad Unità Atomiche per la Stampa */
   .canto-screen-line {
     display: flex !important;
@@ -1776,7 +1780,7 @@ body:has(.stampa-view) .topo-contour-wrapper,
 
 .canzoniere-page .canzoniere-line-item.has-chords,
 .stampa-measure-host .canzoniere-line-item.has-chords {
-  margin-top: 0;
+  margin-top: 1.5em;
   line-height: normal;
 }
 

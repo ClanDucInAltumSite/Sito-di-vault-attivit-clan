@@ -15,7 +15,7 @@ test.describe('FASE 6 - Verifica Reale della Generazione PDF, Indice Verificato 
     await page.evaluate(async () => {
       const DB_NAME = 'vault_scout_db';
       return new Promise<void>((resolve, reject) => {
-        const req = indexedDB.open(DB_NAME, 1);
+        const req = indexedDB.open(DB_NAME);
         req.onerror = () => reject(req.error);
         req.onsuccess = () => {
           const db = req.result;

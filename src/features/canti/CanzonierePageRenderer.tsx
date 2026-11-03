@@ -36,7 +36,7 @@ export function CanzonierePageRenderer({ page, isScreenPreview = false }: Canzon
                 )}
                 {h.mode === 'suona' && h.params.capotasto !== null && (
                   <span className="canzoniere-param-item">
-                    <strong>Capotasto:</strong> {h.params.capotasto}°
+                    <span><strong>Capotasto:</strong> {h.params.capotasto}°</span>
                   </span>
                 )}
               </div>
@@ -108,7 +108,7 @@ export function CanzonierePageRenderer({ page, isScreenPreview = false }: Canzon
               )}
               {page.headerParams.capotasto !== null && (
                 <span className="canzoniere-param-item">
-                  <strong>Capotasto:</strong> {page.headerParams.capotasto}°
+                  <span><strong>Capotasto:</strong> {page.headerParams.capotasto}°</span>
                 </span>
               )}
             </div>

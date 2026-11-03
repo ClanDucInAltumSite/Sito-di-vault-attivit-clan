@@ -41,19 +41,35 @@ export function loadStampaCanzoniConfig(): StampaCanzoniConfig {
   }
   try {
     const raw = sessionStorage.getItem(SESSION_STORAGE_CANZONI_KEY);
-    if (!raw) {
-      // Fallback di retrocompatibilità se impostato tramite la chiave storica 'stampa_selection'
-      const oldRaw = sessionStorage.getItem('stampa_selection');
-      if (oldRaw) {
+    const oldRaw = sessionStorage.getItem('stampa_selection');
+
+    if (oldRaw) {
+      try {
         const oldParsed = JSON.parse(oldRaw);
-        return {
-          selectedCantiIds: Array.isArray(oldParsed.selectedCantiIds) ? oldParsed.selectedCantiIds : [],
-          mode: 'suona',
-          layoutMode: 'riempi_pagina',
-          includeIndex: false,
-          includeCover: false,
-        };
-      }
+        if (Array.isArray(oldParsed.selectedCantiIds)) {
+          if (!raw) {
+            return {
+              selectedCantiIds: oldParsed.selectedCantiIds,
+              mode: 'suona',
+              layoutMode: 'riempi_pagina',
+              includeIndex: Boolean(oldParsed.includeCoverAndIndex ?? oldParsed.includeIndex),
+              includeCover: Boolean(oldParsed.includeCoverAndIndex ?? oldParsed.includeCover),
+            };
+          } else {
+            const parsed = JSON.parse(raw);
+            return {
+              selectedCantiIds: oldParsed.selectedCantiIds,
+              mode: parsed.mode === 'canta' ? 'canta' : 'suona',
+              layoutMode: parsed.layoutMode === 'compatta' ? 'compatta' : 'riempi_pagina',
+              includeIndex: parsed.includeIndex !== undefined ? Boolean(parsed.includeIndex) : true,
+              includeCover: Boolean(parsed.includeCover),
+            };
+          }
+        }
+      } catch (_) {}
+    }
+
+    if (!raw) {
       return { ...DEFAULT_STAMPA_CANZONI_CONFIG };
     }
     const parsed = JSON.parse(raw);

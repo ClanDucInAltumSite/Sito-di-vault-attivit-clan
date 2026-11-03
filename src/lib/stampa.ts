@@ -438,29 +438,51 @@ export async function loadPrintableData(config: StampaConfig): Promise<Printable
     includeCover: false,
   });
 
-  const cantiLegacy: PrintableSong[] = canzData.items.map((it) => ({
-    canto: it.canto,
-    pages: it.layoutResult.pages.map((p) => ({
-      pageIndex: p.pageNumber,
-      totalPages: p.totalPages,
-      isFirstPage: p.isFirstPage,
-      rawChordpro: it.appliedCanto.testo_chordpro,
-      ast: parseChordProAST(it.appliedCanto.testo_chordpro, 0),
-      fontSizePt: p.fontSizePt,
-      hasOverflow: it.layoutResult.hasOverflow,
-    })),
-    pageCount: it.pageCount,
-    hasAnyOverflow: it.layoutResult.hasOverflow,
-    images: [],
-    canzoniereResult: it.layoutResult,
-  }));
+  let globalHasOverflow = false;
+  const cantiLegacy: PrintableSong[] = canzData.items.map((it) => {
+    let songHasOverflow = it.layoutResult.hasOverflow;
+    const pageTexts = splitSongIntoPages(it.appliedCanto.testo_chordpro);
+    pageTexts.forEach((text, idx) => {
+      const isFirst = idx === 0;
+      const overflowResult = measureSongPageOverflow(text, isFirst, {
+        titolo: it.canto.titolo,
+        autore: it.canto.autore,
+        tonalita: it.canto.tonalita,
+      });
+      if (overflowResult.hasOverflow) {
+        songHasOverflow = true;
+        globalHasOverflow = true;
+      }
+    });
+
+    if (it.layoutResult.hasOverflow) {
+      globalHasOverflow = true;
+    }
+
+    return {
+      canto: it.canto,
+      pages: it.layoutResult.pages.map((p) => ({
+        pageIndex: p.pageNumber,
+        totalPages: p.totalPages,
+        isFirstPage: p.isFirstPage,
+        rawChordpro: it.appliedCanto.testo_chordpro,
+        ast: parseChordProAST(it.appliedCanto.testo_chordpro, 0),
+        fontSizePt: p.fontSizePt,
+        hasOverflow: songHasOverflow,
+      })),
+      pageCount: it.pageCount,
+      hasAnyOverflow: songHasOverflow,
+      images: [],
+      canzoniereResult: it.layoutResult,
+    };
+  });
 
   return {
     giochi: gbData.giochi,
     bans: gbData.bans,
     canti: cantiLegacy,
     totalSelected: gbData.totalSelected + cantiLegacy.length,
-    hasAnyOverflow: canzData.hasAnyOverflow,
+    hasAnyOverflow: globalHasOverflow || canzData.hasAnyOverflow,
   };
 }
 

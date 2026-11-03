@@ -9,8 +9,9 @@ import { SegmentedControl } from '../../ui/SegmentedControl';
 import { StampaGiochiBans } from './StampaGiochiBans';
 import { StampaCanzoni } from './StampaCanzoni';
 import { StampaOdg } from './StampaOdg';
+import { StampaFascicolo } from './StampaFascicolo';
 
-export type SectionTab = 'giochibans' | 'canzoni' | 'odg';
+export type SectionTab = 'giochibans' | 'canzoni' | 'odg' | 'fascicolo';
 
 const STORAGE_ACTIVE_TAB_KEY = 'stampa_active_section_tab';
 
@@ -24,8 +25,22 @@ export function StampaView() {
 
   const [activeTab, setActiveTab] = useState<SectionTab>(() => {
     if (typeof window !== 'undefined' && window.sessionStorage) {
+      // Se è presente una configurazione legacy 'stampa_selection' con elementi misti (giochi o bans assieme ai canti),
+      // attiva automaticamente la modalità Fascicolo Completo per retrocompatibilità
+      const legacyRaw = window.sessionStorage.getItem('stampa_selection');
+      if (legacyRaw) {
+        try {
+          const parsed = JSON.parse(legacyRaw);
+          const hasGiochiOrBans = (parsed.selectedGiochiIds?.length > 0 || parsed.selectedBansIds?.length > 0);
+          const hasCanti = parsed.selectedCantiIds?.length > 0;
+          if (hasGiochiOrBans && hasCanti) {
+            return 'fascicolo';
+          }
+        } catch (_) {}
+      }
+
       const saved = window.sessionStorage.getItem(STORAGE_ACTIVE_TAB_KEY);
-      if (saved === 'canzoni' || saved === 'giochibans' || saved === 'odg') {
+      if (saved === 'canzoni' || saved === 'giochibans' || saved === 'odg' || saved === 'fascicolo') {
         return saved;
       }
     }
@@ -40,6 +55,13 @@ export function StampaView() {
       } catch (_) {}
     }
   };
+
+  const tabOptions = [
+    { value: 'canzoni', label: 'Canzoniere' },
+    { value: 'giochibans', label: 'Giochi e Bans' },
+    { value: 'odg', label: 'ODG, Quaderno ed Eventi' },
+    ...(activeTab === 'fascicolo' ? [{ value: 'fascicolo', label: 'Fascicolo Completo' }] : []),
+  ];
 
   return (
     <div className="container stampa-page" style={{ padding: 'var(--space-4) 0' }}>
@@ -56,14 +78,10 @@ export function StampaView() {
           </div>
         </div>
 
-        {/* Selettore a 3 sezioni indipendenti: Canzoniere | Giochi e Bans | OdG */}
-        <div style={{ marginTop: 'var(--space-3)', maxWidth: '520px' }}>
+        {/* Selettore a sezioni indipendenti: Canzoniere | Giochi e Bans | OdG */}
+        <div style={{ marginTop: 'var(--space-3)', maxWidth: '560px' }}>
           <SegmentedControl
-            options={[
-              { value: 'canzoni', label: 'Canzoniere' },
-              { value: 'giochibans', label: 'Giochi e Bans' },
-              { value: 'odg', label: 'ODG, Quaderno ed Eventi' },
-            ]}
+            options={tabOptions}
             value={activeTab}
             onChange={(val) => handleTabChange(val as SectionTab)}
             aria-label="Scegli tipologia di documento da stampare"
@@ -76,6 +94,7 @@ export function StampaView() {
         {activeTab === 'canzoni' && <StampaCanzoni />}
         {activeTab === 'giochibans' && <StampaGiochiBans />}
         {activeTab === 'odg' && <StampaOdg />}
+        {activeTab === 'fascicolo' && <StampaFascicolo />}
       </div>
     </div>
   );
