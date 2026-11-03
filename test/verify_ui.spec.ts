@@ -743,5 +743,154 @@ test.describe('Verifica Generale di Assenza Perdita di Stili (Style Bleed & Inte
   }
 });
 
+test.describe('Audit Finale Completo: Responsività su 10 Viste (320px SE, 390px, Desktop) e Zero Errori Console', () => {
+  const ALL_10_ROUTES = [
+    { route: '#/', name: 'Home' },
+    { route: '#/giochi', name: 'Giochi' },
+    { route: '#/bans', name: 'Bans' },
+    { route: '#/canti', name: 'Canti' },
+    { route: '#/calendario', name: 'Calendario' },
+    { route: '#/quaderno', name: 'Quaderno di Clan' },
+    { route: '#/stampa', name: 'Centro Stampa' },
+    { route: '#/admin', name: 'Admin Dashboard' },
+    { route: '#/stato-dati', name: 'Stato Dati' },
+    { route: '#/design', name: 'Design System' },
+  ];
+
+  const TEST_VIEWPORTS = [
+    { name: 'iPhone SE (320x568)', width: 320, height: 568 },
+    { name: 'iPhone 13/14/15 (390x844)', width: 390, height: 844 },
+    { name: 'Desktop (1440x900)', width: 1440, height: 900 },
+  ];
+
+  for (const r of ALL_10_ROUTES) {
+    for (const vp of TEST_VIEWPORTS) {
+      test(`[${r.name}] Zero scroll orizzontale e zero errori console su ${vp.name}`, async ({ page }) => {
+        const consoleErrors: string[] = [];
+        const pageErrors: Error[] = [];
+
+        page.on('console', (msg) => {
+          if (msg.type() === 'error') {
+            const text = msg.text();
+            if (!text.includes('favicon') && !text.includes('ServiceWorker') && !text.includes('Failed to load resource')) {
+              consoleErrors.push(text);
+            }
+          }
+        });
+
+        page.on('pageerror', (err) => {
+          pageErrors.push(err);
+        });
+
+        await page.setViewportSize({ width: vp.width, height: vp.height });
+        await page.goto(r.route);
+        await page.waitForLoadState('networkidle');
+        await page.waitForTimeout(150);
+
+        const scrollMetrics = await page.evaluate(() => ({
+          scrollWidth: document.documentElement.scrollWidth,
+          clientWidth: document.documentElement.clientWidth,
+        }));
+
+        expect(
+          scrollMetrics.scrollWidth,
+          `Scroll orizzontale anomalo su ${r.name} (${vp.name}): scrollWidth=${scrollMetrics.scrollWidth} > clientWidth=${scrollMetrics.clientWidth}`
+        ).toBeLessThanOrEqual(scrollMetrics.clientWidth + 1);
+
+        expect(consoleErrors, `Errori console rilevati su ${r.name}: ${consoleErrors.join(', ')}`).toHaveLength(0);
+        expect(pageErrors, `Errori runtime di pagina rilevati su ${r.name}`).toHaveLength(0);
+      });
+    }
+  }
+
+  test('Audit accessibilità WCAG AA Axe-Core su Quaderno di Clan (#/quaderno)', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/#/quaderno');
+    await page.waitForLoadState('networkidle');
+
+    const accessibilityScanResults = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa'])
+      .disableRules(['color-contrast'])
+      .analyze();
+
+    const criticalViolations = accessibilityScanResults.violations.filter(
+      (v) => v.impact === 'critical' || v.impact === 'serious'
+    );
+
+    expect(criticalViolations.length, `Violazioni accessibilità su Quaderno: ${JSON.stringify(criticalViolations, null, 2)}`).toBe(0);
+  });
+
+  test('Audit accessibilità WCAG AA Axe-Core su Admin Dashboard (#/admin)', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/#/admin');
+    await page.waitForLoadState('networkidle');
+
+    const accessibilityScanResults = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa'])
+      .disableRules(['color-contrast'])
+      .analyze();
+
+    const criticalViolations = accessibilityScanResults.violations.filter(
+      (v) => v.impact === 'critical' || v.impact === 'serious'
+    );
+
+    expect(criticalViolations.length, `Violazioni accessibilità su Admin: ${JSON.stringify(criticalViolations, null, 2)}`).toBe(0);
+  });
+
+  test('Centro Stampa: navigazione reattiva sui 3 tab senza overflow su iPhone SE (320px)', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 568 });
+    await page.goto('/#/stampa');
+    await page.waitForLoadState('networkidle');
+
+    // Tab 1: Canzoniere (default)
+    let metrics = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+    }));
+    expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth + 1);
+
+    // Tab 2: Giochi e Bans
+    const tabGiochiBans = page.locator('button:has-text("Giochi e Bans")');
+    if (await tabGiochiBans.count() > 0) {
+      await tabGiochiBans.click();
+      await page.waitForTimeout(200);
+      metrics = await page.evaluate(() => ({
+        scrollWidth: document.documentElement.scrollWidth,
+        clientWidth: document.documentElement.clientWidth,
+      }));
+      expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth + 1);
+    }
+
+    // Tab 3: ODG, Quaderno ed Eventi
+    const tabOdg = page.locator('button:has-text("ODG ed Eventi"), button:has-text("ODG, Quaderno ed Eventi")');
+    if (await tabOdg.count() > 0) {
+      await tabOdg.first().click();
+      await page.waitForTimeout(200);
+      metrics = await page.evaluate(() => ({
+        scrollWidth: document.documentElement.scrollWidth,
+        clientWidth: document.documentElement.clientWidth,
+      }));
+      expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth + 1);
+    }
+  });
+
+  test('Verifica Semantica e Requisiti PMI / Associazioni (lang, viewport cover, OpenGraph)', async ({ page }) => {
+    await page.goto('#/');
+    await page.waitForLoadState('networkidle');
+
+    const htmlLang = await page.getAttribute('html', 'lang');
+    expect(htmlLang, 'Il tag html deve avere lang="it"').toBe('it');
+
+    const viewportContent = await page.getAttribute('meta[name="viewport"]', 'content');
+    expect(viewportContent, 'Il viewport deve includere viewport-fit=cover').toContain('viewport-fit=cover');
+
+    const ogTitle = await page.getAttribute('meta[property="og:title"]', 'content');
+    expect(ogTitle).toBeTruthy();
+
+    const ogImage = await page.getAttribute('meta[property="og:image"]', 'content');
+    expect(ogImage).toBeTruthy();
+  });
+});
+
 
 

@@ -714,3 +714,580 @@ Il mantenimento manuale e i controlli visivi/funzionali ripetitivi sottraggono t
    - Configurazione di Dependabot e workflow settimanale di manutenzione per audit dipendenze.
    - Rispetto di tutte le quote gratuite (GitHub Actions < 2000 min/mese, Supabase 2 progetti 0€/mese).
 
+---
+
+## ADR-0021: Riscrizione Completa del Sottosistema di Stampa (Tre Flussi Separati, Due Varianti Canzoniere, Layout Adattivo e Indice per Settori)
+
+### Data
+2026-10-27
+
+### Contesto
+La precedente schermata di stampa (`StampaView.tsx`, 1481 righe) accorpava Giochi, Bans, Canti e ODG in un'unica configurazione mista (`StampaConfig`) e consentiva una modalità "tutti" che generava documenti ibridi e ingestibili per le attività di reparto e clan. Inoltre, il canzoniere utilizzava font statici lasciando vistosi spazi vuoti e non offriva distinzione tra chi suona (accordi, intro/outro, metadati) e chi canta (solo testo, righe più basse, risparmio carta).
+
+### Decisioni Adottate
+1. **Tre Flussi di Stampa Rigorosamente Separati (`SectionTab = 'giochibans' | 'canzoni' | 'odg'`):**
+   - Rimozione totale della modalità "tutti". Giochi/Bans, Canzoni e ODG non coesistono mai nello stesso job né nello stesso foglio di stampa.
+   - Scomposizione di `StampaView.tsx` in un orchestratore modulare e 3 componenti dedicati: `StampaGiochiBans.tsx`, `StampaCanzoni.tsx`, `StampaOdg.tsx`.
+   - Suddivisione della logica in `stampa_shared.ts`, `stampa_giochibans.ts`, `stampa_canzoni.ts`, `stampa_odg.ts`, mantenendo `stampa.ts` come facciata di re-export retrocompatibile.
+2. **Due Varianti del Canzoniere ("Chi suona" e "Chi canta"):**
+   - **Chi suona:** accordi sopra il testo ad alta leggibilità, intro/outro/strum strumentali preservati, metadati in testata (tempo, BPM, ritmo pennata con frecce Nova Mono).
+   - **Chi canta:** accordi completamente rimossi (nessun tag `[Accordo]`, nessuna riga di soli accordi), commenti strumentali e pennate omessi, interlinea ridotta per massimizzare la capienza, testata con solo titolo e autore.
+   - **Politica `RIT.` (`applyRitRepeatPolicy`):** il ritornello compare intero solo alla prima occorrenza; dalla seconda in poi viene sostituito dall'etichetta in grassetto `RIT.`. Ritornelli parzialmente diversi non vengono contratti. Gli artefatti di conversione da PDF (`RIT. / RIT:` in testata pagina) vengono eliminati all'origine.
+3. **Layout Adattivo con Riempimento Spazio (Font Scaling):**
+   - Algoritmo di ricerca binaria sulla dimensione font per canzone: scala proporzionalmente testo, accordi e interlinea tra `minSizePt: 9` e `maxSizePt: 17` pt (passo 0.5 pt).
+   - Modalità predefinita `riempi_pagina`: massimizza la dimensione font nel target minimo di pagine evitando spezzature di strofe, righe orfane e single-word-wrap.
+   - Opzione `compatta`: mantiene il corpo a 11 pt standard per risparmiare carta se richiesto.
+4. **Indice Iniziale Diviso per 4 Settori:**
+   - Ordinamento: 1. Scout (`scout`), 2. Esterni (`esterni`), 3. Chiesa (`chiesa`), 4. Altre (`altre`). I settori vuoti non vengono mostrati.
+   - All'interno di ciascun settore, ordinamento alfabetico deterministico ignorando articoli iniziali italiani (*il, lo, la, i, gli, le, un, uno, una, l'*) e accenti.
+   - Numerazione reale calcolata DOPO la fase di layout. Se la copertina è attiva, l'indice segue la copertina.
+5. **Isolamento DOM e Scoping di Stampa:**
+   - Contenitori DOM dedicati con ID univoci (`stampa-giochibans-root`, `stampa-canzoni-root`, `stampa-odg-root`).
+   - `triggerPrint(scope)` assegna `data-print` sul `<body>` (`canzoni`, `giochibans`, `odg`) prima della stampa e lo rimuove su evento `afterprint`.
+   - Regole CSS in `print.css` nascondono rigorosamente i flussi inattivi.
+6. **Persistenza e Migrazione Morbida:**
+   - Tre chiavi indipendenti in `sessionStorage`: `stampa_giochibans`, `stampa_canzoni`, `stampa_odg`.
+   - La vecchia chiave monolitica `stampa_selection` viene ignorata per i nuovi flussi e supportata in lettura trasparente solo da `loadStampaConfig` legacy.
+
+---
+
+## ADR-0022: Ottimizzazione Avanzata del Layout A4 (1 vs 2 Colonne, Auto-Fill, FillRatio >= 0.90, Risoluzione Dati e Ridisegno Completo UI/UX della Stampa)
+
+### Data
+2026-10-27
+
+### Contesto
+La prima iterazione della riscrittura della stampa presentava diversi limiti pratici nei PDF generati:
+1. I testi occupavano solo il 35-60% dell'altezza pagina con corpi bloccati intorno a 9 pt.
+2. Le righe di testo importate dai PDF presentavano a capo fissi spuri (es. "...il meglio di" / "me.").
+3. I dati di "Danza la vita" presentavano strofe e ritornello mescolati e duplicati ("cuor. Danza assieme a no----------------oi!").
+4. Comparivano etichette duplicate "RIT. RIT:" e strofe ripetute identiche (come in Albachiara) non venivano contratte in `RIT.`.
+5. L'interfaccia a schermo presentava box annidati con scroll interno a 340px, gerarchia poco chiara, opzioni dispersive e pulsanti di stampa lontani dall'utente.
+
+### Decisioni Adottate
+1. **Diagnosi e Risoluzione del Blocco Font a 9 pt:**
+   - *Causa reale:* Il filtro `hasSingleWordWrap` considerava qualsiasi riga con più di 35 caratteri in due colonne come "con parola singola a capo", penalizzando tutti i candidati sopra 9.5 pt e forzando l'algoritmo sul font minimo di fallback (9 pt).
+   - *Soluzione:* Ridefinito il controllo per individuare unicamente le vere parole orfane isolate (`cleanLast.length <= 4`). Implementato un algoritmo di scoring che valuta lo spazio (1 colonna vs 2 colonne) × (font da 9 pt a 28 pt per "Chi canta", e fino a 24 pt per "Chi suona"), privilegiando combinazioni che massimizzano il riempimento (`fillRatio >= 0.90`).
+   - Canzoni brevi o dense usano 1 colonna a tutta larghezza (186 mm) con testo grande (15–18 pt); canzoni articolate passano a 2 colonne (89 mm) con flusso naturale `column-fill: auto`.
+2. **Unione Righe di Continuazione (`joinContinuationLines`):**
+   - Nel modulo `canzoniere_cleaner.ts`, le righe spezzate artificialmente dall'importazione OCR/PDF vengono riunite deterministicamente prima del layout (righe che iniziano con minuscola, completamento di parentesi aperte o continuazioni di frase), lasciando che sia l'algoritmo di impaginazione a calcolare i corretti a capo in base alla colonna.
+3. **Integrità Dati "Danza la vita" e Rigenerazione Ritornelli:**
+   - Testo corretto alla fonte in `src/data/parsed_songs.ts` e `supabase/seed_21_canti.sql` con ritornello coeso `{soc}...{eoc}` e accordi allineati sulle sillabe corrette.
+   - Aggiunto auto-healing a runtime che rileva il record corrotto su IndexedDB e lo sostituisce con la versione canonica.
+4. **Normalizzazione Etichette e Riconoscimento Strofe Ripetute:**
+   - Rimozione degli artefatti "RIT. RIT:" attraverso la coalescenza dei blocchi in `applyRitRepeatPolicy`.
+   - Riconoscimento automatico delle strofe ripetute non marcate (blocchi identici $\ge 2$ righe, come in Albachiara) che dalla seconda occorrenza vengono stampate come etichetta isolata in grassetto `RIT.`.
+5. **Prevenzione Collisioni Verticali Chords/Lyrics su Righe Avvolte:**
+   - Impostato `line-height: 2.2` su `.canzoniere-line-item.has-chords` per garantire che, qualora una riga con accordi vada a capo naturalmente, gli accordi della seconda riga visiva trovino adeguato spazio verticale senza collidere con il testo della prima riga.
+6. **Ridisegno Completo UI/UX della Schermata Canzoniere:**
+   - Flusso unico a colonna singola sotto il commutatore delle 3 stampe.
+   - Bivio principale prominently posizionato: "Per chi stampi?" (`Chi suona (con accordi)` vs `Chi canta (solo testo)`).
+   - Fisarmonica opzioni secondaria chiusa di default, con summary testuale dello stato corrente (`Riempi pagina · Indice attivo · Senza copertina`).
+   - Selezione canti raggruppata per settore (Scout, Esterni, Chiesa, Altre) con touch target $\ge 44$ px, badge con numero di pagine calcolato in tempo reale per ogni canto e page-level scrolling (nessun box a scorrimento interno con altezza fissa).
+   - Barra d'azione fissa in fondo (sticky bottom bar) con riepilogo contatore canti/pagine e pulsanti "Anteprima" e "Stampa / Salva PDF".
+   - Attenuazione dello sfondo topografico majella nella schermata di stampa (`opacity: 0.02`).
+7. **Verifica Visiva e Misure Numeriche Playwright (`test/stampa_canzoniere_visual.spec.ts`):**
+   - Verifica completa a 1280px (desktop) e 390px (mobile).
+   - Risultati misurati nel rendering reale su Chromium:
+     - *Albachiara* (suona): font 14 pt, 2 colonne, fillRatio 100%
+     - *Albachiara* (canta): font 16 pt, 1 colonna, fillRatio 82.1%
+     - *Come ti ama Dio* (suona): font 11 pt, 1 colonna, fillRatio 100%
+     - *Come ti ama Dio* (canta): font 18 pt, 1 colonna, fillRatio 85.2%
+     - *Danza la vita* (suona): font 11.5 pt, 2 colonne, fillRatio 100%
+     - *Danza la vita* (canta): font 15 pt, 1 colonna, fillRatio 88.8%
+     - *Come sole come goccia* (suona): font 12.5 pt, 2 colonne, fillRatio 100%
+     - *Come sole come goccia* (canta): font 17.5 pt, 2 colonne, fillRatio 93.2%
+   - Screenshot salvati in `test/__screenshots__/print_overhaul/`.
+
+
+
+
+---
+
+## ADR-0023: Armonia Tipografica e Modello ad Unità Atomiche per la Stampa Canzoniere A4 (Eliminazione Pagine Bianche Fantasma, Margini Nativo 15mm, Prevenzione Collisioni Orizzontali Accordi/Testo)
+
+### Data
+2026-10-27
+
+### Contesto
+Dall'ispezione visiva e metrica dei primi PDF stampati e generati dal browser sono emersi quattro difetti fondamentali:
+1. **Pagine bianche fantasma alternate:** un canzoniere con 4 canti e indice produceva 9 pagine nel PDF esportato da Chromium, con le pagine 3, 5, 7, 9 completamente bianche (eccetto un minuscolo trattino verticale al centro). La causa scatenante era la combinazione di altezza rigida `.canzoniere-page` e bordi/padding delle card di anteprima a schermo (`.stampa-a4-sheet-card`) che superavano di frazioni di pixel la capienza del foglio A4.
+2. **Clipping sul bordo sinistro:** i primi 15mm sul lato sinistro del foglio venivano tagliati ("ACQUA" anziché "L'ACQUA", "T:" anziché "RIT:") a causa della somma tra il margine fisico del foglio `@page { margin: 15mm }` e la larghezza fissa `width: 210mm` ereditata a schermo, che portava la larghezza calcolata a 240mm forzando Chromium a traslare e ritagliare il contenuto.
+3. **Collisioni e sovrapposizioni orizzontali/verticali tra accordi e testo:** l'uso di ancoraggi a larghezza zero (`.canzoniere-chord-anchor` con `width: 0; position: absolute;`) non occupava spazio fisico nel flusso del testo. Quando la sigla di un accordo era più larga della sillaba sottostante (es. `[Fa#m]` su `e`), l'accordo collideva orizzontalmente con la sillaba successiva (`dalRe`, `casRE`, `risvegFa liCol Do`).
+4. **Disarmonia tipografica estrema:** i canti brevi venivano ingigantiti a corpi da manifesto (18–20 pt), mentre i canti lunghi venivano compressi sotto i 10 pt. Inoltre, strofe ripetute prive di marcatura di ritornello venivano erroneamente contratte in `RIT.` (es. "Respiri piano..." in Albachiara).
+
+### Decisioni Adottate
+1. **Armonia Tipografica Editoriale:**
+   - Range del corpo testo rigorosamente delimitato tra 10.5 pt e 12.5 pt (standard 11.5 pt per "Chi canta", 11.0 pt per "Chi suona").
+   - Canzoni brevi o dense usano 1 colonna a tutta larghezza con font confortevole (11.5–12.0 pt) e centratura verticale armonica, preservando l'aspetto di un canzoniere stampato curato ed elegante.
+   - Canzoni molto lunghe (es. *Scouting For Boys*, 88 versi) scorrono naturalmente su 2 pagine in 2 colonne a 11.0 pt con testatina ridotta a pagina 2, senza mai schiacciare il testo in corpi microscopici o illegibili all'aperto.
+2. **Modello ad Unità Atomiche (`.canto-word` > `.canto-unit`):**
+   - Rimosso interamente il modello basato su ancore a larghezza zero e traslazioni assolute.
+   - Unificata l'architettura visiva di schermo e stampa su una composizione flexbox verticale: ogni parola (`.canto-word`) contiene uno o più blocchi atomici (`.canto-unit`) composti da accordo (`.canto-unit-chord`) sopra e sillaba (`.canto-unit-lyric`) sotto.
+   - Se l'accordo è più largo della sillaba, il box dell'unità si espande naturalmente determinando lo spazio fisico necessario, eliminando in modo matematico qualsiasi collisione o sovrapposizione tra accordi e testo adiacente.
+3. **Reset Rigoroso di Stampa Paged Media e Margini A4:**
+   - `@page { size: A4 portrait; margin: 15mm; }` definisce univocamente i margini fisici del documento A4.
+   - In `@media print`, tutte le classi contenitore dell'anteprima a schermo (`.stampa-a4-sheet-card`, `.stampa-a4-preview-scroll`, `.print-song-book-item`) vengono azzerate (`padding: 0 !important; margin: 0 !important; border: none !important; box-shadow: none !important; width: 100% !important; height: auto !important; max-height: none !important; overflow: visible !important`).
+   - Le pagine `.canzoniere-page` hanno `width: 100% !important; height: auto !important; padding: 0 !important; margin: 0 !important; break-after: page !important`.
+   - Questo annulla qualsiasi overflow di larghezza (azzerando il clipping a sinistra) e di altezza (azzerando le pagine bianche fantasma).
+   - Verifica Playwright su PDF nativo generato da Chromium (`test/stampa_pdf_pages.spec.ts`): 4 canti + indice = esattamente 5 pagine, 0 pagine bianche, 0 caratteri mozzati.
+4. **Politica RIT Riconosciuta:**
+   - Solo i veri ritornelli contrassegnati con direttiva ChordPro `{soc}` o prefisso esplicito `RIT:` vengono contratti nell'etichetta `RIT.` dalla seconda occorrenza in poi.
+   - Le strofe ordinarie che ricorrono nel testo rimangono interamente visibili e cantabili con tutti i versi e gli accordi.
+5. **Verifica Visiva e Misure Reali Playwright (`test/stampa_canzoniere_visual.spec.ts`):**
+   - *Albachiara* (suona): font 11.0 pt, 2 colonne, fillRatio 100%
+   - *Albachiara* (canta): font 12.5 pt, 1 colonna, fillRatio 81.4%
+   - *Come ti ama Dio* (suona): font 11.0 pt, 1 colonna, fillRatio 100%
+   - *Come ti ama Dio* (canta): font 12.5 pt, 1 colonna, fillRatio 59.2%
+   - *Danza la vita* (suona): font 11.5 pt, 2 colonne, fillRatio 100%
+   - *Danza la vita* (canta): font 12.5 pt, 1 colonna, fillRatio 74.0%
+   - *Come sole come goccia* (suona): font 10.5 pt, 2 colonne, fillRatio 100%
+   - *Come sole come goccia* (canta): font 12.5 pt, 1 colonna, fillRatio 86.3% 
+---
+
+## ADR-0024: Perfezionamento Layout e Compressione Spazio A4 (Margini 12mm, Larghezza Colonne 89.5mm, Bilanciamento Colonne Deterministico e Protezione Versi)
+
+### Data
+2026-10-29
+
+### Contesto
+Nonostante l'adozione del modello ad unità atomiche e la risoluzione delle pagine fantasma introdotte in ADR-0023, la stampa cartacea e l'anteprima PDF evidenziavano ancora criticità strutturali nell'impaginazione dei canti:
+1. **Colonna Destra Vuota o Squilibrata:** L'algoritmo di impaginazione sequenziale `column-fill: auto` distribuiva le strofe riempiendo la colonna sinistra fino alla massima altezza possibile; per canti di media lunghezza che entravano interamente in una colonna, la colonna destra rimaneva desolatamente vuota al 100%, lasciando un foglio asimmetrico e spreco di spazio.
+2. **Fusione Aggressiva dei Versi (`joinContinuationLines`):** Nel modulo `canzoniere_cleaner.ts`, un'euristica basata su `(lyrCur.length < 32 || lyrNext.length < 25)` fondeva indiscriminatamente versi consecutivi distinti scritti con iniziale minuscola. Questo accorpamento generava righe artificialmente lunghe (> 65 caratteri) che forzavano continui a capo visivi, innescavano il flag `hasTooLongLines` e deprimevano il font a 9.5–10 pt.
+3. **Geometria Margini e Sovrastima Larghezza Caratteri:** I margini da 15 mm limitavano la larghezza utile di ciascuna colonna a 86.5 mm, costringendo anche versi normali al wrapping. Inoltre, la stima empirica di larghezza carattere a 0.50–0.52 em e il conteggio duplicato degli spazi tra parole gonfiavano artificialmente la larghezza calcolata.
+4. **Altezza Utile Non Calibrata sulla Testata Musicale:** Su canti con testata completa (titolo, autore, tonalità, BPM, ritmo con frecce), l'altezza utile residua per la prima pagina deve rispettare rigidamente la capienza fisica A4 (297 mm - 24 mm di margini - 38 mm di testata = 235 mm) per prevenire lo sbordo a piè di pagina durante la stampa fisica.
+
+### Decisioni Adottate
+1. **Geometria A4 con Margini da 12mm ed Espansione Colonne a 89.5mm:**
+- Fissato `@page { size: A4 portrait; margin: 12mm; }`.
+- Larghezza stampabile utile: 186 mm. Con intercolonna (gap) di 7 mm e linea divisoria centrale continua (`border-left: 0.75pt solid oklch(0.7 0 0)`), ciascuna colonna acquisisce **89.5 mm** di larghezza effettiva (+3 mm rispetto al passato), riducendo drasticamente il wrapping dei versi.
+2. **Algoritmo di Bilanciamento Colonne Deterministico (`balanceIntoTwoColumns`):**
+- Sostituito il packing sequenziale greedy con un algoritmo di partizione ottimizzata applicato a tutte le canzoni a pagina singola e alla pagina terminale dei canti multipagina.
+- L'algoritmo valuta ogni punto di taglio tra blocchi e seleziona l'indice che minimizza il divario di altezza $\Delta h = |h_{left} - h_{right}|$, con il vincolo rigido che $\max(h_{left}, h_{right}) \le \text{maxColHeightMm}$.
+- Nessun blocco o strofa viene spezzato a metà: le strofe fluiscono integre e visivamente bilanciate tra le due colonne, eliminando le voragini bianche.
+3. **Calibrazione Fisica Rigorosa delle Altezze Utili:**
+- Pagina 1 con parametri musicali (tonalità, BPM, ritmo): `235 mm`.
+- Pagina 1 senza parametri musicali: `248 mm`.
+- Pagina 1 in modalità "Chi canta": `254 mm`.
+- Pagine 2+ (testatina ridotta titolo e numero pagina): `262 mm`.
+4. **Calibrazione Metrologica del Font Roboto:**
+- Larghezza media carattere non-spazio in Roboto latino: `0.46 * fontSizePt`.
+- Spaziature tra parole e margini delle unità atomiche isolate: `0.28 * fontSizePt`, evitando il doppio conteggio degli spazi.
+5. **Protezione dei Versi Poetici in `canzoniere_cleaner.ts`:**
+- Rimossa la condizione aggressiva di fusione sulle lunghezze riga.
+- Preservate unicamente le unioni tipograficamente certe:
+- Trattino finale esplicito (`-`);
+- Parentesi aperta non chiusa;
+- Preposizioni o connettivi espliciti in fine riga (`e`, `o`, `ma`, `se`, `per`, `con`, `su`, `tra`, `fra`, `a`, `di`, `da`, `in`);
+- Frammenti tronchi o desinenze minime (`me.`, `te.`).
+6. **Criterio di Selezione Formato (1 Colonna vs 2 Colonne):**
+- Il bonus per il layout a 2 colonne (+450 pt) viene confermato solo per canti che garantiscono un riempimento organico (`fillRatio >= 0.40`).
+- Se un canto molto breve produrrebbe un riempimento inferiore al 40% a 2 colonne, l'ottimizzatore assegna la modalità a 1 colonna a tutta larghezza con font confortevole e armonico (11.5–12.5 pt in `riempi_pagina`), preservando sia la leggibilità che l'eleganza estetica.
+7. **Verifica Globale:**
+- 100% test superati (Vitest 241/241, Playwright PDF export 6 pagine con 0 overflow, Playwright Visual Regression 10/10).
+
+---
+
+## ADR-0025: Perfezionamento Canti Lunghi/Multi-Pagina, Variante "Chi canta" Salva-Spazio, Numerazione Reale e Indice a Riferimenti Incrociati
+
+### Data
+2026-10-30
+
+### Contesto
+Dalle prove di esportazione PDF e stampa fisica del Canzoniere sono emerse quattro necessità editoriali e funzionali:
+1. **Pagine di overflow e sbilanciamenti:** In canti con parametri musicali ricchi (es. "E la strada si apre"), il calcolo geometrico consentiva al blocco finale di estendersi fino al limite estremo del foglio. La presenza di margini inferiori non azzerati nel DOM reale scatenava lo sbordo nel margine non stampabile (12mm) di Chromium, provocando l'emissione di una sesta pagina completamente vuota.
+2. **Variante "Chi canta" (senza accordi) poco efficiente:** Senza accordi, i versi occupano la metà dello spazio verticale. L'algoritmo precedente penalizzava le 2 colonne sui brani di media lunghezza a causa di un `fillRatio` inferiore al 40%, costringendo gran parte dei canti a 1 colonna e vanificando l'opportunità di risparmiare fogli di carta nel libretto dei canti.
+3. **Numerazione pagine e corrispondenza Indice:** L'indice e le card a schermo mostravano numeri relativi o slegati dal foglio stampato, rendendo difficile ritrovare i canti sfogliando il canzoniere cartaceo.
+4. **Mancanza di riferimenti incrociati chitarristi/coro:** Durante le veglie o messe scout, i chitarristi con il canzoniere "Chi suona" e i ragazzi con il libretto "Chi canta" si trovano su pagine diverse poiché "Chi canta" accorpa i brani in meno fogli. Mancava un'indicazione rapida per sincronizzare l'assemblea ("andate a pagina X del vostro canzoniere").
+5. **Indice dispersivo:** I titoli di sezione includevano il contatore `(N)` (es. `CANZONI SCOUT (4)`), la testata usava una riga di sottotitolo separata con badge ingombrante, e l'interlinea non permetteva di far entrare ~30 canti in un unico foglio A4.
+
+### Decisioni Adottate
+1. **Calibrazione Metrologica e Azzeramento Pagine Bianche Fantasma:**
+   - Ridotto `page1MaxColHeightMm` per canti con parametri musicali completi da 235mm a 222mm, assicurando un margine di sicurezza di 24mm dal bordo inferiore del foglio prima del margine fisico di 12mm.
+   - Azzerato il margine inferiore dell'ultimo blocco (`.canzoniere-column .canzoniere-block:last-child { margin-bottom: 0 !important; }`).
+   - Rimosso il doppio salto pagina forzato tra `.canzoniere-page` e `.stampa-a4-sheet-card`, impostando `.canzoniere-page { break-after: auto !important; }` in `@media print` e affidando la suddivisione foglio unicamente a `.stampa-a4-sheet-card`.
+2. **Variante "Chi canta" Salva-Spazio ad Alta Densità:**
+   - Intestazione compatta su riga singola flex (`.canzoniere-header-row`): Titolo in grassetto a sinistra (14pt), autore a destra (10pt) con linea divisoria sottile, guadagnando ~10mm di altezza verticale utile rispetto alla testata estesa con ritmo e BPM.
+   - Soglia di attivazione a 2 colonne impostata a $\ge 22$ versi non vuoti: per tutti i canti standard e lunghi (Danza la vita, Albachiara, Come sole come goccia, Wonderwall, Destri, ecc.) l'algoritmo applica un bonus prioritario (+800 pt) per le 2 colonne e una severa penalità (-3500 pt) alla colonna singola.
+   - I canti brevi (< 22 versi, come "Come ti ama Dio" e "Servo per amore") mantengono l'impaginazione a 1 colonna a tutta larghezza con font grande ed elegante (11.5–12.5 pt).
+3. **Numerazione Reale Continua del Libro:**
+   - Aggiunta la proprietà `bookPageNumber` a `CanzonierePage` e rendering del piè di pagina su ogni foglio stampato: `— {page.bookPageNumber} —`.
+   - L'indice del canzoniere apre a pagina 1 (`— 1 —`), e i canti successivi ricevono progressivamente le pagine `entry.startPage + pIdx` perfettamente allineate all'indice.
+4. **Indice con Riferimenti Incrociati Automatici:**
+   - In `loadPrintableCanzoniData`, il motore calcola simultaneamente l'impaginazione della variante attiva e dell'altra variante.
+   - L'indice "Chi suona" stampa per ogni canto: `[canta: p. X]   p. Y`.
+   - L'indice "Chi canta" stampa per ogni canto: `[suona: p. Y]   p. X`.
+5. **Indice Compatto a Pagina Singola (~30 canti/pagina):**
+   - Titolo unificato: `INDICE DEI CANTI (con accordi)` o `INDICE DEI CANTI (senza accordi)` con variante tra parentesi a 10pt accanto al titolo principale a 14pt.
+   - Rimossi i contatori numerici `(N)` dalle intestazioni di sezione (`CANZONI SCOUT`).
+   - Linee guida punteggiate (`dotted leaders`) con righe a 8.5pt e spaziatura 1.5pt, con soglia di passaggio a 2 pagine elevata a 38 righe complessive.
+6. **Verifica Globale:**
+   - 100% test superati: Vitest 249/249 (27 file), Playwright PDF export 5 pagine esatte con 0 pagine vuote (eliminata pagina 6 fantasma), Playwright Visual Regression 11/11, Weight budget 100% conforme.
+
+---
+
+## ADR-0026: Canzoniere a Flusso Continuo (Concatenazione su 2 Colonne e Header in Colonna)
+
+### Data
+2026-11-02
+
+### Contesto
+Nei modelli di impaginazione precedenti (ADR-0024 e ADR-0025), ogni canto veniva impaginato su un foglio dedicato (o sequenza di fogli dedicati). Sebbene efficace per l'isolamento dei singoli brani, questa impostazione comportava uno spreco consistente di carta: canti brevi o medi lasciavano dal 40% al 60% del foglio A4 inutilizzato.
+Per la produzione di libretti di clan tascabili e densi per uscite e route, è emersa la necessità di un'impaginazione editoriale a **flusso continuo a 2 colonne** (formato libretto dei canti scout professionale), in cui i canti si concatenano sequenzialmente massimizzando il fattore di riempimento medio (target $\approx 80\%$).
+
+### Decisioni Adottate
+
+1. **Flusso Continuo a 2 Colonne (`layoutCanzoniereFlow`):**
+   - Griglia fissa a 2 colonne da 89.5 mm ciascuna, con altezza utile di 256 mm (`CONTINUOUS_FLOW_COL_HEIGHT_MM`).
+   - I canti fluiscono senza soluzione di continuità tra colonna sinistra e destra e attraverso le pagine, eliminando salti pagina artificiali tra un canto e l'altro.
+
+2. **Header di Canto Monocolonna (89.5 mm):**
+   - Poiché i canti possono iniziare a qualsiasi altezza della colonna sinistra o destra, l'intestazione del brano (titolo a 15pt bold, autore a 9.5pt italic, metadati musicali) è incapsulata all'interno della singola colonna (`type: 'header'` in `SongBlock`) anziché come banner a tutta pagina.
+   - Quando un canto inizia a metà colonna (dopo un altro brano), viene inserito un divisorio sottile orizzontale (`.canzoniere-song-divider`) con margine superiore di 4 mm per separare visivamente i brani.
+
+3. **Soglia Spazio Minimo ($\ge 55$ mm) e Prevenzione Header Orfani:**
+   - Un nuovo canto inizia a metà colonna solo se lo spazio verticale residuo nella colonna è $\ge 55$ mm (`MIN_REMAINING_HEIGHT_FOR_NEW_SONG_MM`).
+   - 55 mm garantiscono lo spazio necessario per l'header del canto (~16-24 mm) più almeno due strofe complete (6-8 versi con accordi), evitando rigorosamente titoli orfani in fondo a colonna o frammenti minimi di testo.
+   - Oltre alla soglia fissa di 55 mm, l'algoritmo verifica preventivamente che lo spazio residuo effettivo sia sufficiente per l'header e ALMENO la prima strofa intera (o almeno 2 strofe / 5-6 versi se ci sono più strofe). In caso contrario, il canto avanza automaticamente in cima alla colonna successiva.
+   - È implementata un'invariante difensiva assoluta: qualora per anomalie di metrica la prima strofa non potesse essere posizionata sotto l'header inserito a fondo colonna, l'header viene automaticamente ritirato (pop) e riposizionato in cima alla colonna successiva senza linea divisoria superiore, garantendo matematicamente l'assenza di titoli orfani in tutto il documento.
+
+4. **Uniformità Tipografica del Font ($\pm 0.5$ pt) e Propagazione a Livello di Blocco:**
+   - Dimensione font base standardizzata a 11.0 pt per "Chi suona" e 11.5 pt per "Chi canta".
+   - La compattazione massima consentita per esigenze di adattamento è limitata a 0.5 pt (10.5 pt per "Chi suona", 11.0 pt per "Chi canta"), prevenendo sbalzi ottici sgradevoli tra canti adiacenti nello stesso foglio.
+   - Il font compattato viene marcato direttamente su ciascun blocco (`SongBlock.fontSizePt`) e propagato via Preact a `CantoLineRenderer`, garantendo che l'impaginazione a video e in stampa A4 utilizzi esattamente i font millimetrici previsti.
+
+5. **Compattazione Anti-Orfani e Suddivisione Continua Blocchi Giganti:**
+   - Se l'eventuale sbordo di un brano sulla pagina successiva genera una coda orfana di $\le 4$ righe (`MIN_PAGE_SPILL_LINES = 5`), il motore ricalcola preventivamente il brano con font compattato di 0.5 pt. Se il canto si trovava a fondo colonna destra e la compattazione non evita lo sbordo, l'intero brano viene fatto scattare all'inizio della pagina successiva, azzerando le code orfane di 2-4 versi.
+   - Per strofe continue di lunghezza eccezionale (40-80 righe senza righe vuote), è attivo un ciclo di chunking progressivo (`splitLargeBlock`) che garantisce il rispetto del limite di colonna (256 mm) senza overflow.
+   - Gli autori o sottotitoli lunghi su 2 o più righe calcolano dinamicamente la propria altezza reale evitando sottostime dell'ingombro.
+
+6. **Differenziazione Metadati e Variante "Chi canta":**
+   - "Chi suona": riporta accordi, capotasto e frecce ritmiche Nova Mono (`↓ ↑`).
+   - "Chi canta": omette completamente accordi, capotasto e ritmo, riducendo l'ingombro dell'header a una riga singola compatta con titolo e autore.
+
+7. **Testatina Corrente di Sezione (`.canzoniere-running-header`):**
+   - Ogni pagina del flusso continuo mostra in alto a destra la sezione tematica attiva (es. `CANZONI SCOUT`, `LITURGICI`, `VARIE`), fornendo orientamento immediato durante lo sfoglio.
+
+8. **Sincronizzazione Indice e Riferimenti Incrociati Continui:**
+   - La funzione `calculateCanzoniereIndex` mappa la pagina reale di inizio canto ricavata dal layout continuo (`actualStartPagesMap`).
+   - Più canti possono condividere la medesima pagina di inizio (es. canti concatenati su pagina 2).
+   - I riferimenti incrociati (`[canta: p. X]` / `[suona: p. Y]`) vengono calcolati eseguendo preventivamente il layout continuo di entrambe le modalità.
+
+### Verifica Globale
+- **Unit Test (Vitest):** 261/261 test passati (27 file), inclusi 18 test specifici di layout continuo in `test/canzoniere_layout.test.ts` e 21 test di integrazione indice in `test/stampa_nuova_logica.test.ts`.
+- **End-to-End & Visual Test (Playwright):** 11/11 test superati in `test/stampa_pdf_pages.spec.ts` e `test/stampa_canzoniere_visual.spec.ts`.
+- **Metriche di Riempimento:** Misurato su DOM reale un riempimento del 90.9% - 92.8% sulle pagine continue a 2 colonne, con 0 pagine vuote o fantasma.
+- **Weight Budget:** 100% conforme (bundle critico JS+CSS a 25.98 KiB gzip vs 100 KiB budget).
+
+---
+
+## ADR-0027: Rimozione Totale Dicitura 'RIT.' in Modalità 'Chi suona', Deduplicazione Ritornelli in 'Chi canta' e Anti-Orfani di Coda
+
+### Data
+2026-11-02
+
+### Contesto
+Durante l'esecuzione musicale dal vivo (veglie, fuochi di bivacco, messe scout), i chitarristi che consultano il canzoniere cartaceo "Chi suona" non possono girare continuamente le pagine avanti e indietro per recuperare il testo o gli accordi di un ritornello sostituito da una dicitura sintetica "RIT.". Inoltre, la presenza di etichette orfane `RIT.` o `RIT:` da sole in cima o fondo colonna creava frammentazione visiva, spreco di righe e disorientamento. In modalità "Chi canta", ritornelli ripetuti consecutivamente generavano righe `RIT.` duplicate ridondanti (`RIT.` seguito da un altro `RIT.`), mentre l'ultima pagina del libretto poteva risultare scarsamente riempita (< 45%).
+
+### Decisioni Adottate
+
+1. **Modalità 'Chi suona' - Accordi al 100% e Zero Sigle 'RIT.'**:
+   - **Nessuna sostituzione dei ritornelli:** ogni ritornello viene sempre emesso per esteso con accordi completi e testo in formato `{soc}...{eoc}`. I chitarristi leggono sempre il flusso continuo senza dover retrocedere nel libretto.
+   - **Espansione automatica delle abbreviazioni sorgente:** se il testo originario del canto contiene una dicitura `RIT.` o `RIT:` isolata (ad es. shorthand nel database o importazioni storiche), `transformChordproText` recupera le righe con accordi del ritornello precedente (`seenChorusRawLines`) e le reinserisce per esteso.
+   - **Soppressione totale di badge e header sintetici:** disabilitata l'iniezione automatica di `pendingChorusLabel = 'RIT:'` in `groupIntoBlocks` e soppresso il rendering di linee ritornello prive di accordi in `CantoLineRenderer` quando `showChords` è attivo. In questo modo la dicitura testuale "RIT." non compare mai nel layout di "Chi suona".
+
+2. **Modalità 'Chi canta' - Deduplicazione Rigorosa Ritornelli**:
+   - **Compattazione ad alta densità:** mantenuta la contrazione del ritornello ripetuto a `['RIT.']` per consentire ai cantanti di avere libretti leggeri e tascabili.
+   - **Deduplicazione:** ritornelli consecutivi ripetuti vengono contratti in un'unica riga esplicita `RIT. (x2)` o `RIT. (x3)`, vietando rigorosamente la stampa di righe `RIT.` adiacenti consecutive.
+   - Riconoscimento delle modulazioni e parti strumentali (`modulazione` inclusa in `isInstrumentalSequence`).
+
+3. **Regole di Flusso Anti-Orfano di Coda e Invarianti di Colonna (`layoutCanzoniereFlow`)**:
+   - **Tail Anti-Orphan Rule:** Se la coda di un canto su una colonna/pagina successiva consiste unicamente in un `RIT.` isolato o in $\le 2$ versi (< 15 mm):
+     - Se lo spazio residuo della colonna precedente lo consente entro una tolleranza di 5-7 mm, la coda viene assorbita nella colonna corrente.
+     - Se l'assorbimento non è possibile, la strofa precedente viene retrocessa (*pull back*) per ribilanciare il blocco evitando frammenti orfani.
+     - **Preservazione Header in Pull-Back:** Nel retrocedere una strofa alla colonna successiva, se tale strofa era l'unico blocco sotto l'intestazione del brano (`songBlocksInCol === 1`), anche l'intestazione viene spostata con la strofa nella colonna successiva, impedendo matematicamente testate orfane a fondo colonna.
+   - **Guardia Inizio Colonna/Pagina:** Nessuna colonna o pagina può aprirsi con un blocco costituito esclusivamente da un'etichetta `RIT.` orfana (`col.blocks[0]`).
+
+4. **Prevenzione Rottura Brani su Cambio Pagina in 'Chi suona' (Anti-Domino Page-Turn Rule)**:
+   - In modalità chitarristi ("Chi suona"), voltare pagina a metà brano interrompe l'esecuzione musicale.
+   - **Regola Anti-Domino:** Quando un brano inizia nella colonna destra (dove rimangono al massimo 256 mm) e non può concludersi nella colonna stessa ma ha un'altezza complessiva tale da poter stare per intero su una pagina nuova (colonna SX + colonna DX $\le 522$ mm), il layout avanza immediatamente il brano alla pagina successiva. In questo modo il brano occupa colonna sinistra e destra del medesimo foglio senza subire voltate di pagina.
+   - Analoga regola scatta nella colonna sinistra quando il brano inizia a metà colonna (dopo un altro canto) e non riuscirebbe a completarsi entro la pagina corrente: se può stare su un foglio pulito, viene anticipato alla pagina successiva, bloccando sul nascere l'effetto a catena (domino) di canzoni spezzate su pagine consecutive.
+   - **Bin-Packing Esatto dei Blocchi e Compattazione Dinamica:** Per brani densi con blocchi indivisibili (es. *Strade di coraggio*), la verifica di capienza (`canBlocksFitInRemainingPage`) simula la reale distribuzione delle strofe nelle colonne anziché basarsi sulla mera somma aritmetica delle altezze. Se il brano non entra a 11.0 pt ma entra con compattazione a 10.5 pt, la compattazione si attiva dinamicamente mantenendo il brano su un'unica pagina.
+
+5. **Ottimizzazione Fill Ratio Ultima Pagina ('Chi canta')**:
+   - Rilevamento automatico di ultima pagina scarsa (< 45% di altezza utile). Se si verifica, scatta un secondo passaggio di compattazione leggera (riduzione font di 0.5 pt a 11.0 pt), che ha permesso di compattare il canzoniere canta da 13 pagine (con p. 13 a sole 16 righe) a 12 pagine dense (con p. 12 a 47 righe, riempimento > 75%).
+
+6. **Stabilizzazione CSS Divisori di Stampa**:
+   - Inclusione di `box-sizing: border-box !important;` e `clear: both !important;` con margine normalizzato (5pt 0 4pt 0) per `.canzoniere-song-divider` sia nell'anteprima web che in stampa cartacea A4.
+
+### Verifica Globale
+- **Unit Test (Vitest):** 265/265 test passati (27 file), inclusi test aggiornati per `stampa_nuova_logica.test.ts` e `canzoniere_adaptive_fill.test.ts`.
+- **End-to-End & Visual Test (Playwright):** 11/11 test superati in `test/stampa_pdf_pages.spec.ts` e `test/stampa_canzoniere_visual.spec.ts`.
+- **Audit PDF Reali Playwright (`test/audit_new_complete_pdfs.spec.ts`):**
+  - "Chi suona": 23 pagine totali (1 indice + 22 pagine canti). 20 canti su 21 (95.2%) contenuti interamente su singola pagina con ZERO cambi pagina per i chitarristi. 0 token 'RIT' isolati, accordi presenti al 100% su tutti i ritornelli.
+  - "Chi canta": 12 pagine totali (1 indice + 11 pagine canti). 0 righe 'RIT.' consecutive, 0 'RIT' orfani in cima a colonna/pagina, fill ratio medio > 85% e ultima pagina con 47 righe dense.
+- **Weight Budget:** 100% conforme (25.98 KiB gzip vs 100 KiB budget).
+
+---
+
+## ADR-0028: Ripristino Flusso Continuo ("Uno dopo l'altro") in 'Chi suona' e Riempimento Fondo Colonna tramite Splitting Strofe Dinamico ($\ge 20$ mm)
+
+### Data
+2026-11-02
+
+### Contesto
+1. **Flusso canti in 'Chi suona':** Nei PDF recenti, una regola eccessivamente restrittiva volta a prevenire la rottura dei brani forzava l'avanzamento a una nuova pagina (`advanceColumn()`) ogni volta che un brano non rientrava nello spazio rimanente del foglio. Questo causava colonne parzialmente o totalmente vuote (es. *Tra boschi e prati* e *Servo per amore*, che lasciavano l'intera colonna destra a 0 mm di riempimento), rompendo il flusso sequenziale compatto ("uno dopo l'altro") fortemente apprezzato e richiesto dagli utenti.
+2. **Spazi bianchi a fondo colonna (50–70 mm) in brani come *Albachiara* e *Aglio e Olio*:** Il motore `layoutCanzoniereFlow` invocava `splitLargeBlock` unicamente se l'intero blocco strofa superava l'altezza massima di una colonna intera (`curBlock.heightMm > maxColHeightMm`, ovvero 256 mm). Le normali strofe di 4–16 versi (35–90 mm) che eccedevano lo spazio residuo (es. 30–80 mm) cadevano direttamente nel ramo `else`; in molti casi la logica anti-orfano di coda retrocedeva perfino la strofa precedente (*pull back*), lasciando vistosi vuoti bianchi di 50–80 mm a fondo colonna. Inoltre, `splitLargeBlock` conteneva un vincolo statico `lines.length <= minLines * 2` che divideva a metà o imponeva 3 righe senza verificare la capienza effettiva in millimetri di `maxColHeightMm`.
+
+### Decisioni Adottate
+
+1. **Ripristino Flusso Continuo Naturale in 'Chi suona'**:
+   - Rimosso il salto forzato di colonna/pagina (`advanceColumn`) in modalità `suona` (ex righe 1856–1875).
+   - Quando un canto termina, se lo spazio residuo nella colonna è $\ge 55$ mm (`MIN_REMAINING_HEIGHT_FOR_NEW_SONG_MM`) e vi è capienza per l'intestazione e la prima strofa, il canto successivo inizia immediatamente sotto nella medesima colonna, separato da divisorio sottile, fluendo naturalmente da colonna a colonna.
+   - Mantenuta unicamente la compattazione anti-orfano opzionale a -0.5 pt quando consente di far rientrare il canto nel foglio corrente.
+
+2. **Splitting Dinamico delle Strofe a Fondo Colonna (`availableInCol >= 20 mm`)**:
+   - Riscritto `splitLargeBlock`: calcola dinamicamente quante righe della strofa ($k \ge 1$) entrano esattamente nell'altezza utile passata (`maxColHeightMm`), garantendo che la prima parte rispetti la capienza della colonna e che la seconda parte riceva i versi rimanenti.
+   - Nel ciclo di inserimento strofe di `layoutCanzoniereFlow`, quando una strofa eccede `availableInCol` ma lo spazio disponibile è $\ge 20$ mm (spazio utile per almeno 2 righe con accordi/interlinea), scatta la suddivisione progressiva con `splitLargeBlock(curBlock, availableInCol, ...)`:
+     - Le righe che entrano riempiono la colonna attuale fino al margine inferiore (residuo vuoto ridotto a 0–15 mm);
+     - Le righe rimanenti avanzano fluidamente in cima alla colonna successiva.
+   - Azzerati i falsi trigger di *pull back* che svuotavano le colonne nei brani con strofe dense come *Albachiara* e *Aglio e Olio*.
+
+3. **Verifica Allineamento Calendario & ODG**:
+   - Confermato che i test in `test/calendario_odg.test.ts` verificano la nuova dicitura `Data da concordare` e l'assenza di stringhe `• Tutto il giorno` su `formatEventDateTimeRange`, con tutti i 31 test passati.
+
+### Verifica Globale
+- **TypeScript Typecheck:** `npm run typecheck` completato con 0 errori.
+- **Unit Test (Vitest):** 303/303 test passati (30 file di test), inclusi 2 nuovi test dedicati in `test/canzoniere_layout.test.ts` per il flusso continuo in "Chi suona" e lo splitting dinamico con `availableInCol >= 20 mm`.
+- **Playwright PDF Audit Reale (`test/audit_new_complete_pdfs.spec.ts`):** 1/1 test passato con ZERO errori su entrambi i PDF reali A4 generati con Chromium e analizzati con `pdf-parse`:
+  - **"Chi suona":** canzoniere ridotto da 23 a 20 pagine totali (1 indice + 19 pagine canti). I brani fluiscono continuamente ("uno dopo l'altro"); azzerate le colonne vuote (es. *Tra boschi e prati*, *Servo per amore* che lasciavano colonne a 0 mm); lo spazio residuo a fondo colonna in brani spezzati (es. *Aglio e Olio*, *Albachiara*) è ridotto a 0–8 mm (rispetto ai 50–70 mm precedenti).
+  - **"Chi canta":** 12 pagine totali (1 indice + 11 pagine canti), fill ratio medio > 85%, 0 righe RIT duplicate o orfane.
+
+---
+
+## ADR-0029: Prevenzione Righe Orfane/Vedove (Anti-Widow/Orphan), Tolleranza di Assorbimento a Fondo Colonna, Evidenziazione Ritornello con Barra Laterale e Riposizionamento Azione Stampa
+
+### Data
+2026-11-03
+
+### Contesto
+1. **Spilli orfani di 1 o 2 righe a inizio colonna/pagina:** Nelle stampe precedenti capitava che una strofa o ritornello venisse spezzata lasciando un singolo verso isolato in cima alla colonna successiva (es. `| Eha, eha, eha, eha, eha, eha, eh!` a inizio colonna destra in *Un falco nel cielo*, o una riga isolata di *Scouting For Boys* o *Wonderwall*). L'utente ha espressamente indicato: *"a volte cambia pagina/colonna per una riga o per pochissima roba, sistema questo e siamo apposto, ricorda che va benissimo che i canti siano uno dopo l'altro se possibile, forse ti direi non ragionare di non spezzare strofe o ritornelli ma ragiona a non lasciare poche righe da sole in modo da non spezzare troppo presto il testo in modo da coprire più spazio bianco che viene lasciato in basso"*.
+2. **Coda dei canti e tagli prematuri:** Il vecchio meccanismo di *pull-back* rimuoveva intere strofe da 40–50 mm già impaginate per accompagnare 1–2 versi eccedenti alla colonna successiva, lasciando vistosi vuoti bianchi a fondo pagina.
+3. **Evidenziazione ritornello:** Necessità di distinguere chiaramente il ritornello senza appesantire la grafica né ricorrere a box colorati.
+4. **Ergonomia UI Stampa:** La barra sticky inferiore risultava scomoda e copriva l'ultimo canto selezionato; l'utente ha richiesto di posizionare il pulsante principale di stampa e il riepilogo in alto, rimuovendo anteprime e opzioni ridondanti a schermo.
+
+### Decisioni Adottate
+
+1. **Riorganizzazione UI `StampaCanzoni.tsx`**:
+   - Spostato il blocco di azione primaria (`Stampa / Salva PDF` e riepilogo canti/pagine) in alto, all'interno della hero card principale sotto il selettore *"Per chi stampi?"*.
+   - Rimossa la barra fissa in fondo che ostruiva la lista canti.
+   - Rimossa la visualizzazione dell'anteprima interna a schermo (il documento viene renderizzato direttamente in `@media print`).
+
+2. **Evidenziazione Ritornello con Barra Laterale**:
+   - Aggiunta proprietà `isChorus?: boolean` sui blocchi `SongBlock`.
+   - Il parser assegna `isChorus: true` per i blocchi compresi tra `{soc}...{eoc}` o contenenti `RIT.`.
+   - Rendering CSS: classe `.canzoniere-block.is-chorus` con bordo sinistro solido nero (`border-left: 2.5pt solid oklch(0.2 0 0)`) e `padding-left: 3.5mm`.
+
+3. **Algoritmo Anti-Orfano con Tolleranza di Assorbimento Dinamica (`splitLargeBlock`)**:
+   - **Tolleranza di Assorbimento a Fondo Colonna:** Su foglio A4 (altezza utile 273 mm vs target 256 mm), esiste un margine di sicurezza di oltre 15 mm prima del footer. Se un blocco eccede lo spazio disponibile di $\le 8.5\text{ mm}$ (canta) o $\le 9.5\text{ mm}$ (suona) — ovvero l'ingombro di 1 verso — **l'intero blocco viene assorbito a fondo colonna senza spezzarlo**.
+   - **Assorbimento dell'ultimo verso residuo:** Se una strofa viene suddivisa e rimarrebbe 1 solo verso per la seconda parte (`remainingLines === 1`), se l'intero blocco rientra entro $+10.0\text{ mm}$ (canta) / $+11.0\text{ mm}$ (suona), tutti i versi restano nella prima parte.
+   - **Vincolo Minimo Righe (Anti-Widow/Orphan):** Nessuno spezzamento può lasciare meno di 2 righe in `firstPart` né meno di 2 righe in `secondPart` (minimo 3 per blocchi di 6 o più righe). Se non è possibile rispettare questo vincolo, il blocco non viene spezzato ma trasla interamente alla colonna successiva.
+   - **Eliminazione del Pull-Back Distruttivo:** Rimossa la logica che svuotava colonne eliminando 50 mm di strofe precedenti. La colonna mantiene sempre tutto ciò che vi entra, azzerando i buchi bianchi a fondo pagina.
+   - **Tolleranza di Compattazione a -0.5 pt:** Ampliata a `compactTotalH <= pageRemainingSpace + 5 mm`, permettendo a canti come *E la strada si apre* di completarsi al 100% sulla stessa pagina evitando lo spillo di sole 3 righe su una nuova facciata.
+
+### Verifica Globale
+- **TypeScript Typecheck:** `npm run typecheck` completato con 0 errori.
+- **Unit Test (Vitest):** 316/316 test passati (30 file di test).
+- **Audit Automatizzato Righe Orfane (`scratch/audit_orphans.ts`):** 0 spilli orfani di 1 riga sia in modalità `canta` che `suona`. Tutte le continuazioni contengono $\ge 2$ righe.
+- **Production Build:** `npm run build` completato con successo (PWA precache 154 entries).
+- **Playwright PDF Audit Reale (`test/audit_new_complete_pdfs.spec.ts`):** Generati e validati con successo `scratch/new_canta.pdf` (12 pagine) e `scratch/new_suona.pdf` (20 pagine, canti suonabili ridotti a 19 pagine).
+
+---
+
+## ADR-0030: Ottimizzazione Spazi Residui a Fondo Colonna, Eliminazione Salti Prematuri per Inizio Canto e Flusso Continuo Naturale ("Uno dopo l'altro")
+
+### Data
+2026-11-03
+
+### Contesto
+Nei canzonieri generati ("Chi suona" e "Chi canta"), ampie porzioni di colonna (da 70 a 140 mm, corrispondenti a oltre il 40–50% di una colonna A4) venivano lasciate prematuramente vuote a causa di:
+1. **Soglia Spazio Minimo e Condizione di Ammissibilità Inizio Canto Troppo Rigida (`MIN_REMAINING_HEIGHT_FOR_NEW_SONG_MM = 55 mm`):**
+   Quando un brano non rientrava per intero, l'algoritmo richiedeva che entrassero almeno 2 strofe complete o almeno 5–6 versi, valutando solo strofe intere non frazionate. Brani preceduti da intro strumentale (1 verso) o con prima strofa densa (8–11 versi, come *I cento passi*, *Destri*, *Re dei Re*, *Servo per amore*) venivano rigettati alla colonna successiva pur disponendo di 100–140 mm di spazio utile residuo, ampiamente sufficiente per intestazione + 3–6 versi.
+2. **Salto Forzato di Colonna Destra in 'Chi canta' (`spillMm <= 26`):**
+   Se un canto a fondo colonna destra eccedeva leggermente lo spazio pagina e la compattazione non evitava lo sforo, il motore forzava un salto a pagina successiva (`advanceColumn()`), lasciando la colonna destra vuota di 70–120 mm.
+3. **Invariante Difensiva Header a Fondo Colonna Troppo Restrittiva:**
+   Nel ciclo strofe, `sIdx === 0 && b.heightMm > availableInCol` ritirava (pop) l'intestazione anche qualora la prima strofa potesse essere frazionata tramite `splitLargeBlock` garantendo $\ge 2$ versi in ciascuna colonna.
+
+### Decisioni Adottate
+
+1. **Riduzione Soglia Minima Spazio Residuo a 38 mm (`MIN_REMAINING_HEIGHT_FOR_NEW_SONG_MM = 38`):**
+   - Calibrata sull'ingombro reale minimo di intestazione (~24–32 mm) + almeno 2 versi con accordi/interlinea.
+2. **Condizione di Ammissibilità Dinamica con Splitting Preventivo:**
+   - La capienza dello spazio residuo verifica se, con l'ingombro esatto dell'header, è possibile alloggiare (anche tramite `splitLargeBlock`) almeno una strofa o frazione di strofa contenente $\ge 2$ versi di liriche reali (o $\ge 2$ versi totali per brani strumentali).
+   - In presenza di introduzioni strumentali (1 verso commento), viene garantito che l'intro sia accompagnato da almeno 2 versi cantati nella stessa colonna, impedendo matematicamente header o intro orfani.
+3. **Eliminazione del Salto Forzato a Inizio Pagina in 'Chi canta':**
+   - Rimosso l'avanzamento forzato di colonna destra; i canti fluiscono liberamente da colonna a colonna e da pagina a pagina come da specifica di flusso continuo ("uno dopo l'altro").
+4. **Aggiornamento Invariante Difensiva Header:**
+   - L'intestazione a fondo colonna viene ritirata solo se la prima strofa non entra né può essere frazionata rispettando il vincolo $\ge 2$ versi (`!canSplitB`).
+
+### Verifica Globale
+- **TypeScript Typecheck:** `npm run typecheck` completato con 0 errori.
+- **Unit Test (Vitest):** 316/316 test passati (30 file di test).
+- **Playwright PDF Audit Reale (`test/audit_new_complete_pdfs.spec.ts`):** 1/1 test passato con ZERO errori su entrambi i PDF reali:
+  - **"Chi suona" (con accordi):** Canzoniere ridotto da 20 a 19 pagine totali (1 indice + 18 pagine canti). Eliminata completamente la pagina 20 prima quasi vuota; riempiti tutti i vuoti precedenti (p. 10, 11, 16, 17, 18 ora a 248–255 mm di altezza utile).
+  - **"Chi canta" (solo testo):** Canzoniere ridotto da 12 a 11 pagine totali (1 indice + 10 pagine canti). Eliminata completamente la pagina 12 residua; tutte le colonne tra pagina 5 e 10 raggiungono un'altezza utile compresa tra 243 e 260 mm (riempimento 96–100%).
+  - **Regola Anti-Orfano:** 0 spilli orfani di 1 riga, ogni continuazione ha $\ge 2$ versi.
+---
+
+## ADR-0031: Risoluzione Conflitti di Regole e Tolleranze nello Splitting dei Canti a Fondo Colonna
+
+### Data
+2026-11-03
+
+### Contesto
+Dopo la prima revisione del flusso continuo (ADR-0030), persistevano anomalie di taglio prematuro e spazi vuoti a fondo colonna (tra 40 e 60 mm):
+1. **Mancanza di Tolleranza nel Loop di Conteggio Versi in `splitLargeBlock`:**
+   Mentre i chiamanti ammettevano una tolleranza fino a 8.5 mm (canta) o 9.5 mm (suona) su `firstPart.heightMm`, il ciclo interno di ricerca `splitIdx` in `splitLargeBlock` valutava strettamente `h <= maxColHeightMm` con 0 mm di tolleranza. Per blocchi di 4 versi in cui 2 versi superavano lo spazio disponibile di appena 1.5 mm (es. 25.2 mm vs 23.6 mm o 20.6 mm vs 18.9 mm), `splitIdx` si fermava a 1 verso; il vincolo anti-orfano (`splitIdx < 2`) rigettava lo split restituendo 0 versi, inducendo i chiamanti a dichiarare `canStart = false` e sprecando 40–60 mm di fondo colonna (es. pag. 1 SX in canta, pag. 6 DX in suona).
+2. **Conflitto di Regole nell'Assorbimento Anti-Orfano:**
+   Quando `remainingLines === 1`, `splitLargeBlock` assorbiva l'intero blocco in `firstPart` lasciando `secondPart.lines = []`. Tuttavia, le guardie nei chiamanti richiedevano rigidamente `sp.secondPart.lines.length >= 2`, rigettando l'intero blocco proprio quando era stato integralmente assorbito.
+3. **Inversione di Precedenza tra Blocchi Giganti e Frazionamento Strofe:**
+   La condizione `curBlock.lines.length >= 4` veniva valutata prima di `curBlock.heightMm > maxColHeightMm`. Di conseguenza, blocchi continui giganti (es. 70 versi) venivano processati come strofe ordinarie con tolleranza d'assorbimento invece che con limite rigido di colonna (`tol = 0`), causando overflow oltre i 256.5 mm.
+
+### Decisioni Adottate
+
+1. **Integrazione del Parametro `toleranceMm` nel Loop di `splitLargeBlock`:**
+   - La ricerca del massimo numero di righe ammette `h <= maxColHeightMm + toleranceMm`.
+   - Se 2 versi rientrano entro la tolleranza di fondo colonna (+8.5/+9.5 mm), lo split ha successo senza lasciare righe orfane.
+2. **Armonizzazione Guardie Chiamanti (`part2Ok`):**
+   - La condizione di validità dello split è stata aggiornata in tutti i punti di invocazione:
+     `const part2Ok = sp.secondPart.lines.length === 0 || sp.secondPart.lines.length >= 2;`
+     `const heightOk = sp.firstPart.heightMm <= availableInCol + toleranceMm + 1.5;`
+   - Se il blocco viene integralmente assorbito in colonna (`secondPart` vuoto), l'ammissibilità è confermata.
+3. **Precedenza Rigida per Blocchi Giganti (`> maxColHeightMm`):**
+   - I blocchi continui di dimensioni superiori a una colonna intera vengono suddivisi con `tolerance = 0`, garantendo che nessuna colonna ecceda il limite fisico di 256 mm / 256.5 mm.
+4. **Soglia `MIN_REMAINING_HEIGHT_FOR_NEW_SONG_MM` a 30 mm:**
+   - Permette a canti con intestazione compatta di iniziare validamente in colonne con 35–45 mm residui quando possono alloggiare almeno 2 versi di testo.
+5. **Autocompattazione e Ribilanciamento Globale in "Chi canta":**
+   - Canzoniere "Chi canta" compattato stabilmente a 10 pagine (1 indice + 10 facciate canti), con riempimento 95%–100% per tutte le facciate tra 1 e 9.
+
+### Verifica Globale
+- **TypeScript Typecheck:** `npm run typecheck` completato con 0 errori.
+- **Unit Test (Vitest):** 322/322 test superati su 322 (31 file di test).
+- **Playwright PDF Audit Reale (`test/audit_new_complete_pdfs.spec.ts`):** 1/1 test Playwright superato con ZERO errori:
+  - **"Chi suona":** 19 pagine totali (1 indice + 18 pagine canti, 0 pagine vuote residue).
+  - **"Chi canta":** 11 pagine totali (1 indice + 10 pagine canti, ogni pagina densa e bilanciata tra 70 e 82 righe, 0 pagine vuote).
+  - 0 spilli orfani di 1 riga su entrambi i PDF.
+---
+
+## ADR-0032: Diagnostica Interruzione Ritornello Re dei Re e Posizionamento Autore sotto il Titolo
+
+### Data
+2026-11-03
+
+### Contesto e Quesiti Utente
+1. **Perché in Pagina 10 di "Chi canta" il ritornello di *Re dei Re* è interrotto e continuato alla pagina successiva se sotto sembrava esserci spazio? E perché la colonna sinistra (*Come ti ama Dio*) si ferma con spazio sotto?**
+   - **Colonna Sinistra (Pag. 10):** Il canto *Come ti ama Dio* è composto unicamente da 3 strofe e ritornello: il testo finisce fisicamente lì. Al di sotto restavano ~26 mm di altezza utile. Il canto successivo (*È più bello insieme*) richiede almeno ~38 mm (intestazione con titolo, autore e linea divisoria ~26 mm + prima strofa di almeno 2 versi ~12 mm). Collocare l'inizio in 26 mm avrebbe generato un'intestazione orfana (titolo senza testo o con 1 solo verso orfano). Il layout sposta quindi in modo protetto l'inizio del nuovo canto in cima alla colonna successiva.
+   - **Colonna Destra (Pag. 10):** La colonna ospita già l'intero canto *È più bello insieme* (~180 mm) + divisorio, titolo e strofa 1 di *Re dei Re* (~52 mm). Lo spazio rimanente prima del limite fisico di 256 mm della colonna era di appena ~24 mm. Il ritornello completo di *Re dei Re* è composto da 8 versi (~47 mm): non poteva entrare per intero. Il motore ha spezzato il ritornello a metà: 4 versi a fondo pagina 10 (fino al limite dei 256 mm) e 4 versi a inizio pagina 11, garantendo che nessuna metà avesse meno di 2 versi (anti-orfano).
+   - **Perché visivamente sembra esserci tanto spazio sotto:**
+     - Un foglio A4 misura 297 mm. I margini (12 mm sopra e sotto), la testatina corrente e il numero di pagina a piè di pagina occupano circa 41 mm totali. La colonna utile è fissata a 256 mm per evitare che le stampanti taglino o generino pagine bianche fantasma. Pertanto, anche a colonna satura al 100%, il testo termina a 25 mm dal bordo del foglio.
+     - Nelle opzioni della finestra di stampa del browser (Chrome / Edge), se la scala è impostata su **"Adatta alla pagina" (Fit to page)**, il browser riduce ulteriormente le dimensioni dell'intero foglio (spesso all'85-90%), creando un'ampia fascia bianca vuota in basso. È fondamentale impostare la finestra di stampa con **Scala: 100% (o Predefinita)** e **Margini: Predefiniti (o Nessuno)**.
+
+2. **Posizionamento Autore del Canto:**
+   - L'autore non deve essere allineato tutto a destra (`space-between`), ma posizionato immediatamente sotto il titolo del canto.
+
+### Decisioni Adottate
+1. **Allineamento CSS Autore Sotto il Titolo (`print.css`):**
+   - Regola `.canzoniere-header-top`: convertita a `display: flex !important; flex-direction: column !important; align-items: flex-start !important; width: 100% !important; margin-bottom: 2pt !important;` sia in `@media print` che nella vista anteprima a schermo.
+   - Rimossi `justify-content: space-between` e `align-items: baseline`.
+   - `.canzoniere-header-author`: stilato a `font-size: 9.5pt; font-style: italic; color: oklch(0.3 0 0); margin: 1pt 0 2pt 0; line-height: 1.2;` con wrap pulito, coerente con l'altezza stimata da `calculateSongHeaderHeightMm`.
+
+---
+
+## ADR-0033: Regola Minimo 4 Righe per Introdurre un Nuovo Canto e Calibrazione Anti-Clipping
+
+### Data
+2026-11-03
+
+### Contesto
+1. **Regola di inizio canto a fondo colonna:** In precedenza, un nuovo canto poteva iniziare a fondo colonna se poteva contenere solo 2 righe sotto il titolo (come visibile a pag. 2 di "Chi canta", dove *Come sole come goccia* iniziava con appena 2 versi prima di spezzarsi). L'utente richiede esplicitamente che sotto il titolo debbano esserci almeno 4 righe reali per introdurre un nuovo canto; se non ci sono almeno 4 righe, il canto deve slittare in cima alla colonna successiva.
+2. **Taglio del testo a fondo pagina (*clipping*):** In alcune pagine di "Chi suona" (es. pag. 9 a sinistra su *Aglio e Olio*, pag. 18 a destra su *L'unico Maestro*), l'ultima riga di testo risultava tagliata a metà dal bordo inferiore del foglio. La causa risiedeva nella somma tra `CONTINUOUS_FLOW_COL_HEIGHT_MM = 256` e la tolleranza `toleranceMm = 9.5 mm`, che consentiva alle colonne di raggiungere 265.5 mm, eccedendo i 259 mm utili del contenitore `.stampa-a4-sheet-card` dotato di `overflow: hidden`.
+
+### Decisioni Adottate
+1. **Regola Vincolante Minimo 4 Righe sotto il Titolo (`canzoniere_layout.ts`):**
+   - Soglia minima di spazio per iniziare un canto `minHeightForNewSong`: portata a 38 mm per "Chi canta" e a 50 mm per "Chi suona".
+   - Controllo di ammissibilità `canStart`: richiede tassativamente `lyricLinesCount >= 4` (o `totalLinesCount >= 4` se puramente strumentale).
+   - Nel frazionamento difensivo del primo blocco dopo l'intestazione (`sIdx === 0` o `isImmediatelyAfterHeader`), la prima parte deve contenere almeno 4 righe (`minPart1Lines = 4`). Se non ci sono almeno 4 righe disponibili, sia il blocco che l'intestazione vengono arretrati e spostati in cima alla colonna successiva.
+2. **Risoluzione Definitiva Anti-Clipping a Fondo Colonna:**
+   - Calibrata l'altezza massima delle colonne: `maxColHeightMm = mode === 'suona' ? 250 : 252;` con tolleranza prudenziale `toleranceMm = 3.0;`.
+   - L'altezza totale massima di qualsiasi colonna non supera mai 255.3 mm, rimanendo ampiamente entro il limite dei 259 mm del contenitore A4 ed evitando qualsiasi collisione con `overflow: hidden`.
+
+### Verifica Globale
+- **TypeScript Typecheck:** `npm run typecheck` completato con 0 errori.
+- **Unit Test (Vitest):** 324/324 test superati su 324 (31 file di test).
+- **Playwright PDF Audit Reale:**
+  - *Chi canta*: 11 pagine totali; tutte le introduzioni di canti hanno $\ge 4$ versi (es. *Come sole come goccia* inizia in cima a colonna DX con 25 versi, *Danza la vita* con 4 versi esatti, *Re dei Re* integro a 25 versi).
+  - *Chi suona*: 19 pagine totali; pag. 9 e pag. 18 terminano in modo pulito con margine di respiro verso il piè di pagina, zero lettere o parole tagliate a metà.
+
+---
+
+## ADR-0034: Autore a Destra del Titolo (Attaccato) e Calibrazione Millimetrica Altezze su Rendering Reale Chromium ("Chi canta")
+
+### Data
+2026-11-03
+
+### Contesto
+1. **Posizionamento Autore:** L'autore del canto deve essere posizionato immediatamente alla destra del titolo sulla stessa riga (`[TITOLO] [Autore]`), attaccato ad esso con uno spazio compatto (gap 6pt) anziché spinto sul bordo estremo destro (`justify-content: space-between`) o posizionato su una riga separata sotto il titolo. Esempi: **ALBACHIARA** *Vasco Rossi*, **SERVO PER AMORE** *Gen Rosso*, risparmiando una riga verticale rispetto al layout incolonnato.
+2. **Sovrastima Altezze in "Chi canta":** In modalità "Chi canta", il motore di layout continuava a riscontrare 50–70 mm di vuoto bianco a fondo colonna (ad es. prima di *Re dei Re* a fine pagina, tagliando anticipatamente il ritornello) perché le altezze calcolate in millimetri/punti accumulavano margini di sicurezza artificiali:
+   - Ogni riga di testo sommava `+ 1.5 pt` di padding invisibile non presente nel CSS reale (`line-height: 1.25`, `margin: 0`), accumulando 20–30 mm fittizi a colonna.
+   - Il divisorio superiore tra canti calcolava 26 pt (+9.17 mm) senza considerare il naturale collassamento dei margini verticali CSS (il divisorio reale con Chromium `@media print` misura solo 10 pt / ~3.5 mm).
+   - L'intestazione del canto veniva stimata a 21–30 mm contro i 12–15 mm effettivi misurati su Chromium.
+   Questo portava l'algoritmo a credere che la colonna fosse a 252 mm quando l'inchiostro reale occupava appena ~190 mm.
+
+### Decisioni Adottate
+1. **Autore alla Destra del Titolo (Attaccato sulla Stessa Riga):**
+   - In `CanzonierePageRenderer.tsx`: l'elemento `<h1>` del titolo precede `<span class="canzoniere-header-author">` dell'autore in entrambi i punti di rendering (flusso continuo e canto singolo).
+   - In `print.css`: `.canzoniere-header-top` è impostato con `display: flex !important; flex-direction: row !important; flex-wrap: wrap !important; align-items: baseline !important; justify-content: flex-start !important; gap: 2pt 6pt !important;` sia in `@media print` che nella preview a schermo.
+   - `.canzoniere-header-author`: impostato con `margin: 0 !important; white-space: nowrap !important; line-height: 1.2 !important;`.
+   - `.canzoniere-column-header .canzoniere-header-title`: azzerato il margine a `margin: 0 !important;` per allineare perfettamente le baseline tipografiche.
+   - In `canzoniere_layout.ts`: `calculateSongHeaderHeightMm` calcola la larghezza combinata di titolo + gap (6pt) + autore. Poiché l'autore è affiancato al titolo, non aggiunge una riga verticale tranne in caso di overflow colonna.
+2. **Calibrazione Millimetrica "cm totali" su Chromium:**
+   - In `calculateBlockHeightMm`: eliminato il fattore fittizio `+ 1.5 pt` per riga nella modalità `css_calibrated`, impostando l'altezza della riga all'esatto valore fisico `visualWraps * (fontSizePt * 1.25)`.
+   - In `calculateSongHeaderHeightMm`: ridotta l'altezza stimata del divisorio superiore concatenato da 26 pt a 10 pt (~3.5 mm), rispecchiando il collassamento reale del margine CSS.
+   - Le altezze calcolate rispecchiano ora con precisione millimetrica l'ingombro fisico reale:
+     - Header senza divisorio: ~14.4 mm (Chromium: 12.2 mm).
+     - Header con divisorio: ~17.9 mm (Chromium: 15.6 mm).
+     - Strofa da 4 versi: ~23.1 mm (Chromium: 22.58 mm).
+     - Ritornello da 8 versi: ~43.4 mm (Chromium: 42.34 mm).
+
+### Verifica Globale
+- **TypeScript Typecheck:** `npm run typecheck` completato con 0 errori.
+- **Unit Test (Vitest):** 324/324 test passati (31 suite di test, 100% green).
+- **Playwright PDF Audit Reale:**
+  - *Chi canta*: ridotto da 11 a 10 pagine complessive ad altissima densità (1 indice + 9 pagine di canti, con una media costante di 83–90 righe per pagina).
+  - *Re dei Re* a pagina 9 è ora stampato al 100% per intero (tutti i 25 versi, Strofa 1, Ritornello 1, Strofa 2, Ritornello 2, Outro, RIT) sulla medesima pagina senza alcun taglio anticipato.
+  - Spazi bianchi anomali a fondo colonna completamente eliminati.
+
+---
+
+## ADR-0035: Slider di Controllo per Inclusione/Esclusione Indice nel Menù Stampa Canzoniere
+
+### Data
+2026-11-03
+
+### Contesto
+Gli animatori liturgici e capi reparto necessitano talvolta di stampare solo i canti selezionati senza la pagina iniziale di indice (ad es. per fascicoli brevi di 2-4 canti o foglietti volanti per la messa). In precedenza la proprietà `includeIndex` era supportata nel motore di calcolo ma mancava un controllo interattivo (slider switch) nel menù di stampa a schermo per consentire all'utente di abilitarla o disabilitarla a piacimento.
+
+### Decisioni Adottate
+1. **Integrazione ToggleSwitch nel Menù di Stampa Canti (`StampaCanzoni.tsx`):**
+   - Inserito il componente nativo iOS-grade `ToggleSwitch` nella sezione comandi del menù di stampa, affiancato al selettore "Per chi stampi?".
+   - Etichetta dinamica reattiva: `Includi indice` (attivo, default) o `Senza indice` (disattivato).
+   - Stato sincronizzato con `config.includeIndex` e persistito in `sessionStorage` (`stampa_canzoni`).
+2. **Reattività Dinamica del Layout e Conteggio Pagine:**
+   - Alla disattivazione dello slider (`includeIndex = false`):
+     - La pagina indice iniziale non viene renderizzata nel DOM di stampa (`stampa-canzoni-root`).
+     - I numeri di pagina (`bookPageNumber`) delle canzoni partono direttamente da **1** anziché da 2.
+     - La stima e il totale delle pagine A4 si aggiornano all'istante (ad es. da 10 a 9 pagine per l'intero canzoniere *Chi canta*).
+3. **Verifica:**
+   - Aggiunto test specifico n. 12 in `test/stampa_nuova_logica.test.ts`.
+   - 325/325 test Vitest verdi (100%), typecheck a 0 errori e build di produzione verificata.
+

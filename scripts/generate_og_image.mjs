@@ -11,6 +11,12 @@ async function generateOgImage() {
     ? `data:image/png;base64,${fs.readFileSync(logoPath).toString('base64')}`
     : '';
 
+  // Leggi foto di sfondo sentiero montagna
+  const bgPath = path.resolve('assets/photos/sentiero_montagna.jpg');
+  const bgBase64 = fs.existsSync(bgPath)
+    ? `data:image/jpeg;base64,${fs.readFileSync(bgPath).toString('base64')}`
+    : '';
+
   const topoPath = path.resolve('public/assets/topo_majella.svg');
   const topoSvg = fs.existsSync(topoPath) ? fs.readFileSync(topoPath, 'utf8') : '';
   const topoBase64 = topoSvg ? `data:image/svg+xml;utf8,${encodeURIComponent(topoSvg)}` : '';
@@ -30,221 +36,147 @@ async function generateOgImage() {
       height: 630px;
       overflow: hidden;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      background: linear-gradient(135deg, #1b0c30 0%, #35175e 50%, #150826 100%);
-      color: #ffffff;
       position: relative;
       display: flex;
       align-items: center;
       justify-content: center;
+      background: #1e293b;
     }
 
-    /* Sfondo topografico soffuso */
-    .topo-bg {
+    /* Contenitore sfondo con foto e vignettatura applicata SOLO alla foto */
+    .bg-wrap {
       position: absolute;
-      inset: -50px;
-      opacity: 0.12;
-      background-image: url('${topoBase64}');
+      inset: 0;
+      overflow: hidden;
+    }
+
+    .bg-photo {
+      position: absolute;
+      inset: -20px;
+      background-image: url('${bgBase64}');
       background-size: cover;
-      background-position: center;
-      filter: invert(1) contrast(1.5);
-      pointer-events: none;
+      background-position: center 36%;
+      filter: brightness(0.92) contrast(1.06) saturate(1.1);
     }
 
-    /* Glow radiale di profondità */
-    .glow-radial {
+    /* Overlay cinematografico morbido che preserva la luce del sole sulle montagne */
+    .cinema-overlay {
       position: absolute;
-      width: 800px;
-      height: 800px;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(168, 85, 247, 0.25) 0%, rgba(59, 130, 246, 0.1) 40%, transparent 70%);
-      top: -200px;
-      right: -100px;
+      inset: 0;
+      background: radial-gradient(ellipse at 50% 64%, rgba(0, 0, 0, 0.58) 0%, rgba(0, 0, 0, 0.22) 50%, rgba(0, 0, 0, 0.45) 100%),
+                  linear-gradient(180deg, rgba(0, 0, 0, 0.25) 0%, transparent 35%, rgba(0, 0, 0, 0.4) 100%);
       pointer-events: none;
     }
 
-    .glow-bottom {
-      position: absolute;
-      width: 600px;
-      height: 600px;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(234, 179, 8, 0.15) 0%, transparent 65%);
-      bottom: -250px;
-      left: 100px;
-      pointer-events: none;
-    }
-
-    /* Card principale contenitore */
-    .container {
+    /* Composizione A VIVO: niente scatole, l'informazione è integrata nella natura */
+    .hero-composition {
       position: relative;
       z-index: 10;
-      width: 1080px;
-      height: 510px;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      border-radius: 28px;
-      box-shadow: 0 30px 60px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.2);
-      backdrop-filter: blur(16px);
       display: flex;
+      flex-direction: column;
       align-items: center;
-      padding: 0 50px;
-      gap: 55px;
+      text-align: center;
+      max-width: 820px;
+      padding: 0 24px;
+      margin-top: -12px;
     }
 
-    /* Targa Logo Apple-grade */
-    .logo-badge {
-      width: 240px;
-      height: 240px;
+    /* Targa quadrata scout ufficiale: accoglie perfettamente il logo e la scritta Ponte San Giovanni 1 */
+    .scout-seal {
+      width: 205px;
+      height: 205px;
+      border-radius: 22px;
       background: #ffffff;
-      border-radius: 40px;
-      padding: 16px;
+      padding: 14px;
+      margin-bottom: 14px;
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 20px 45px rgba(0, 0, 0, 0.35), 0 4px 12px rgba(0, 0, 0, 0.15);
-      flex-shrink: 0;
-      border: 3px solid rgba(255, 255, 255, 0.9);
+      box-shadow: 0 16px 38px rgba(0, 0, 0, 0.42), 0 3px 10px rgba(0, 0, 0, 0.2), 0 0 0 3px rgba(255, 255, 255, 0.95);
     }
 
-    .logo-badge img {
+    .scout-seal img {
       width: 100%;
       height: 100%;
       object-fit: contain;
     }
 
-    /* Contenuto testuale */
-    .content {
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      flex: 1;
-    }
-
-    .brand-eyebrow {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 15px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 2px;
-      color: #fbbf24;
-      margin-bottom: 8px;
-    }
-
-    .brand-title {
-      font-size: 56px;
+    /* Tipografia cinematografica a vivo sul panorama */
+    .clan-title {
+      font-size: 46px;
       font-weight: 900;
-      letter-spacing: -1.5px;
-      line-height: 1.08;
       color: #ffffff;
-      margin-bottom: 10px;
-      text-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+      letter-spacing: -0.6px;
+      line-height: 1.1;
+      margin-bottom: 5px;
+      text-shadow: 0 3px 16px rgba(0, 0, 0, 0.85), 0 1px 3px rgba(0, 0, 0, 0.95);
     }
 
-    .brand-subtitle {
-      font-size: 20px;
-      font-weight: 400;
-      color: rgba(255, 255, 255, 0.85);
-      line-height: 1.4;
-      margin-bottom: 28px;
+    .clan-tagline {
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: #fbbf24;
+      margin-bottom: 14px;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.85);
     }
 
-    /* Sezioni pill */
-    .pills-row {
+    /* Riga separatrice leggera */
+    .divider {
+      width: 50px;
+      height: 3px;
+      background: #ffffff;
+      border-radius: 2px;
+      margin-bottom: 14px;
+      opacity: 0.9;
+      box-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
+    }
+
+    /* Contenuti puliti, leggibili, senza scatole */
+    .contents-row {
       display: flex;
       flex-wrap: wrap;
-      gap: 12px;
-      margin-bottom: 24px;
-    }
-
-    .pill {
-      display: inline-flex;
+      justify-content: center;
       align-items: center;
-      gap: 8px;
-      padding: 8px 18px;
-      border-radius: 999px;
-      font-size: 15px;
+      gap: 12px 18px;
+      font-size: 16px;
       font-weight: 700;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    }
-
-    .pill-giochi {
-      background: #f59e0b;
-      color: #451a03;
-    }
-
-    .pill-bans {
-      background: #ef4444;
       color: #ffffff;
+      text-shadow: 0 2px 14px rgba(0, 0, 0, 0.9), 0 1px 3px rgba(0, 0, 0, 1);
     }
 
-    .pill-canti {
-      background: #38bdf8;
-      color: #082f49;
-    }
-
-    .pill-calendario {
-      background: #6366f1;
-      color: #ffffff;
-    }
-
-    /* Footer targa */
-    .footer-bar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      border-top: 1px solid rgba(255, 255, 255, 0.12);
-      padding-top: 14px;
-      font-size: 14px;
-      color: rgba(255, 255, 255, 0.6);
-    }
-
-    .footer-url {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      color: rgba(255, 255, 255, 0.9);
-      font-weight: 600;
-    }
-
-    .footer-motto {
-      font-style: italic;
+    .dot {
       color: #fbbf24;
+      font-size: 14px;
+      text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
     }
   </style>
 </head>
 <body>
-  <div class="topo-bg"></div>
-  <div class="glow-radial"></div>
-  <div class="glow-bottom"></div>
+  <div class="bg-wrap">
+    <div class="bg-photo"></div>
+    <div class="cinema-overlay"></div>
+  </div>
 
-  <div class="container">
-    <div class="logo-badge">
-      ${logoBase64 ? `<img src="${logoBase64}" alt="Logo Duc In Altum" />` : ''}
+  <div class="hero-composition">
+    <div class="scout-seal">
+      ${logoBase64 ? `<img src="${logoBase64}" alt="Logo Gruppo AGESCI Ponte San Giovanni 1" />` : ''}
     </div>
 
-    <div class="content">
-      <div class="brand-eyebrow">
-        <span>Scout Vault</span>
-        <span>•</span>
-        <span>Duc In Altum</span>
-      </div>
+    <h1 class="clan-title">Clan Duc In Altum</h1>
+    <div class="clan-tagline">Vault Digitale di Clan</div>
 
-      <h1 class="brand-title">Vault Clan</h1>
+    <div class="divider"></div>
 
-      <p class="brand-subtitle">
-        Archivio digitale condiviso per le attività di Clan: giochi, canti con accordi, bans e calendario con ordine del giorno.
-      </p>
-
-      <div class="pills-row">
-        <span class="pill pill-giochi">Giochi</span>
-        <span class="pill pill-bans">Bans</span>
-        <span class="pill pill-canti">Canti & Accordi</span>
-        <span class="pill pill-calendario">Calendario & ODG</span>
-      </div>
-
-      <div class="footer-bar">
-        <span class="footer-url">clanducinaltumsite.github.io/Sito-di-vault-attivit-clan</span>
-        <span class="footer-motto">«Duc In Altum»</span>
-      </div>
+    <div class="contents-row">
+      <span>Canti & Accordi</span>
+      <span class="dot">•</span>
+      <span>Giochi & Bans</span>
+      <span class="dot">•</span>
+      <span>Calendario & ODG</span>
+      <span class="dot">•</span>
+      <span>Quaderno</span>
     </div>
   </div>
 </body>

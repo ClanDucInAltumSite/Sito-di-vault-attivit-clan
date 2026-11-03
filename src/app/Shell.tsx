@@ -4,6 +4,8 @@ import { useRoute, navigate, RouteName } from './router';
 import { useAdmin } from '../lib/auth';
 import { AdminLoginModal } from '../features/admin/AdminLoginModal';
 import { Icon, IconName } from '../ui/Icon';
+import { Toast } from '../ui/Toast';
+import { shareWebApp } from '../lib/share';
 import { BrandLogo } from '../ui/BrandLogo';
 import { TopographicBackground } from '../ui/TopographicBackground';
 import { CompassSync } from '../ui/ScoutMotifs';
@@ -30,6 +32,19 @@ export function Shell({
   const { route } = useRoute();
   const { isAdmin } = useAdmin();
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const handleShare = async () => {
+    try {
+      const result = await shareWebApp();
+      if (result.copied) {
+        setToastMessage(I18N.app.shareSuccess);
+        setTimeout(() => setToastMessage(null), 3500);
+      }
+    } catch (err) {
+      console.error('Errore condivisione web app:', err);
+    }
+  };
 
   const routeTitles: Record<RouteName, string> = {
     home: I18N.app.shortTitle,
@@ -37,6 +52,7 @@ export function Shell({
     bans: I18N.nav.bans,
     canti: I18N.nav.canti,
     calendario: I18N.nav.calendario,
+    quaderno: I18N.quaderno.title,
     stampa: I18N.stampa.title,
     admin: I18N.nav.admin,
     design: 'Sistema di Design',
@@ -49,6 +65,7 @@ export function Shell({
     { id: 'bans', label: I18N.nav.bans, icon: 'bans' },
     { id: 'canti', label: I18N.nav.canti, icon: 'canti' },
     { id: 'calendario', label: I18N.nav.calendario, icon: 'calendario' },
+    { id: 'quaderno', label: 'Quaderno', icon: 'quaderno' },
   ];
 
   const formattedSyncTime = lastSyncTime
@@ -133,6 +150,18 @@ export function Shell({
             <CompassSync isSyncing={isSyncing} size={20} />
           </button>
 
+          {/* Condivisione Web App */}
+          <button
+            type="button"
+            className="ios-btn ios-btn-ghost ios-btn-sm"
+            onClick={handleShare}
+            aria-label={I18N.app.shareBtn}
+            title={I18N.app.shareBtn}
+            style={{ padding: '0 8px', minWidth: '38px' }}
+          >
+            <Icon name="share" size={20} />
+          </button>
+
           {/* Scorciatoia Centro Stampa */}
           <button
             type="button"
@@ -209,6 +238,25 @@ export function Shell({
           navigate('admin');
         }}
       />
+
+      {/* Notifica Toast Fluttuante */}
+      {toastMessage && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: 'calc(var(--tab-bar-height, 64px) + 16px + env(safe-area-inset-bottom, 0px))',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 3500,
+          }}
+        >
+          <Toast
+            message={toastMessage}
+            type="success"
+            onClose={() => setToastMessage(null)}
+          />
+        </div>
+      )}
     </>
   );
 }
