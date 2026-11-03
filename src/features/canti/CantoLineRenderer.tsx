@@ -1,4 +1,4 @@
-import { useRef, useLayoutEffect } from 'preact/hooks';
+import { useRef } from 'preact/hooks';
 import { transposeChord } from '../../lib/chord_theory';
 
 export interface CantoLineData {
@@ -43,7 +43,7 @@ export function parseCantoLine(lineStr: string): CantoLineData | null {
     return null;
   }
 
-  if (/^RIT[.:]?$/i.test(trimmed)) {
+  if (/^RIT[.:]?(\s*\(x\d+\))?$/i.test(trimmed)) {
     return {
       lyrics: trimmed.toUpperCase(),
       chords: [],
@@ -222,42 +222,12 @@ export function CantoLineRenderer({
   const { lyrics, chords, isRitLabel, isChordOnly, hasChords } = data;
   const displayChords = showChords && hasChords;
 
-  // Collision detection e prevenzione sovrapposizione accordi (< 0.4 em) solo per Stampa A4
-  useLayoutEffect(() => {
-    if (!isPrint || !displayChords || chords.length <= 1 || !lineRef.current) return;
-
-    const badges = lineRef.current.querySelectorAll<HTMLElement>('.canzoniere-chord-badge');
-    if (badges.length <= 1) return;
-
-    const firstBadge = badges[0];
-    if (!firstBadge) return;
-    const computedFontSize = parseFloat(window.getComputedStyle(firstBadge).fontSize) || 14;
-    const minGapPx = 0.4 * computedFontSize;
-
-    // Resetta prima eventuali trasformazioni precedenti
-    for (let i = 0; i < badges.length; i++) {
-      badges[i]!.style.transform = '';
-    }
-
-    let currentRightEdge = badges[0]!.getBoundingClientRect().right;
-
-    for (let i = 1; i < badges.length; i++) {
-      const b = badges[i]!;
-      const r = b.getBoundingClientRect();
-      const requiredLeft = currentRightEdge + minGapPx;
-
-      if (r.left < requiredLeft) {
-        const shift = requiredLeft - r.left;
-        b.style.transform = `translateX(${shift}px)`;
-        currentRightEdge = r.left + shift + r.width;
-      } else {
-        currentRightEdge = r.right;
-      }
-    }
-  }, [data, showChords, transposeDelta, isPrint]);
-
   // 1. Etichetta ritornello (RIT.)
   if (isRitLabel) {
+    if (showChords && !hasChords) {
+      // In modalità con accordi (suona) non mostrare etichette RIT isolate o mute
+      return null;
+    }
     return (
       <div
         className={`canzoniere-rit-label ${className}`.trim()}
@@ -329,78 +299,32 @@ export function CantoLineRenderer({
     );
   }
 
-  // 5A. MODALITÀ LETTURA A SCHERMO / MOBILE (Responsive Flexbox): Chords sopra le parole senza sovrapposizioni
-  if (!isPrint) {
-    const words = parseLineToScreenWords(lyrics, chords, transposeDelta);
-    return (
-      <div
-        className={`canzoniere-line-item canto-screen-line has-chords ${className}`.trim()}
-        style={{ fontSize: fontSize || undefined }}
-      >
-        {words.map((w, wIdx) => (
-          <span key={wIdx} className="canto-word">
-            {w.units.map((u, uIdx) => (
-              <span key={uIdx} className="canto-unit">
-                <span
-                  className={`canto-unit-chord song-chord ${u.chord ? 'canzoniere-chord-badge' : ''}`.trim()}
-                  aria-hidden={!u.chord}
-                >
-                  {u.chord || '\u00A0'}
-                </span>
-                <span className="canto-unit-lyric">
-                  {u.lyric || '\u00A0'}
-                </span>
-              </span>
-            ))}
-          </span>
-        ))}
-      </div>
-    );
-  }
-
-  // 5B. MODALITÀ STAMPA A4: Riga con accordi ancorati a zero-width per colonne fisse
-  const segments: any[] = [];
-  let lastChar = 0;
-
-  for (let cIdx = 0; cIdx < chords.length; cIdx++) {
-    const ch = chords[cIdx];
-    if (!ch) continue;
-    const charPos = Math.min(ch.charIndex, lyrics.length);
-
-    // Segmento di testo precedente all'accordo
-    if (charPos > lastChar) {
-      segments.push(lyrics.slice(lastChar, charPos));
-    }
-
-    // Ancora a larghezza zero con accordo in posizione assoluta sopra
-    const transposed = transposeChord(ch.chord, transposeDelta);
-    segments.push(
-      <span
-        key={`anchor-${cIdx}`}
-        className="canzoniere-chord-anchor"
-        data-chord={transposed}
-      >
-        <span className="canzoniere-chord-badge song-chord">
-          {transposed}
-        </span>
-      </span>
-    );
-
-    lastChar = charPos;
-  }
-
-  // Testo rimanente della riga
-  if (lastChar < lyrics.length) {
-    segments.push(lyrics.slice(lastChar));
-  }
-
+  // 5. Riga con accordi: Modello ad Unità Atomiche (.canto-word e .canto-unit)
+  // Utilizzato universalmente per schermo e stampa per impedire qualsiasi collisione tra accordi e parole.
+  const words = parseLineToScreenWords(lyrics, chords, transposeDelta);
   return (
     <div
       ref={lineRef}
-      className={`canzoniere-line-item has-chords is-print ${className}`.trim()}
+      className={`canzoniere-line-item canto-screen-line has-chords ${isPrint ? 'is-print' : ''} ${className}`.trim()}
       style={{ fontSize: fontSize || undefined }}
     >
-      {segments}
+      {words.map((w, wIdx) => (
+        <span key={wIdx} className="canto-word">
+          {w.units.map((u, uIdx) => (
+            <span key={uIdx} className="canto-unit">
+              <span
+                className={`canto-unit-chord song-chord ${u.chord ? 'canzoniere-chord-badge' : ''}`.trim()}
+                aria-hidden={!u.chord}
+              >
+                {u.chord || '\u00A0'}
+              </span>
+              <span className="canto-unit-lyric">
+                {u.lyric || '\u00A0'}
+              </span>
+            </span>
+          ))}
+        </span>
+      ))}
     </div>
   );
 }

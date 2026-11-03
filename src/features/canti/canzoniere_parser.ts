@@ -10,8 +10,8 @@
  * protezione rigorosa contro trappole parole italiane e raccolta diagnostica di avvisi.
  */
 
-import { cleanPastedText, CleanTextResult, CleanerChange, reconstructWithActiveChanges } from './canzoniere_cleaner';
-export { cleanPastedText, reconstructWithActiveChanges };
+import { cleanPastedText, CleanTextResult, CleanerChange, reconstructWithActiveChanges, joinContinuationLines } from './canzoniere_cleaner';
+export { cleanPastedText, reconstructWithActiveChanges, joinContinuationLines };
 export type { CleanTextResult, CleanerChange };
 
 export interface ParsedCantoResult {

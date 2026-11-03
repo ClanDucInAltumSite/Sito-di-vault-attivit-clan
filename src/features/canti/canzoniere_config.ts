@@ -50,7 +50,9 @@ export interface CanzoniereConfig {
     colorDivider: string;
     baseSizePt: number; // 11 pt base
     minSizePt: number; // 9 pt minimo (-2 pt)
-    maxSizePt: number; // 13 pt massimo per riempimento pagina
+    maxSizePt: number; // 28 pt massimo per riempimento pagina adattivo
+    maxSizePtSuona: number; // 24 pt variante Chi suona
+    maxSizePtCanta: number; // 28 pt variante Chi canta
     stepPt: number; // 0.5 pt a gradino
     lineHeight: number; // 1.5 interlinea standard (passo 16.5 pt su 11 pt)
     lineStepPt: number; // 16.5 pt passo esatto tra righe a 11 pt
@@ -117,18 +119,18 @@ export const CANZONIERE_CONFIG: CanzoniereConfig = {
     orientation: 'portrait',
     widthMm: 210,
     heightMm: 297,
-    marginTopMm: 10, // Margine superiore 1,0 cm
-    marginBottomMm: 20, // Margine inferiore 2,0 cm
-    marginLeftMm: 20, // Margine sinistro 2,0 cm
-    marginRightMm: 20, // Margine destro 2,0 cm
-    contentWidthMm: 170, // 210 - 20 - 20 = 170 mm
-    contentHeightMm: 267, // 297 - 10 - 20 = 267 mm
+    marginTopMm: 12,
+    marginBottomMm: 12,
+    marginLeftMm: 12,
+    marginRightMm: 12,
+    contentWidthMm: 186, // 210 - 24 = 186 mm
+    contentHeightMm: 273, // 297 - 24 = 273 mm
   },
 
   columns: {
     count: 2,
-    widthMm: 81, // Due colonne di 8,1 cm ciascuna
-    gapMm: 8, // 170 - (81 * 2) = 8 mm
+    widthMm: 89.5, // 89.5 * 2 + 7 = 186 mm
+    gapMm: 7,
     separator: {
       widthPt: 0.75, // Linea verticale sottile tra le due colonne
       style: 'solid',
@@ -144,50 +146,52 @@ export const CANZONIERE_CONFIG: CanzoniereConfig = {
     colorTitle: '#000000',
     colorMeta: '#4A5568',
     colorDivider: '#A0A0A0',
-    baseSizePt: 11, // Base 11 pt come nel file di riferimento
-    minSizePt: 9, // Riduzione massima -2 pt (fino a 9 pt)
-    maxSizePt: 13, // Ingrandimento controllato per evitare vuoti (fino a 13 pt)
+    baseSizePt: 11, // Base 11 pt
+    minSizePt: 10.0, // Minimo 10.0 pt per mantenere ottima leggibilità da leggio (10.0 - 12.5 pt)
+    maxSizePt: 12.5, // Massimo 12.5 pt per armonia tipografica editoriale
+    maxSizePtSuona: 12.0, // Variante Chi suona (accordi + testo)
+    maxSizePtCanta: 12.5, // Variante Chi canta (solo testo)
     stepPt: 0.5, // Passi di 0,5 pt
-    lineHeight: 1.5, // Interlinea del corpo 1.5 (passo 16.5 pt su 11 pt)
-    lineStepPt: 16.5, // Passo esatto tra righe a 11 pt
-    arrowBaseSizePt: 17, // Nova Mono Bold 17 pt per frecce (↓ ↑)
+    lineHeight: 1.5, // Interlinea standard (passo 16.5 pt su 11 pt)
+    lineStepPt: 16.5, // Passo proporzionale esatto a 11 pt
+    arrowBaseSizePt: 16, // Nova Mono Bold per frecce (↓ ↑)
     arrowWeight: 700,
   },
 
   header: {
     title: {
-      sizePt: 22,
+      sizePt: 18,
       weight: 700,
       textTransform: 'uppercase',
-      marginTopPt: 24, // Spazio sopra 24 pt
-      marginBottomPt: 6, // Spazio sotto 6 pt
-      lineHeight: 1.0,
+      marginTopPt: 0, // Niente margine superiore artificiale a inizio foglio
+      marginBottomPt: 2,
+      lineHeight: 1.1,
       color: '#000000',
     },
     author: {
-      sizePt: 11,
+      sizePt: 9.5,
       fontStyle: 'italic',
-      marginBottomPt: 4,
+      marginBottomPt: 2,
       lineHeight: 1.2,
       color: '#4A5568',
     },
     params: {
-      sizePt: 11,
-      marginBottomPt: 6,
-      lineHeight: 1.25,
+      sizePt: 9,
+      marginBottomPt: 3,
+      lineHeight: 1.2,
       labelWeight: 700,
-      separatorTabWidthMm: 12,
+      separatorTabWidthMm: 10,
     },
     divider: {
-      heightPt: 1.0,
+      heightPt: 0.5,
       color: '#A0A0A0',
-      marginTopPt: 4,
-      marginBottomPt: 10,
+      marginTopPt: 2,
+      marginBottomPt: 5,
     },
     page2Header: {
-      sizePt: 11,
+      sizePt: 9.5,
       weight: 700,
-      marginBottomPt: 8,
+      marginBottomPt: 6,
       borderBottomWidthPt: 0.5,
     },
   },
@@ -197,6 +201,6 @@ export const CANZONIERE_CONFIG: CanzoniereConfig = {
     smallOverflowMaxPercent: 0.15,
     minLinesPerBlockSplit: 3,
     minLinesLastPage: 6,
-    fillTargetPercent: 88, // Se l'altezza colonna è < 88% dell'area utile, scala font fino a maxSizePt
+    fillTargetPercent: 88,
   },
 };

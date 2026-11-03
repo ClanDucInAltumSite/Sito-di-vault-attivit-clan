@@ -51,14 +51,10 @@ stai [Fa]pro---[Sol]-nto e…
 
 {soc}
 RIT:
-[Do]Danza la [Fa]vita al [Sol]ritmo dello [Do]spirito
-Spirito che riempi i nostri
-[Lam]Danza, [Fa]danza al [Sol]ritmo che c''è [(Do)]in te.
-cuor. Danza assieme a no----------------oi!
-[Fa][Do]Spirito [Sol]che [Do]riempi i nostri
-Danza la vita al ritmo dello spirito
-[Lam]cuor. [Fa]Danza assieme [Sol]a no--------------[(Do)]--oi!
-Danza, danza al ritmo che c''è in te.
+[Do]Danza la [Fa]vita al [Sol]ritmo dello [Do]spirito,
+[Lam]danza, [Fa]danza al [Sol]ritmo che c''è [Do]in te.
+[Do]Spirito [Fa]che [Sol]riempi i nostri [Do]cuor,
+[Lam]danza [Fa]assieme a [Sol]no----[Do]oi!
 {eoc}
 
 {comment: strum: Do Fa Do Fa}
@@ -77,14 +73,10 @@ stai [Fa]pro---[Sol]-nto e…
 
 {soc}
 RIT:
-[Do]Danza la [Fa]vita al [Sol]ritmo dello [Do]spirito
-Spirito che riempi i nostri
-[Lam]Danza, [Fa]danza al [Sol]ritmo che c''è [(Do)]in te.
-cuor. Danza assieme a no----------------oi!
-[Fa][Do]Spirito [Sol]che [Do]riempi i nostri
-Danza la vita al ritmo dello spirito
-[Lam]cuor. [Fa]Danza assieme [Sol]a no--------------[(Do)]--oi!
-Danza, danza al ritmo che c''è in te.
+[Do]Danza la [Fa]vita al [Sol]ritmo dello [Do]spirito,
+[Lam]danza, [Fa]danza al [Sol]ritmo che c''è [Do]in te.
+[Do]Spirito [Fa]che [Sol]riempi i nostri [Do]cuor,
+[Lam]danza [Fa]assieme a [Sol]no----[Do]oi!
 {eoc}
 
 {comment: outro: Do Fa Do_|}[Do]',
@@ -290,10 +282,12 @@ che possa atti[Do]rare attenzione
 mangiando una [Do]mela, coi libri di [Fa]scuola,
 ti piace stu[Do]diare,
 [Re]non te ne devi vergognare! [Sol]
+
 [Do]E quando guardi con quegli [Sol]occhi grandi
 [Lam]forse un po'' troppo sin[Do]ceri, sinceri
 [Fa]si vede quello che [Do]pensi,
 [Re]quello che [Sol]sogni
+
 [Do]E qualche volta fai pen[Sol]sieri strani
 [Lam]con una mano, una [Do]mano ti sfiori
 [Fa]Tu sola [Do]dentro la stanza

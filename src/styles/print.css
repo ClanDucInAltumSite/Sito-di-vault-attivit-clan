@@ -6,7 +6,7 @@
 @media print {
   @page {
     size: A4 portrait;
-    margin: 10mm 20mm 20mm 20mm;
+    margin: 12mm;
   }
 
   /* Reset generale per risparmio inchiostro e leggibilità */
@@ -95,12 +95,69 @@
     margin: 0 !important;
   }
 
-  /* Il contenitore di stampa occupa la larghezza completa */
-  .stampa-print-container {
+  .stampa-a4-preview-scroll,
+  .print-song-book-item {
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  .stampa-a4-sheet-card {
+    display: flex !important;
+    flex-direction: column !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    width: 100% !important;
+    height: 271mm !important;
+    min-height: 271mm !important;
+    max-height: 271mm !important;
+    overflow: hidden !important;
+    break-after: page !important;
+    page-break-after: always !important;
+    box-sizing: border-box !important;
+  }
+
+  /* I contenitori di stampa occupano la larghezza completa */
+  .stampa-print-container,
+  .stampa-print-container-canzoni,
+  .stampa-print-container-giochibans,
+  .stampa-print-container-odg {
     display: block !important;
     width: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
+  }
+
+  /* Isolamento rigido tra i 3 flussi di stampa */
+  body[data-print="canzoni"] .stampa-print-container-giochibans,
+  body[data-print="canzoni"] .stampa-print-container-odg,
+  body[data-print="canzoni"] #stampa-giochibans-root,
+  body[data-print="canzoni"] #stampa-odg-root {
+    display: none !important;
+  }
+
+  body[data-print="giochibans"] .stampa-print-container-canzoni,
+  body[data-print="giochibans"] .stampa-print-container-odg,
+  body[data-print="giochibans"] #stampa-canzoni-root,
+  body[data-print="giochibans"] #stampa-odg-root {
+    display: none !important;
+  }
+
+  body[data-print="odg"] .stampa-print-container-canzoni,
+  body[data-print="odg"] .stampa-print-container-giochibans,
+  body[data-print="odg"] #stampa-canzoni-root,
+  body[data-print="odg"] #stampa-giochibans-root {
+    display: none !important;
   }
 
   /* --- 1. COPERTINA E INDICE (Opzionali) --- */
@@ -146,48 +203,113 @@
   }
 
   .print-index-page {
-    break-after: page;
-    page-break-after: always;
     padding: 0 !important;
     width: 100% !important;
     box-sizing: border-box !important;
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 260mm !important;
   }
 
   .print-index-title {
-    font-size: 18pt;
-    font-weight: 700;
-    border-bottom: 1.5pt solid oklch(0 0 0);
-    padding-bottom: 6pt;
-    margin-bottom: 16pt;
+    font-size: 14pt !important;
+    font-weight: 800 !important;
+    border-bottom: 1.5pt solid oklch(0 0 0) !important;
+    padding-bottom: 3pt !important;
+    margin-bottom: 8pt !important;
+    display: flex !important;
+    align-items: baseline !important;
   }
 
-  .print-index-section {
-    margin-bottom: 16pt;
+  .print-index-subtitle {
+    font-size: 9pt !important;
+    font-weight: 500 !important;
+    text-transform: lowercase !important;
+    color: oklch(0.3 0 0) !important;
+    margin-left: 6pt !important;
   }
 
-  .print-index-section-header {
-    font-size: 12pt;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: 6pt;
-    border-bottom: 0.75pt solid oklch(0.3 0 0);
-    padding-bottom: 2pt;
+  .print-index-section,
+  .print-index-sector {
+    margin-bottom: 6pt !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .print-index-section-header,
+  .print-index-sector-title {
+    font-size: 9.5pt !important;
+    font-weight: 800 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.04em !important;
+    margin-top: 6pt !important;
+    margin-bottom: 2pt !important;
+    border-bottom: 0.75pt solid oklch(0.2 0 0) !important;
+    padding-bottom: 1.5pt !important;
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  .print-index-sector:first-of-type .print-index-sector-title {
+    margin-top: 0 !important;
   }
 
   .print-index-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    padding: 4pt 0;
-    border-bottom: 0.5pt dotted oklch(0.6 0 0);
-    font-size: 11pt;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: baseline !important;
+    padding: 1.2pt 0 !important;
+    border-bottom: none !important;
+    font-size: 8.5pt !important;
+    line-height: 1.2 !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 
-  .print-index-row-num {
-    font-weight: 700;
-    min-width: 20pt;
-    text-align: right;
+  .print-index-row-title {
+    font-weight: 600 !important;
+    font-size: 8.5pt !important;
+  }
+
+  .print-index-row-author {
+    font-weight: 400 !important;
+    font-style: italic !important;
+    font-size: 7.5pt !important;
+    margin-left: 4pt !important;
+    color: oklch(0.35 0 0) !important;
+  }
+
+  .print-index-dots {
+    flex: 1 !important;
+    border-bottom: 0.75pt dotted oklch(0.65 0 0) !important;
+    margin: 0 6pt 2pt !important;
+    min-width: 12pt !important;
+  }
+
+  .print-index-pages-badge {
+    display: inline-flex !important;
+    align-items: baseline !important;
+    gap: 4pt !important;
+    flex-shrink: 0 !important;
+  }
+
+  .print-index-cross-page {
+    font-size: 7pt !important;
+    font-weight: 500 !important;
+    color: oklch(0.4 0 0) !important;
+  }
+
+  .print-index-main-page {
+    font-weight: 800 !important;
+    font-size: 8.5pt !important;
+    min-width: 16pt !important;
+    text-align: right !important;
+  }
+
+  .canzoniere-index-footer {
+    margin-top: auto !important;
+    padding-top: 4pt !important;
+    text-align: center !important;
   }
 
   /* --- 2. SEZIONE GIOCHI E BANS: Flusso continuo --- */
@@ -352,22 +474,38 @@
   /* ==============================================================================
      FASE 9 - CANZONIERE STILE IDENTICO AL DOCUMENTO DI RIFERIMENTO
      ============================================================================== */
-  .canzoniere-page {
+  .canzoniere-page,
+  .canzoniere-page.stampa-preview-paper,
+  .canzoniere-index-page,
+  .print-index-page {
     width: 100% !important;
     max-width: 100% !important;
-    height: 267mm !important;
-    max-height: 267mm !important;
+    min-width: 0 !important;
+    height: 100% !important;
+    min-height: 271mm !important;
+    max-height: 271mm !important;
     margin: 0 !important;
     padding: 0 !important;
     box-sizing: border-box !important;
-    background: oklch(1 0 0) !important;
-    color: oklch(0.33 0.02 255) !important;
+    background: transparent !important;
+    color: oklch(0 0 0) !important;
     font-family: 'Roboto', system-ui, -apple-system, sans-serif !important;
-    break-before: page !important;
-    page-break-before: always !important;
+    break-after: auto !important;
+    page-break-after: auto !important;
     overflow: hidden !important;
     display: flex !important;
     flex-direction: column !important;
+  }
+
+  .print-song-book-item:last-child .stampa-a4-sheet-card:last-child,
+  .print-song-book-item:last-child .stampa-a4-sheet-card:last-child .canzoniere-page,
+  .canzoniere-book-container > .stampa-a4-sheet-card:last-child {
+    break-after: auto !important;
+    page-break-after: auto !important;
+  }
+
+  .canzoniere-column .canzoniere-block:last-child {
+    margin-bottom: 0 !important;
   }
 
   .canzoniere-header {
@@ -377,41 +515,60 @@
     margin: 0 !important;
   }
 
+  .canzoniere-header-top {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    align-items: baseline !important;
+    justify-content: flex-start !important;
+    gap: 2pt 6pt !important;
+    width: 100% !important;
+    margin-bottom: 2pt !important;
+  }
+
   .canzoniere-header-title {
     font-family: 'Roboto', sans-serif !important;
-    font-size: 22pt !important;
+    font-size: 14pt !important;
     font-weight: 700 !important;
     text-transform: uppercase !important;
     color: oklch(0 0 0) !important;
-    margin-top: 24pt !important;
-    margin-bottom: 6pt !important;
-    line-height: 1.0 !important;
+    margin: 0 !important;
+    line-height: 1.15 !important;
     letter-spacing: -0.01em !important;
   }
 
   .canzoniere-header-author {
     font-family: 'Roboto', sans-serif !important;
-    font-size: 11pt !important;
+    font-size: 9.5pt !important;
     font-style: italic !important;
-    color: oklch(0.4 0 0) !important;
-    margin-bottom: 4pt !important;
+    color: oklch(0.3 0 0) !important;
+    margin: 0 !important;
     line-height: 1.2 !important;
+    white-space: nowrap !important;
   }
 
   .canzoniere-header-params {
     font-family: 'Roboto', sans-serif !important;
-    font-size: 11pt !important;
-    color: oklch(0.35 0 0) !important;
-    margin-bottom: 6pt !important;
-    line-height: 1.25 !important;
+    font-size: 8.5pt !important;
+    color: oklch(0.25 0 0) !important;
+    margin-top: 1pt !important;
+    margin-bottom: 2pt !important;
+    line-height: 1.2 !important;
     display: flex !important;
+    flex-wrap: wrap !important;
     align-items: center !important;
-    gap: 16pt !important;
+    gap: 10pt !important;
+  }
+
+  .canzoniere-param-item {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 3pt !important;
   }
 
   .canzoniere-arrow-glyph {
     font-family: 'Nova Mono', monospace !important;
-    font-size: 17pt !important;
+    font-size: 13pt !important;
     font-weight: 700 !important;
     color: oklch(0 0 0) !important;
     line-height: 1 !important;
@@ -420,21 +577,120 @@
 
   .canzoniere-header-divider {
     border: none !important;
-    border-bottom: 1pt solid oklch(0.7 0 0) !important;
-    margin-top: 4pt !important;
-    margin-bottom: 10pt !important;
+    border-bottom: 0.5pt solid oklch(0.7 0 0) !important;
+    margin-top: 2pt !important;
+    margin-bottom: 5pt !important;
     width: 100% !important;
+  }
+
+  /* Concatenazione canti su 2 colonne a flusso continuo */
+  .canzoniere-column-header-block {
+    display: block !important;
+    width: 100% !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    break-after: avoid !important;
+    page-break-after: avoid !important;
+    margin-bottom: 3pt !important;
+  }
+
+  .canzoniere-song-divider {
+    border: none !important;
+    border-top: 1.5pt solid oklch(0.2 0 0) !important;
+    margin: 16pt 0 8pt 0 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    clear: both !important;
+  }
+
+  .canzoniere-column-header {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+  }
+
+  .canzoniere-column-header .canzoniere-header-title {
+    font-size: 15pt !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    color: oklch(0 0 0) !important;
+    margin: 0 !important;
+    line-height: 1.15 !important;
+    letter-spacing: -0.01em !important;
+    word-break: break-word !important;
+  }
+
+  .canzoniere-column-header .canzoniere-header-author {
+    font-size: 9.5pt !important;
+    font-style: italic !important;
+    color: oklch(0.3 0 0) !important;
+    margin: 0 !important;
+    line-height: 1.2 !important;
+    white-space: nowrap !important;
+  }
+
+  .canzoniere-column-header .canzoniere-header-params {
+    font-size: 8.5pt !important;
+    color: oklch(0.25 0 0) !important;
+    margin-top: 1pt !important;
+    margin-bottom: 2pt !important;
+    line-height: 1.25 !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: 3pt 8pt !important;
+  }
+
+  .canzoniere-running-header {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: baseline !important;
+    width: 100% !important;
+    font-family: 'Roboto', sans-serif !important;
+    font-size: 8.5pt !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+    color: oklch(0.35 0 0) !important;
+    border-bottom: 0.5pt solid oklch(0.75 0 0) !important;
+    padding-bottom: 2pt !important;
+    margin-bottom: 4pt !important;
+    break-after: avoid !important;
+    page-break-after: avoid !important;
+  }
+
+  .canzoniere-running-title {
+    font-weight: 700 !important;
+    letter-spacing: 0.05em !important;
+  }
+
+  .canzoniere-page-footer,
+  .canzoniere-index-footer {
+    display: block !important;
+    width: 100% !important;
+    margin-top: auto !important;
+    padding-top: 4pt !important;
+    padding-bottom: 0 !important;
+    text-align: center !important;
+  }
+
+  .canzoniere-page-number {
+    font-family: 'Roboto', sans-serif !important;
+    font-size: 8.5pt !important;
+    font-weight: 600 !important;
+    color: oklch(0.3 0 0) !important;
+    line-height: 1 !important;
   }
 
   .canzoniere-page2-header {
     font-family: 'Roboto', sans-serif !important;
-    font-size: 11pt !important;
+    font-size: 9.5pt !important;
     font-weight: 700 !important;
     color: oklch(0 0 0) !important;
     text-transform: uppercase !important;
     border-bottom: 0.5pt solid oklch(0.7 0 0) !important;
-    padding-bottom: 4pt !important;
-    margin: 0 0 8pt 0 !important;
+    padding-bottom: 3pt !important;
+    margin: 0 0 6pt 0 !important;
     width: 100% !important;
     max-width: 100% !important;
     display: flex !important;
@@ -450,34 +706,61 @@
     margin: 0 !important;
     flex: 1 !important;
     min-height: 0 !important;
-    gap: 8mm !important;
+    gap: 7mm !important;
   }
 
-  .canzoniere-column {
-    width: 81mm !important;
-    max-width: 81mm !important;
+  .canzoniere-columns-container.is-single-column {
+    flex-direction: column !important;
+    width: 100% !important;
+    gap: 0 !important;
+  }
+
+  .canzoniere-columns-container.is-centered-vertically {
+    justify-content: center !important;
+  }
+
+  .canzoniere-column-single {
+    width: 100% !important;
+    max-width: 100% !important;
+    border: none !important;
+    padding: 0 !important;
+  }
+
+  .canzoniere-column-left,
+  .canzoniere-column-right {
+    flex: 1 1 0 !important;
+    width: calc(50% - 3.5mm) !important;
+    max-width: calc(50% - 3.5mm) !important;
     box-sizing: border-box !important;
-    overflow: hidden !important;
+    overflow: visible !important;
   }
 
   .canzoniere-column-left {
     border-right: 0.75pt solid oklch(0.7 0 0) !important;
-    padding-right: 4mm !important;
+    padding-right: 3.5mm !important;
   }
 
   .canzoniere-column-right {
-    padding-left: 4mm !important;
+    padding-left: 3.5mm !important;
   }
 
   .canzoniere-block {
-    margin-bottom: 1.5em !important;
+    margin-bottom: 8pt !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .canzoniere-block.is-chorus {
+    border-left: 2.5pt solid oklch(0.2 0 0) !important;
+    padding-left: 3.5mm !important;
+    box-sizing: border-box !important;
   }
 
   .canzoniere-line-item {
     font-family: 'Roboto', system-ui, -apple-system, sans-serif !important;
     font-weight: 400 !important;
     color: oklch(0 0 0) !important;
-    line-height: 1.5 !important;
+    line-height: 1.25 !important;
     position: relative !important;
     white-space: pre-wrap !important;
     word-break: normal !important;
@@ -485,34 +768,56 @@
     margin-bottom: 0 !important;
   }
 
-  .canzoniere-line-item.has-chords {
-    margin-top: 1.5em !important;
+  /* Modello ad Unità Atomiche per la Stampa */
+  .canto-screen-line {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: flex-end !important;
+    margin-top: 0 !important;
+    margin-bottom: 1.5pt !important;
+    line-height: 1 !important;
+  }
+
+  .canto-word {
+    display: inline-flex !important;
+    white-space: nowrap !important;
+    vertical-align: bottom !important;
+    margin-right: 0.28em !important;
+    margin-bottom: 0.08em !important;
+  }
+
+  .canto-unit {
+    display: inline-flex !important;
+    flex-direction: column !important;
+    vertical-align: bottom !important;
+    position: relative !important;
+    white-space: pre !important;
+  }
+
+  .canto-unit-chord {
+    font-family: 'Roboto', sans-serif !important;
+    font-weight: 700 !important;
+    font-size: 0.82em !important;
+    line-height: 1.1 !important;
+    color: oklch(0 0 0) !important;
+    min-height: 1.1em !important;
+    white-space: nowrap !important;
+    padding-right: 0.08em !important;
+  }
+
+  .canto-unit-lyric {
+    font-family: inherit !important;
+    font-size: 1em !important;
+    line-height: 1.25 !important;
+    color: oklch(0 0 0) !important;
+    white-space: pre !important;
   }
 
   .canzoniere-line-item.is-chord-only {
     white-space: pre !important;
   }
 
-  .canzoniere-chord-anchor {
-    display: inline-block !important;
-    width: 0 !important;
-    position: relative !important;
-    vertical-align: baseline !important;
-  }
-
   .canzoniere-chord-badge {
-    position: absolute !important;
-    bottom: 1.35em !important;
-    left: 0 !important;
-    white-space: nowrap !important;
-    font-family: 'Roboto', sans-serif !important;
-    font-weight: 700 !important;
-    color: oklch(0 0 0) !important;
-    line-height: 1.2 !important;
-    pointer-events: none !important;
-  }
-
-  .canzoniere-chord-only-item {
     font-family: 'Roboto', sans-serif !important;
     font-weight: 700 !important;
     color: oklch(0 0 0) !important;
@@ -561,16 +866,195 @@
     color: oklch(0.3 0 0) !important;
   }
 
-  /* --- 5. SEZIONE ODG: Scheda con caselle quadrate stampabili (Preparatoria Fase 7) --- */
-  .print-odg-sheet {
-    break-before: page;
-    page-break-before: always;
+  /* --- 5. SEZIONE ODG: Scheda A4 verticale con stato punti, presenze e scadenze --- */
+  .print-odg-wrapper {
+    display: block !important;
+    width: 100% !important;
+  }
+
+  .print-odg-event-card {
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+    break-after: page !important;
+    page-break-after: always !important;
+    margin-bottom: 24pt !important;
+    padding-bottom: 16pt !important;
+  }
+
+  .print-odg-event-card:last-child {
+    break-after: auto !important;
+    page-break-after: auto !important;
   }
 
   .print-odg-header {
     border-bottom: 1.5pt solid oklch(0 0 0);
     padding-bottom: 6pt;
     margin-bottom: 14pt;
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  .print-odg-badge-tipo {
+    display: inline-block;
+    font-size: 8.5pt;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    padding: 2pt 6pt;
+    border: 1pt solid oklch(0 0 0);
+    border-radius: 3pt;
+    margin-bottom: 6pt;
+  }
+
+  .print-odg-title {
+    font-size: 18pt;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin: 2pt 0 6pt;
+  }
+
+  .print-odg-meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16pt;
+    font-size: 10pt;
+    color: oklch(0.2 0 0);
+    margin-bottom: 6pt;
+  }
+
+  .print-odg-description {
+    font-size: 10pt;
+    line-height: 1.4;
+    margin-bottom: 8pt;
+    color: oklch(0.25 0 0);
+  }
+
+  .print-odg-divider {
+    border: none;
+    border-bottom: 1pt solid oklch(0.5 0 0);
+    margin: 8pt 0 12pt;
+  }
+
+  .print-odg-section {
+    margin-bottom: 16pt;
+  }
+
+  .print-odg-section-title {
+    font-size: 12pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 0.75pt solid oklch(0.4 0 0);
+    padding-bottom: 3pt;
+    margin: 0 0 8pt;
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  .print-odg-punto-item {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    padding: 6pt 0;
+    border-bottom: 0.5pt dashed oklch(0.7 0 0);
+  }
+
+  .print-odg-punto-header {
+    display: flex;
+    align-items: baseline;
+    gap: 8pt;
+  }
+
+  .print-odg-punto-number {
+    font-weight: 700;
+    font-size: 11pt;
+    min-width: 16pt;
+  }
+
+  .print-odg-punto-text {
+    flex: 1;
+    font-size: 11pt;
+    line-height: 1.35;
+  }
+
+  .print-odg-status-badge {
+    font-size: 8pt;
+    font-weight: 700;
+    padding: 2pt 6pt;
+    border-radius: 3pt;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .odg-status-proposto {
+    border: 1pt solid oklch(0.4 0 0);
+  }
+
+  .odg-status-discusso {
+    border: 1pt solid oklch(0.3 0 0);
+    font-style: italic;
+  }
+
+  .odg-status-approvato {
+    border: 1.5pt solid oklch(0 0 0);
+    font-weight: 800;
+  }
+
+  .odg-status-rimandato {
+    border: 1pt dashed oklch(0.3 0 0);
+    text-decoration: underline;
+  }
+
+  .print-odg-punto-sub {
+    font-size: 8.5pt;
+    font-style: italic;
+    color: oklch(0.35 0 0);
+    margin-left: 24pt;
+    margin-top: 2pt;
+  }
+
+  .print-odg-presenze-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16pt;
+    margin-top: 6pt;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .print-odg-presenze-col {
+    border: 0.75pt solid oklch(0.6 0 0);
+    border-radius: 4pt;
+    padding: 6pt;
+  }
+
+  .print-odg-presenze-header {
+    display: block;
+    font-weight: 700;
+    font-size: 9.5pt;
+    margin-bottom: 4pt;
+    text-transform: uppercase;
+  }
+
+  .print-odg-lined-notes {
+    margin-top: 8pt;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .print-note-line {
+    border-bottom: 0.75pt dotted oklch(0.6 0 0);
+    height: 20pt;
+  }
+
+  .print-odg-scadenze-card {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    margin-top: 16pt;
+  }
+
+  .print-odg-scadenza-item {
+    padding: 6pt 0;
+    border-bottom: 0.5pt solid oklch(0.8 0 0);
   }
 
   .print-odg-item {
@@ -598,7 +1082,9 @@
    Stili a Schermo per la Schermata Stampa (#/stampa)
    ============================================================================== */
 @media screen {
-  .stampa-print-container {
+  .stampa-print-container-canzoni,
+  .stampa-print-container-giochibans,
+  .stampa-print-container-odg {
     display: none !important;
   }
 
@@ -666,7 +1152,245 @@
     padding: var(--space-3) var(--space-4);
     border-bottom: 1px solid var(--color-border);
   }
-}
+
+  /* --- Redesign Stampa Canzoniere (Flusso unico a colonna singola) --- */
+  .stampa-workflow-shell {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    width: 100%;
+  }
+
+  .stampa-hero-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    padding: var(--space-4) var(--space-5);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .stampa-sector-section {
+    margin-bottom: var(--space-4);
+  }
+
+  .stampa-sector-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-2) 0;
+    margin-bottom: var(--space-2);
+    border-bottom: 1.5px solid var(--color-border);
+  }
+
+  .stampa-sector-title {
+    font-size: var(--font-size-base);
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: var(--color-text);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin: 0;
+  }
+
+  .stampa-song-row {
+    min-height: 48px;
+    padding: var(--space-2) var(--space-3);
+    margin-bottom: 2px;
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    cursor: pointer;
+    transition: background var(--duration-fast) var(--ease-ios), border-color var(--duration-fast) var(--ease-ios);
+    border: 1px solid transparent;
+    user-select: none;
+  }
+
+  .stampa-song-row:hover {
+    background: var(--color-fill-tertiary);
+  }
+
+  .stampa-song-row.is-selected {
+    background: var(--color-primary-subtle);
+    border-color: var(--color-primary);
+  }
+
+  .stampa-song-checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    cursor: pointer;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .stampa-song-checkbox {
+    width: 22px;
+    height: 22px;
+    min-width: 22px;
+    min-height: 22px;
+    cursor: pointer;
+    flex-shrink: 0;
+    accent-color: var(--color-primary);
+  }
+
+  .stampa-song-info {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .stampa-song-title {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--color-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .stampa-song-meta {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 1px;
+  }
+
+  /* Fisarmonica Opzioni compatto */
+  .stampa-options-accordion {
+    margin-bottom: var(--space-4);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-xs);
+  }
+
+  .stampa-options-summary {
+    padding: var(--space-3) var(--space-4);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+    background: var(--color-surface);
+  }
+
+  .stampa-options-summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .stampa-options-content {
+    padding: var(--space-4);
+    border-top: 1px solid var(--color-border);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    background: var(--color-fill-tertiary);
+  }
+
+  /* Sticky Bottom Action Bar */
+  .stampa-sticky-bottom-bar {
+    position: sticky;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.12);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    padding: var(--space-3) var(--space-4);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--space-3);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    margin: var(--space-6) 0 0 0;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .stampa-sticky-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .stampa-sticky-count {
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    color: var(--color-text);
+  }
+
+  .stampa-sticky-count strong {
+    font-weight: 700;
+    color: var(--color-primary);
+  }
+
+  .stampa-sticky-dot {
+    margin: 0 6px;
+    color: var(--color-text-tertiary);
+  }
+
+  .stampa-sticky-loading {
+    font-size: var(--font-size-2xs);
+    color: var(--color-text-secondary);
+    font-style: italic;
+  }
+
+  .stampa-sticky-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  /* Anteprima A4 Schermo */
+  .stampa-preview-section {
+    margin-top: var(--space-6);
+    padding-top: var(--space-4);
+    border-top: 2px solid var(--color-border);
+  }
+
+  .stampa-a4-preview-scroll {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: var(--space-4) 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-6);
+  }
+
+  .stampa-a4-sheet-card {
+    background: white;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+    border-radius: 4px;
+    border: 1px solid oklch(0.85 0 0);
+    max-width: 100%;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .stampa-page-pill {
+    position: absolute;
+    top: 8px;
+    right: 12px;
+    z-index: 10;
+    background: rgba(0, 0, 0, 0.65);
+    color: white;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+    pointer-events: none;
+  }
 
 /* Contenitore invisibile per la misurazione reale dell'overflow A4 */
 .stampa-measure-host {
@@ -698,7 +1422,7 @@
 .canzoniere-page {
   box-sizing: border-box;
   background: oklch(1 0 0);
-  color: oklch(0.33 0.02 255);
+  color: oklch(0 0 0);
   font-family: 'Roboto', system-ui, -apple-system, sans-serif;
   overflow: hidden;
   display: flex;
@@ -706,7 +1430,7 @@
   width: 210mm;
   max-width: 100%;
   margin: 0 auto;
-  padding: 10mm 20mm 20mm 20mm;
+  padding: 12mm;
 }
 
 .canzoniere-page .canzoniere-header,
@@ -717,45 +1441,66 @@
   margin: 0;
 }
 
+.canzoniere-page .canzoniere-header-top,
+.stampa-measure-host .canzoniere-header-top {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: flex-start;
+  gap: 2pt 6pt;
+  width: 100%;
+  margin-bottom: 2pt;
+}
+
 .canzoniere-page .canzoniere-header-title,
 .stampa-measure-host .canzoniere-header-title {
   font-family: 'Roboto', sans-serif;
-  font-size: 22pt;
+  font-size: 14pt;
   font-weight: 700;
   text-transform: uppercase;
   color: oklch(0 0 0);
-  margin-top: 24pt;
-  margin-bottom: 6pt;
-  line-height: 1.0;
+  margin: 0;
+  line-height: 1.15;
   letter-spacing: -0.01em;
 }
 
 .canzoniere-page .canzoniere-header-author,
 .stampa-measure-host .canzoniere-header-author {
   font-family: 'Roboto', sans-serif;
-  font-size: 11pt;
+  font-size: 9.5pt;
   font-style: italic;
-  color: oklch(0.4 0 0);
-  margin-bottom: 4pt;
+  color: oklch(0.3 0 0);
+  margin: 0;
   line-height: 1.2;
+  white-space: nowrap;
 }
 
 .canzoniere-page .canzoniere-header-params,
 .stampa-measure-host .canzoniere-header-params {
   font-family: 'Roboto', sans-serif;
-  font-size: 11pt;
-  color: oklch(0.35 0 0);
-  margin-bottom: 6pt;
-  line-height: 1.25;
+  font-size: 8.5pt;
+  color: oklch(0.25 0 0);
+  margin-top: 1pt;
+  margin-bottom: 2pt;
+  line-height: 1.2;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 16pt;
+  gap: 10pt;
+}
+
+.canzoniere-page .canzoniere-param-item,
+.stampa-measure-host .canzoniere-param-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 3pt;
 }
 
 .canzoniere-page .canzoniere-arrow-glyph,
 .stampa-measure-host .canzoniere-arrow-glyph {
   font-family: 'Nova Mono', monospace;
-  font-size: 17pt;
+  font-size: 13pt;
   font-weight: 700;
   color: oklch(0 0 0);
   line-height: 1;
@@ -765,22 +1510,159 @@
 .canzoniere-page .canzoniere-header-divider,
 .stampa-measure-host .canzoniere-header-divider {
   border: none;
-  border-bottom: 1pt solid oklch(0.7 0 0);
-  margin-top: 4pt;
-  margin-bottom: 10pt;
+  border-bottom: 0.5pt solid oklch(0.7 0 0);
+  margin-top: 2pt;
+  margin-bottom: 5pt;
   width: 100%;
+}
+
+.canzoniere-page .canzoniere-page-footer,
+.stampa-measure-host .canzoniere-page-footer {
+  width: 100%;
+  margin-top: auto;
+  padding-top: 4pt;
+  text-align: center;
+}
+
+.canzoniere-page .canzoniere-page-number,
+.stampa-measure-host .canzoniere-page-number,
+.canzoniere-index-footer .canzoniere-page-number {
+  font-family: 'Roboto', sans-serif;
+  font-size: 8.5pt;
+  font-weight: 600;
+  color: oklch(0.3 0 0);
+  line-height: 1;
+}
+
+.canzoniere-page .canzoniere-column .canzoniere-block:last-child {
+  margin-bottom: 0;
+}
+
+/* Anteprima a schermo per concatenazione canti a flusso continuo */
+.canzoniere-page .canzoniere-column-header-block {
+  display: block;
+  width: 100%;
+  margin-bottom: 3pt;
+}
+
+.canzoniere-page .canzoniere-song-divider {
+  border: none;
+  border-top: 1.5pt solid oklch(0.2 0 0);
+  margin: 16pt 0 8pt 0;
+  width: 100%;
+  box-sizing: border-box;
+  clear: both;
+}
+
+.canzoniere-page .canzoniere-column-header {
+  display: block;
+  width: 100%;
+  margin: 0;
+}
+
+.canzoniere-page .canzoniere-column-header .canzoniere-header-title {
+  font-size: 15pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: oklch(0 0 0);
+  margin: 0;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  word-break: break-word;
+}
+
+.canzoniere-page .canzoniere-column-header .canzoniere-header-author {
+  font-size: 9.5pt;
+  font-style: italic;
+  color: oklch(0.3 0 0);
+  margin: 0;
+  line-height: 1.2;
+}
+
+.canzoniere-page .canzoniere-column-header .canzoniere-header-params {
+  font-size: 8.5pt;
+  color: oklch(0.25 0 0);
+  margin-top: 1pt;
+  margin-bottom: 2pt;
+  line-height: 1.25;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3pt 8pt;
+}
+
+.canzoniere-page .canzoniere-running-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  width: 100%;
+  font-family: 'Roboto', sans-serif;
+  font-size: 8.5pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: oklch(0.35 0 0);
+  border-bottom: 0.5pt solid oklch(0.75 0 0);
+  padding-bottom: 2pt;
+  margin-bottom: 4pt;
+}
+
+.canzoniere-page .canzoniere-running-title {
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.print-index-subtitle {
+  font-size: 10pt;
+  font-weight: 500;
+  text-transform: lowercase;
+  color: oklch(0.3 0 0);
+  margin-left: 6pt;
+}
+
+.print-index-dots {
+  flex: 1;
+  border-bottom: 0.75pt dotted oklch(0.65 0 0);
+  margin: 0 6pt 2pt;
+  min-width: 12pt;
+}
+
+.print-index-pages-badge {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4pt;
+  flex-shrink: 0;
+}
+
+.print-index-cross-page {
+  font-size: 7.5pt;
+  font-weight: 500;
+  color: oklch(0.4 0 0);
+}
+
+.print-index-main-page {
+  font-weight: 800;
+  font-size: 8.5pt;
+  min-width: 16pt;
+  text-align: right;
+}
+
+.canzoniere-index-footer {
+  margin-top: auto;
+  padding-top: 4pt;
+  text-align: center;
 }
 
 .canzoniere-page .canzoniere-page2-header,
 .stampa-measure-host .canzoniere-page2-header {
   font-family: 'Roboto', sans-serif;
-  font-size: 11pt;
+  font-size: 9.5pt;
   font-weight: 700;
   color: oklch(0 0 0);
   text-transform: uppercase;
   border-bottom: 0.5pt solid oklch(0.7 0 0);
-  padding-bottom: 4pt;
-  margin: 0 0 8pt 0;
+  padding-bottom: 3pt;
+  margin: 0 0 6pt 0;
   width: 100%;
   max-width: 100%;
   display: flex;
@@ -797,41 +1679,86 @@
   margin: 0;
   flex: 1;
   min-height: 0;
-  gap: 8mm;
+  gap: 7mm;
+}
+
+.canzoniere-page .canzoniere-columns-container.is-single-column,
+.stampa-measure-host .canzoniere-columns-container.is-single-column {
+  flex-direction: column;
+  width: 100%;
+  gap: 0;
+}
+
+.canzoniere-page .canzoniere-columns-container.is-centered-vertically,
+.stampa-measure-host .canzoniere-columns-container.is-centered-vertically {
+  justify-content: center;
 }
 
 .canzoniere-page .canzoniere-column,
 .stampa-measure-host .canzoniere-column {
-  width: 81mm;
-  max-width: 81mm;
+  width: calc(50% - 3.5mm);
+  max-width: calc(50% - 3.5mm);
   box-sizing: border-box;
-  overflow: hidden;
+  overflow: visible;
+}
+
+.canzoniere-page .canzoniere-column-single,
+.stampa-measure-host .canzoniere-column-single {
+  width: 100%;
+  max-width: 100%;
+  border: none;
+  padding: 0;
 }
 
 .canzoniere-page .canzoniere-column-left,
 .stampa-measure-host .canzoniere-column-left {
   border-right: 0.75pt solid oklch(0.7 0 0);
-  padding-right: 4mm;
+  padding-right: 3.5mm;
 }
 
 .canzoniere-page .canzoniere-column-right,
 .stampa-measure-host .canzoniere-column-right {
-  padding-left: 4mm;
+  padding-left: 3.5mm;
 }
 
 .canzoniere-page.stampa-preview-paper {
   width: 210mm;
   min-width: 210mm;
   max-width: 210mm;
+  height: 297mm;
+  min-height: 297mm;
+  max-height: 297mm;
   box-sizing: border-box;
-  padding: 10mm 20mm 20mm 20mm;
+  padding: 12mm;
   background: oklch(1 0 0);
   color: oklch(0 0 0);
 }
 
+.print-index-title,
+.print-index-sector-title,
+.print-index-row-title {
+  letter-spacing: normal !important;
+  word-spacing: normal !important;
+}
+
+/* Attenuazione/occultamento mappa topografica nella vista Stampa */
+body.in-stampa-view .topo-contour-wrapper,
+body:has(.stampa-page) .topo-contour-wrapper,
+body:has(.stampa-view) .topo-contour-wrapper,
+.stampa-page .topo-contour-wrapper,
+.stampa-view .topo-contour-wrapper {
+  opacity: 0.02 !important;
+}
+
 .canzoniere-page .canzoniere-block,
 .stampa-measure-host .canzoniere-block {
-  margin-bottom: 1.5em;
+  margin-bottom: 8pt;
+}
+
+.canzoniere-page .canzoniere-block.is-chorus {
+  border-left: 2.5pt solid oklch(0.2 0 0);
+  padding-left: 3.5mm;
+  box-sizing: border-box;
 }
 
 .canzoniere-page .canzoniere-line-item,
@@ -839,7 +1766,7 @@
   font-family: 'Roboto', system-ui, -apple-system, sans-serif;
   font-weight: 400;
   color: oklch(0 0 0);
-  line-height: 1.5;
+  line-height: 1.25;
   position: relative;
   white-space: pre-wrap;
   word-break: normal;
@@ -849,7 +1776,57 @@
 
 .canzoniere-page .canzoniere-line-item.has-chords,
 .stampa-measure-host .canzoniere-line-item.has-chords {
-  margin-top: 1.5em;
+  margin-top: 0;
+  line-height: normal;
+}
+
+.canzoniere-page .canto-screen-line,
+.stampa-measure-host .canto-screen-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  margin-top: 0;
+  margin-bottom: 1.5pt;
+  line-height: 1;
+}
+
+.canzoniere-page .canto-word,
+.stampa-measure-host .canto-word {
+  display: inline-flex;
+  white-space: nowrap;
+  vertical-align: bottom;
+  margin-right: 0.28em;
+  margin-bottom: 0.08em;
+}
+
+.canzoniere-page .canto-unit,
+.stampa-measure-host .canto-unit {
+  display: inline-flex;
+  flex-direction: column;
+  vertical-align: bottom;
+  position: relative;
+  white-space: pre;
+}
+
+.canzoniere-page .canto-unit-chord,
+.stampa-measure-host .canto-unit-chord {
+  font-family: 'Roboto', sans-serif;
+  font-weight: 700;
+  font-size: 0.82em;
+  line-height: 1.1;
+  color: oklch(0 0 0);
+  min-height: 1.1em;
+  white-space: nowrap;
+  padding-right: 0.08em;
+}
+
+.canzoniere-page .canto-unit-lyric,
+.stampa-measure-host .canto-unit-lyric {
+  font-family: inherit;
+  font-size: 1em;
+  line-height: 1.25;
+  color: oklch(0 0 0);
+  white-space: pre;
 }
 
 .canzoniere-page .canzoniere-line-item.is-chord-only,
@@ -857,24 +1834,12 @@
   white-space: pre;
 }
 
-.canzoniere-page .canzoniere-chord-anchor,
-.stampa-measure-host .canzoniere-chord-anchor {
-  display: inline-block;
-  width: 0;
-  position: relative;
-  vertical-align: baseline;
-}
-
 .canzoniere-page .canzoniere-chord-badge,
 .stampa-measure-host .canzoniere-chord-badge {
-  position: absolute;
-  bottom: 1.35em;
-  left: 0;
-  white-space: nowrap;
   font-family: 'Roboto', sans-serif;
   font-weight: 700;
   color: oklch(0 0 0);
-  line-height: 1.2;
+  line-height: 1.1;
 }
 
 .canzoniere-page .canzoniere-chord-only-item,
@@ -887,8 +1852,8 @@
 
 .canzoniere-page .canzoniere-line-empty,
 .stampa-measure-host .canzoniere-line-empty {
-  line-height: 1.5;
-  height: 1.5em;
+  line-height: 1.25;
+  height: 1.25em;
 }
 
 .canzoniere-page .canzoniere-rit-label,
@@ -896,10 +1861,12 @@
   font-family: 'Roboto', sans-serif;
   font-weight: 700;
   color: oklch(0 0 0);
-  line-height: 1.5;
+  line-height: 1.25;
   margin-top: 0;
   margin-bottom: 0;
 }
+}
+
 
 
 

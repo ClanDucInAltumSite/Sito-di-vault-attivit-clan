@@ -82,11 +82,15 @@ export function CantiView() {
     const dvIdx = enriched.findIndex((c) => c.id === DANZA_LA_VITA_PARSED.id);
     if (dvIdx >= 0) {
       const existingDv = enriched[dvIdx];
-      if (existingDv && !existingDv.testo_chordpro.includes('Cammina sulle [Fa]orme')) {
+      if (
+        existingDv &&
+        (!existingDv.testo_chordpro.includes('Cammina sulle [Fa]orme') ||
+          existingDv.testo_chordpro.includes('cuor. Danza assieme a no----------------oi!'))
+      ) {
         enriched[dvIdx] = {
           ...existingDv,
           ...DANZA_LA_VITA_PARSED,
-          updated_at: existingDv.updated_at,
+          updated_at: new Date().toISOString(),
           created_at: existingDv.created_at,
           deleted_at: null,
         } as Canto;

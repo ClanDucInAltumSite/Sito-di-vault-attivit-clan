@@ -154,9 +154,9 @@ RIT.
 
       const result = layoutCanzoniereSong(syntheticShortSong, CANZONIERE_CONFIG);
       expect(result.pages).toHaveLength(1);
-      // Il font deve essere scalato oltre gli 11 pt base fino a 12.5 o 13 pt per riempire il foglio
+      // Il font deve essere scalato oltre gli 11 pt base fino a riempire il foglio (fino a maxSizePt: 24 pt)
       expect(result.fontSizePt).toBeGreaterThan(11);
-      expect(result.fontSizePt).toBeLessThanOrEqual(13);
+      expect(result.fontSizePt).toBeLessThanOrEqual(24);
     });
 
     it('impostando maxSizePt = baseSizePt (11 pt) lo scaling è disattivato', () => {

@@ -277,3 +277,90 @@ export function reconstructWithActiveChanges(
 
   return result;
 }
+
+/**
+ * Unisce le righe di continuazione (riga che inizia in minuscolo, o che chiude una frase interrotta,
+ * o che finisce una parentesi rimasta aperta) PRIMA del layout.
+ * Non tocca i versi che sono davvero righe separate (iniziano con maiuscola o seguono una riga con punteggiatura forte).
+ */
+export function joinContinuationLines(chordproText: string): string {
+  if (!chordproText) return '';
+  const lines = chordproText.split(/\r?\n/);
+  const result: string[] = [];
+
+  const stripChords = (str: string) => str.replace(/\[[^\]]*\]/g, '').trim();
+
+  let i = 0;
+  while (i < lines.length) {
+    let currentLine = lines[i]!;
+    let currentTrimmed = currentLine.trim();
+
+    // Se la riga è vuota, direttiva o etichetta, mantienila e passa avanti
+    if (!currentTrimmed || currentTrimmed.startsWith('{') || /^RIT[.:]?$/i.test(currentTrimmed)) {
+      result.push(currentLine);
+      i++;
+      continue;
+    }
+
+    // Prova a unire righe di continuazione successive
+    while (i + 1 < lines.length) {
+      const nextLine = lines[i + 1]!;
+      const nextTrimmed = nextLine.trim();
+
+      // Non unire se la riga successiva è vuota, direttiva o etichetta
+      if (!nextTrimmed || nextTrimmed.startsWith('{') || /^RIT[.:]?$/i.test(nextTrimmed)) {
+        break;
+      }
+
+      const lyrCur = stripChords(currentLine);
+      const lyrNext = stripChords(nextLine);
+
+      if (!lyrCur || !lyrNext) {
+        break;
+      }
+
+      // 1. Parentesi aperte non ancora chiuse in lyrCur
+      const openParenCount = (lyrCur.match(/\(/g) || []).length;
+      const closeParenCount = (lyrCur.match(/\)/g) || []).length;
+      const hasUnclosedParen = openParenCount > closeParenCount;
+
+      // 2. Controllo punteggiatura forte finale di lyrCur: . ! ? : ; ,
+      const endsWithStrongPunct = /[.!?:\;,]$/.test(lyrCur);
+
+      // 3. Parole connettive italiane o modificatori che indicano chiaramente frase interrotta
+      const connectingEndWords = /\b(?:di|del|della|dei|delle|degli|a|al|alla|ai|alle|agli|da|dal|dalla|dai|dalle|dagli|in|nel|nella|nei|nelle|negli|con|col|colla|coi|colle|su|sul|sulla|sui|sulle|sugli|per|tra|fra|e|ed|o|ma|se|che|un|uno|una|il|lo|la|i|gli|le|nostri|vostri|miei|tuoi|suoi)\s*$/i.test(lyrCur);
+
+      // 4. Inizio o caratteristiche della riga successiva
+      const nextStartsLowercase = /^[a-zà-ÿ]/.test(lyrNext);
+      const nextClosesParen = hasUnclosedParen && lyrNext.includes(')');
+      const nextIsShortEnding = /^(?:me|cuor|noi|te)[.!?]?$/i.test(lyrNext);
+      const nextStartsConnecting = /^(?:verso|per|di|a|da|in|con|su|del|al|dal|nel|col|sul)\b/i.test(lyrNext);
+
+      // Criteri per considerare nextLine come riga di continuazione:
+      const shouldJoin =
+        nextClosesParen ||
+        hasUnclosedParen ||
+        lyrCur.endsWith('-') ||
+        ((lyrCur.endsWith('…') || lyrCur.endsWith('...')) && (nextStartsLowercase || nextIsShortEnding || nextStartsConnecting)) ||
+        (connectingEndWords && !endsWithStrongPunct && (nextStartsLowercase || nextIsShortEnding || nextStartsConnecting)) ||
+        (nextIsShortEnding && !endsWithStrongPunct);
+
+      if (shouldJoin) {
+        if (currentLine.trimEnd().endsWith('-')) {
+          currentLine = currentLine.trimEnd().slice(0, -1) + nextLine.trimStart();
+        } else {
+          currentLine = currentLine.trimEnd() + ' ' + nextLine.trimStart();
+        }
+        i++; // Assorbi nextLine
+      } else {
+        break;
+      }
+    }
+
+    result.push(currentLine);
+    i++;
+  }
+
+  return result.join('\n');
+}
+
