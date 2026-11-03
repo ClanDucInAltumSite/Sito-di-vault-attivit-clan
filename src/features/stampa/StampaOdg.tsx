@@ -747,7 +747,7 @@ export function StampaOdg() {
       </div>
 
       {/* 3. Contenitore di Stampa A4: invisibile a schermo, attivo solo per la stampa di sistema / PDF */}
-      <div id="stampa-odg-root" className="stampa-print-container-odg">
+      <div id="stampa-odg-root" className="stampa-print-container stampa-print-container-odg">
         {dataset.totalSelected > 0 && (
           <div className="print-odg-wrapper">
             {/* 1. SEZIONE ORDINI DEL GIORNO SELEZIONATI */}

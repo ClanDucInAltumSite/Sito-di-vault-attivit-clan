@@ -391,7 +391,7 @@ export function StampaGiochiBans() {
       </div>
 
       {/* Contenitore di Stampa A4: attivo per la stampa di sistema / PDF */}
-      <div id="stampa-giochibans-root" className="stampa-print-container-giochibans">
+      <div id="stampa-giochibans-root" className="stampa-print-container stampa-print-container-giochibans">
         {totalSelected > 0 && (
           <div className="print-continuous">
             {printableData.giochi.length > 0 && (

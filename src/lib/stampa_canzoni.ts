@@ -41,7 +41,21 @@ export function loadStampaCanzoniConfig(): StampaCanzoniConfig {
   }
   try {
     const raw = sessionStorage.getItem(SESSION_STORAGE_CANZONI_KEY);
-    if (!raw) return { ...DEFAULT_STAMPA_CANZONI_CONFIG };
+    if (!raw) {
+      // Fallback di retrocompatibilità se impostato tramite la chiave storica 'stampa_selection'
+      const oldRaw = sessionStorage.getItem('stampa_selection');
+      if (oldRaw) {
+        const oldParsed = JSON.parse(oldRaw);
+        return {
+          selectedCantiIds: Array.isArray(oldParsed.selectedCantiIds) ? oldParsed.selectedCantiIds : [],
+          mode: 'suona',
+          layoutMode: 'riempi_pagina',
+          includeIndex: false,
+          includeCover: false,
+        };
+      }
+      return { ...DEFAULT_STAMPA_CANZONI_CONFIG };
+    }
     const parsed = JSON.parse(raw);
     return {
       selectedCantiIds: Array.isArray(parsed.selectedCantiIds) ? parsed.selectedCantiIds : [],

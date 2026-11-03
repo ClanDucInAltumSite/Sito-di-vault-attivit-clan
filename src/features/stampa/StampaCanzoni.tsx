@@ -418,7 +418,7 @@ export function StampaCanzoni() {
       </div>
 
       {/* Contenitore di Stampa A4: invisibile a schermo, attivo solo per la stampa di sistema / PDF */}
-      <div id="stampa-canzoni-root" className="stampa-print-container-canzoni">
+      <div id="stampa-canzoni-root" className="stampa-print-container stampa-print-container-canzoni">
         {selectedCount > 0 && (
           <div className="canzoniere-book-container">
             {/* INDICE PER SETTORI A INIZIO CANZONIERE */}
@@ -486,7 +486,7 @@ export function StampaCanzoni() {
             {dataset.pages && dataset.pages.length > 0 ? (
               <div className="canzoniere-book-container">
                 {dataset.pages.map((page, pIdx) => (
-                  <div key={`canzoniere-page-${pIdx}`} className="stampa-a4-sheet-card">
+                  <div key={`canzoniere-page-${pIdx}`} className="stampa-a4-sheet-card canzoniere-page">
                     <CanzonierePageRenderer
                       page={page}
                       isScreenPreview={false}

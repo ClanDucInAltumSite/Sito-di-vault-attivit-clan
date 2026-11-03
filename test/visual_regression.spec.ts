@@ -240,7 +240,7 @@ test.describe('FASE 12D — Regressione Visiva e Baseline Screenshot', () => {
     await page.evaluate((song) => {
       const DB_NAME = 'vault_scout_db';
       return new Promise<void>((resolve, reject) => {
-        const req = indexedDB.open(DB_NAME, 1);
+        const req = indexedDB.open(DB_NAME);
         req.onsuccess = () => {
           const db = req.result;
           if (!db.objectStoreNames.contains('canti')) return resolve();
@@ -263,6 +263,13 @@ test.describe('FASE 12D — Regressione Visiva e Baseline Screenshot', () => {
         includeCoverAndIndex: false,
       };
       sessionStorage.setItem('stampa_selection', JSON.stringify(config));
+      sessionStorage.setItem('stampa_canzoni', JSON.stringify({
+        selectedCantiIds: [song.id, 'canto-danza-la-vita'],
+        mode: 'suona',
+        layoutMode: 'riempi_pagina',
+        includeIndex: false,
+        includeCover: false,
+      }));
     }, SYNTHETIC_SONG);
 
     // Naviga a stampa
@@ -270,13 +277,13 @@ test.describe('FASE 12D — Regressione Visiva e Baseline Screenshot', () => {
     await expect(page.locator('.stampa-print-container')).toBeAttached({ timeout: 15000 });
 
     if (testInfo.project.name === 'chromium') {
-      await expect(page.locator('.canzoniere-page').first()).toBeAttached({ timeout: 15000 });
+      await expect(page.locator('.canzoniere-page, .stampa-a4-sheet-card').first()).toBeAttached({ timeout: 15000 });
       await page.emulateMedia({ media: 'print' });
-      await expect(page.locator('.canzoniere-page').first()).toBeVisible({ timeout: 10000 });
+      await expect(page.locator('.canzoniere-page, .stampa-a4-sheet-card').first()).toBeVisible({ timeout: 10000 });
       await page.waitForTimeout(300);
 
       if (shouldRunPixelDiff(testInfo, 'print_preview_page.png')) {
-        await expect(page.locator('.canzoniere-page').first()).toHaveScreenshot('print_preview_page.png', { maxDiffPixelRatio: 0.05 });
+        await expect(page.locator('.canzoniere-page, .stampa-a4-sheet-card').first()).toHaveScreenshot('print_preview_page.png', { maxDiffPixelRatio: 0.05 });
       }
     } else {
       // Su WebKit e mobile, verifica funzionale dell'anteprima web
