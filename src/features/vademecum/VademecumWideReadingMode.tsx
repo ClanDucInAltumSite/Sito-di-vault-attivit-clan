@@ -3,7 +3,7 @@
 // per la Carta di Clan, Regole e Canovacci con supporto PDF e modifica rapida admin
 
 import { useState, useEffect } from 'preact/hooks';
-import { VademecumItem } from '../../lib/vademecum';
+import { VademecumItem, subscribeVademecum, getVademecumItem } from '../../lib/vademecum';
 import { useAdmin } from '../../lib/auth';
 import { Icon } from '../../ui/Icon';
 import { QuadernoDocRenderer } from '../quaderno/QuadernoDocRenderer';
@@ -34,11 +34,25 @@ export function VademecumWideReadingMode({
     }
   }, [item]);
 
+  // Aggiornamento reattivo da IndexedDB in tempo reale
+  useEffect(() => {
+    if (!currentItem?.id) return;
+    const unsubscribe = subscribeVademecum(async () => {
+      const fresh = await getVademecumItem(currentItem.id);
+      if (fresh) {
+        setCurrentItem(fresh);
+      }
+    });
+    return unsubscribe;
+  }, [currentItem?.id]);
+
   // Gestione tasto indietro browser / popstate
   useEffect(() => {
     if (!isOpen || !currentItem) return;
 
-    if (!window.history.state?.vademecumReadingOpen) {
+    if (window.history.state?.vademecumEditorOpen) {
+      window.history.replaceState({ vademecumReadingOpen: true, docId: currentItem.id }, '');
+    } else if (!window.history.state?.vademecumReadingOpen) {
       window.history.pushState({ vademecumReadingOpen: true, docId: currentItem.id }, '');
     }
 
@@ -326,7 +340,7 @@ export function VademecumWideReadingMode({
       </div>
 
       {/* Editor per l'Admin */}
-      {isEditing && (
+      {isEditing && currentItem && (
         <VademecumEditSheet
           item={currentItem}
           section={currentItem.section}

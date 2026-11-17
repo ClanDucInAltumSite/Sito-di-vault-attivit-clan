@@ -41,7 +41,7 @@ function getVademecumDb(): Promise<IDBPDatabase> {
 }
 
 // Dati predefiniti curati e realistici per Clan Scout
-const DEFAULT_VADEMECUM_ITEMS: VademecumItem[] = [
+export const DEFAULT_VADEMECUM_ITEMS: VademecumItem[] = [
   {
     id: 'carta_clan',
     section: 'carta_clan',
