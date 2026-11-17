@@ -56,13 +56,17 @@ export default defineConfig({
           '**/pdf.worker*.*',
           '**/pdf-*.js',
           '**/pdfjs*.*',
+          '**/*tesseract*.*',
           '**/tesseract/**',
+          '**/*jszip*.*',
           '**/og-image.*',
           '**/*.woff',
           '**/logo-*.png',
           '**/assets/favicon.png',
           '**/assets/logo-*',
+          '**/sw-notifications.js',
         ],
+        importScripts: ['sw-notifications.js'],
         cleanupOutdatedCaches: true,
         navigateFallback: `${basePath}index.html`,
         navigateFallbackAllowlist: [/^(?!\/__).*/],
@@ -124,6 +128,12 @@ export default defineConfig({
           if (id.includes('node_modules')) {
             if (id.includes('pdfjs-dist')) {
               return 'pdfjs-dist';
+            }
+            if (id.includes('tesseract')) {
+              return 'vendor-tesseract';
+            }
+            if (id.includes('jszip')) {
+              return 'vendor-jszip';
             }
             if (id.includes('@supabase')) {
               return 'vendor-supabase';

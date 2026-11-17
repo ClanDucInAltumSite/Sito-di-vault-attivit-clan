@@ -43,10 +43,18 @@ import {
   subscribeProposte,
   PropostaItem,
 } from '../../lib/proposte';
-import { RifiutaPropostaModal } from '../admin/RifiutaPropostaModal';
-import { stripQuadernoSnippet } from '../quaderno/quaderno_dom';
 import { HEADER_PHOTOS } from '../../lib/photos';
 import { Toast } from '../../ui/Toast';
+
+function stripMarkdownPreview(md: string): string {
+  return md
+    .replace(/!\[.*?\]\(.*?\)/g, '')
+    .replace(/\[(.*?)\]\(.*?\)/g, '$1')
+    .replace(/==([a-z]+:)?(.*?)==/g, '$2')
+    .replace(/[#*`_~>-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
 const VademecumWideReadingMode = lazy(() =>
   import('../vademecum/VademecumWideReadingMode').then((m) => ({ default: m.VademecumWideReadingMode }))
@@ -56,6 +64,10 @@ const VademecumEditSheet = lazy(() =>
 );
 const CartaFotoEditModal = lazy(() =>
   import('../vademecum/CartaFotoEditModal').then((m) => ({ default: m.CartaFotoEditModal }))
+);
+
+const RifiutaPropostaModal = lazy(() =>
+  import('../admin/RifiutaPropostaModal').then((m) => ({ default: m.RifiutaPropostaModal }))
 );
 const DeleteConfirmModal = lazy(() =>
   import('../../ui/DeleteConfirmModal').then((m) => ({ default: m.DeleteConfirmModal }))
@@ -163,7 +175,7 @@ export function HomeView() {
   const canovacciList = vademecumItems.filter((d) => d.section === 'canovaccio');
 
   const regoleSnippet = useMemo(() => {
-    const clean = stripQuadernoSnippet(regoleDoc?.contenuto || '');
+    const clean = stripMarkdownPreview(regoleDoc?.contenuto || '');
     if (!clean) return '';
     return clean.slice(0, 160) + (clean.length > 160 ? '…' : '');
   }, [regoleDoc?.contenuto]);
@@ -566,19 +578,34 @@ export function HomeView() {
               <Badge variant="azzurro" size="sm">Documento Fondamentale</Badge>
               {cartaDoc?.pdfNome && <Badge variant="nuovo" size="sm">PDF Disponibile</Badge>}
               {isAdmin && (
-                <button
-                  type="button"
-                  className="carta-hero-admin-btn"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setIsCartaPhotoOpen(true);
-                  }}
-                  title="Modifica foto della Carta di Clan"
-                  aria-label="Modifica foto della Carta di Clan"
-                >
-                  <Icon name="camera" size={13} />
-                  <span>Modifica foto</span>
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <button
+                    type="button"
+                    className="carta-hero-admin-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleOpenEdit(cartaDoc, 'carta_clan');
+                    }}
+                    title="Modifica Carta di Clan"
+                    aria-label="Modifica Carta di Clan"
+                  >
+                    <Icon name="edit" size={13} />
+                    <span>Modifica</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="carta-hero-admin-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsCartaPhotoOpen(true);
+                    }}
+                    title="Modifica foto della Carta di Clan"
+                    aria-label="Modifica foto della Carta di Clan"
+                  >
+                    <Icon name="camera" size={13} />
+                    <span>Foto</span>
+                  </button>
+                </div>
               )}
             </div>
             <h3 className="carta-hero-title">{cartaDoc?.titolo || 'Carta di Clan'}</h3>

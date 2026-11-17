@@ -2,7 +2,6 @@ import { useState, useEffect } from 'preact/hooks';
 import { lazy, Suspense } from 'preact/compat';
 import { useRoute } from './router';
 import { Shell } from './Shell';
-import { HomeView } from '../features/home/HomeView';
 import {
   initSyncEngine,
   subscribeSyncState,
@@ -11,6 +10,7 @@ import {
   getSyncState,
 } from '../lib/sync';
 
+const HomeView = lazy(() => import('../features/home/HomeView').then((m) => ({ default: m.HomeView })));
 const GiochiView = lazy(() => import('../features/giochi/GiochiView').then((m) => ({ default: m.GiochiView })));
 const BansView = lazy(() => import('../features/bans/BansView').then((m) => ({ default: m.BansView })));
 const CantiView = lazy(() => import('../features/canti/CantiView').then((m) => ({ default: m.CantiView })));
