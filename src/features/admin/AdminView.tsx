@@ -21,8 +21,8 @@ import { getDetailedCounts } from '../../lib/db';
 import { getStorageUsageInfo, findOrphanStorageFiles, purgeOrphanStorageFiles, OrphanFileInfo } from '../../lib/attachments';
 import { downloadAllAttachmentsForOffline, getOfflineAttachmentStats } from '../../lib/storage-cache';
 import { supabase } from '../../lib/supabase';
+import { getProposteAdmin, getBlockedIps, subscribeProposte } from '../../lib/proposte';
 import { DEFAULT_PARSED_SONGS } from '../../data/parsed_songs';
-import { getProposteAdmin, getBlockedIps } from '../../lib/proposte';
 import { AdminLoginModal } from './AdminLoginModal';
 import { TrashSheet } from './TrashSheet';
 import { ProposteReviewSheet } from './ProposteReviewSheet';
@@ -97,6 +97,14 @@ export function AdminView() {
 
   useEffect(() => {
     loadData();
+
+    const unsubscribe = subscribeProposte(() => {
+      loadData();
+    });
+
+    return () => {
+      unsubscribe();
+    };
   }, [isAdmin]);
 
   const handleScanOrphans = async () => {
@@ -329,6 +337,44 @@ export function AdminView() {
         </GroupedList>
       ) : (
         <>
+          {/* Banner Avviso Modifiche in Attesa di Approvazione */}
+          {proposteCount > 0 && (
+            <div
+              style={{
+                margin: '0 0 var(--space-4) 0',
+                padding: '14px 16px',
+                borderRadius: '14px',
+                backgroundColor: 'var(--color-bans-tenue, #FFF8E1)',
+                border: '1px solid var(--color-bans, #FF9800)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '12px',
+                boxShadow: 'var(--shadow-rest)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Icon name="warning" size={24} style={{ color: 'var(--color-bans-badge-text, #E65100)', flexShrink: 0 }} />
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '0.92rem', color: 'var(--color-ink)' }}>
+                    {proposteCount === 1 ? '1 proposta in attesa di approvazione' : `${proposteCount} proposte in attesa di approvazione`}
+                  </div>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
+                    I membri della comunità hanno proposto nuovi contenuti. Revisiona e approva per inserirli nel Vault.
+                  </div>
+                </div>
+              </div>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => setIsProposteOpen(true)}
+                style={{ flexShrink: 0 }}
+              >
+                Revisiona
+              </Button>
+            </div>
+          )}
+
           {/* Stato Sessione Admin */}
           <GroupedList header="STATO SESSIONE">
             <GroupedRow

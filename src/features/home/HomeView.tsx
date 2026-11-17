@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useMemo } from 'preact/hooks';
 import { I18N } from '../../lib/i18n';
 import { navigate } from '../../app/router';
 import { GroupedList } from '../../ui/GroupedList';
@@ -34,6 +34,7 @@ import {
   deleteVademecumItem,
   VademecumItem,
   VademecumDocType,
+  DEFAULT_VADEMECUM_ITEMS,
 } from '../../lib/vademecum';
 import {
   getPropostePerVisualizzazione,
@@ -43,14 +44,18 @@ import {
   PropostaItem,
 } from '../../lib/proposte';
 import { RifiutaPropostaModal } from '../admin/RifiutaPropostaModal';
-import { QuadernoDocRenderer } from '../quaderno/QuadernoDocRenderer';
+import { stripQuadernoSnippet } from '../quaderno/quaderno_dom';
 import { HEADER_PHOTOS } from '../../lib/photos';
+import { Toast } from '../../ui/Toast';
 
 const VademecumWideReadingMode = lazy(() =>
   import('../vademecum/VademecumWideReadingMode').then((m) => ({ default: m.VademecumWideReadingMode }))
 );
 const VademecumEditSheet = lazy(() =>
   import('../vademecum/VademecumEditSheet').then((m) => ({ default: m.VademecumEditSheet }))
+);
+const CartaFotoEditModal = lazy(() =>
+  import('../vademecum/CartaFotoEditModal').then((m) => ({ default: m.CartaFotoEditModal }))
 );
 const DeleteConfirmModal = lazy(() =>
   import('../../ui/DeleteConfirmModal').then((m) => ({ default: m.DeleteConfirmModal }))
@@ -75,6 +80,8 @@ export function HomeView() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [deletingItem, setDeletingItem] = useState<VademecumItem | null>(null);
+  const [isCartaPhotoOpen, setIsCartaPhotoOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const loadData = async () => {
@@ -141,9 +148,25 @@ export function HomeView() {
     };
   }, [isAdmin]);
 
-  const cartaDoc = vademecumItems.find((d) => d.section === 'carta_clan');
-  const regoleDoc = vademecumItems.find((d) => d.section === 'regole_clan');
+  useEffect(() => {
+    if (!toastMessage) return;
+    const t = setTimeout(() => setToastMessage(null), 3500);
+    return () => clearTimeout(t);
+  }, [toastMessage]);
+
+  const cartaDoc =
+    vademecumItems.find((d: VademecumItem) => d.section === 'carta_clan') ||
+    DEFAULT_VADEMECUM_ITEMS.find((d: VademecumItem) => d.id === 'carta_clan');
+  const regoleDoc =
+    vademecumItems.find((d: VademecumItem) => d.section === 'regole_clan') ||
+    DEFAULT_VADEMECUM_ITEMS.find((d: VademecumItem) => d.id === 'regole_clan');
   const canovacciList = vademecumItems.filter((d) => d.section === 'canovaccio');
+
+  const regoleSnippet = useMemo(() => {
+    const clean = stripQuadernoSnippet(regoleDoc?.contenuto || '');
+    if (!clean) return '';
+    return clean.slice(0, 160) + (clean.length > 160 ? '…' : '');
+  }, [regoleDoc?.contenuto]);
 
   const handleOpenWideDoc = (item: VademecumItem | undefined) => {
     if (!item) return;
@@ -234,6 +257,44 @@ export function HomeView() {
 
         {/* 4. GUIDA DI INSTALLAZIONE PWA AL PRIMO UTILIZZO (DISMISSIBILE) */}
         <PwaInstallGuide />
+
+        {/* 4b. AVVISO PROPOSTE DA APPROVARE PER L'ADMIN */}
+        {isAdmin && pendingProposteMap.size > 0 && (
+          <div
+            style={{
+              padding: '12px 16px',
+              borderRadius: '14px',
+              backgroundColor: 'var(--color-bans-tenue, #FFF8E1)',
+              border: '1px solid var(--color-bans, #FF9800)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px',
+              marginBottom: 'var(--space-4, 16px)',
+              boxShadow: 'var(--shadow-rest)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Icon name="admin" size={24} style={{ color: 'var(--color-bans-badge-text, #E65100)', flexShrink: 0 }} />
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--color-ink)' }}>
+                  {pendingProposteMap.size === 1 ? '1 proposta in attesa di approvazione' : `${pendingProposteMap.size} proposte in attesa di approvazione`}
+                </div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
+                  Controlla e approva i nuovi contenuti inviati dai membri.
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              className="ios-btn ios-btn-primary ios-btn-sm"
+              onClick={() => navigate('admin')}
+              style={{ flexShrink: 0 }}
+            >
+              Revisiona
+            </button>
+          </div>
+        )}
 
         {/* 5. CARD PROSSIMO EVENTO (CALENDARIO DA PARETE) CON STATO VUOTO CURATO */}
         {nextEventData ? (
@@ -510,13 +571,13 @@ export function HomeView() {
                   className="carta-hero-admin-btn"
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleOpenEdit(cartaDoc, 'carta_clan');
+                    setIsCartaPhotoOpen(true);
                   }}
-                  title="Modifica Carta di Clan"
-                  aria-label="Modifica Carta di Clan"
+                  title="Modifica foto della Carta di Clan"
+                  aria-label="Modifica foto della Carta di Clan"
                 >
-                  <Icon name="edit" size={13} />
-                  <span>Modifica</span>
+                  <Icon name="camera" size={13} />
+                  <span>Modifica foto</span>
                 </button>
               )}
             </div>
@@ -531,48 +592,59 @@ export function HomeView() {
           </div>
         </div>
 
-        {/* 10. REGOLE DEL CLAN (GIÀ ESPANSE IN HOME) */}
-        <div className="regole-section">
-          <div className="regole-expanded-card">
-            <div className="regole-expanded-header">
-              <div className="regole-expanded-title-wrap">
-                <div className="section-sq-icon section-sq-quaderno section-sq-md" aria-hidden="true">
-                  <Icon name="file-text" size={18} />
-                </div>
-                <div>
-                  <h3 className="regole-expanded-title">{regoleDoc?.titolo || 'Regole del Clan'}</h3>
-                  <p className="regole-expanded-desc">
-                    {regoleDoc?.descrizioneBreve || 'Patto di convivenza, orari, sede, telefoni e cassa'}
-                  </p>
-                </div>
-              </div>
+        {/* 10. REGOLE DEL CLAN (CARD SENZA FOTO CON PREVIEW E LETTURA AMPIA) */}
+        <div style={{ marginBottom: 'var(--space-2)' }}>
+          <span className="section-title-sm">REGOLE DEL CLAN</span>
+        </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                {regoleDoc?.pdfDataUrl && (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => handleOpenPdf(regoleDoc)}
-                  >
-                    <Icon name="file" size={14} />
-                    <span>Apri PDF</span>
-                  </Button>
-                )}
-                {isAdmin && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleOpenEdit(regoleDoc, 'regole_clan')}
-                  >
-                    <Icon name="edit" size={14} />
-                    <span>Modifica Regole</span>
-                  </Button>
-                )}
-              </div>
+        <div
+          className="regole-hero-card"
+          role="button"
+          tabIndex={0}
+          onClick={() => handleOpenWideDoc(regoleDoc)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              handleOpenWideDoc(regoleDoc);
+            }
+          }}
+          aria-label={`Apri Regole del Clan: ${regoleDoc?.titolo || 'Regole del Clan'}`}
+        >
+          <div className="regole-hero-content">
+            <div className="regole-hero-badge-wrap">
+              <Badge variant="giallo" size="sm">Patto di Convivenza</Badge>
+              {regoleDoc?.pdfNome && <Badge variant="nuovo" size="sm">PDF Disponibile</Badge>}
+              {isAdmin && (
+                <button
+                  type="button"
+                  className="regole-hero-admin-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpenEdit(regoleDoc, 'regole_clan');
+                  }}
+                  title="Modifica Regole del Clan"
+                  aria-label="Modifica Regole del Clan"
+                >
+                  <Icon name="edit" size={13} />
+                  <span>Modifica</span>
+                </button>
+              )}
             </div>
 
-            <div className="regole-expanded-content doc-rendered">
-              <QuadernoDocRenderer content={regoleDoc?.contenuto || ''} />
+            <h3 className="regole-hero-title">{regoleDoc?.titolo || 'Regole del Clan'}</h3>
+            <p className="regole-hero-desc">
+              {regoleDoc?.descrizioneBreve || 'Patto di convivenza, orari, sede, telefoni e cassa'}
+            </p>
+
+            {regoleSnippet && (
+              <p className="regole-hero-preview">
+                {regoleSnippet}
+              </p>
+            )}
+
+            <div className="regole-hero-cta">
+              <span>Leggi le Regole a grande schermo</span>
+              <Icon name="chevron-right" size={15} />
             </div>
           </div>
         </div>
@@ -772,6 +844,19 @@ export function HomeView() {
             />
           )}
 
+          {isCartaPhotoOpen && (
+            <CartaFotoEditModal
+              isOpen={isCartaPhotoOpen}
+              cartaDoc={cartaDoc || null}
+              onClose={() => setIsCartaPhotoOpen(false)}
+              onSaved={(_updated: VademecumItem) => {
+                loadData();
+                setIsCartaPhotoOpen(false);
+                setToastMessage('Foto della Carta di Clan aggiornata');
+              }}
+            />
+          )}
+
           {/* Modal In-App Rifiuta Proposta e Blocco Utente (Admin) */}
           <RifiutaPropostaModal
             proposta={rejectingProposta}
@@ -782,6 +867,15 @@ export function HomeView() {
             }}
           />
         </Suspense>
+
+        {/* Notifica Toast Feedback */}
+        {toastMessage && (
+          <Toast
+            message={toastMessage}
+            type="success"
+            onClose={() => setToastMessage(null)}
+          />
+        )}
       </div>
     </div>
   );

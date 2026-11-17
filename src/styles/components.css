@@ -1192,7 +1192,7 @@
 .ios-sheet-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 1000;
+  z-index: var(--z-sheet, 2400);
   background-color: var(--color-backdrop);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -1325,7 +1325,7 @@
 .ios-modal-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 2500;
+  z-index: var(--z-modal, 2600);
   background-color: var(--color-backdrop);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
