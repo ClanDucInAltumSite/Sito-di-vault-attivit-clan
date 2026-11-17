@@ -6,6 +6,8 @@ import { Ban } from '../../lib/db';
 import { saveBan } from '../../lib/admin_actions';
 import { findSimilarName } from '../../lib/search';
 import { Icon } from '../../ui/Icon';
+import { useAdmin } from '../../lib/auth';
+import { inviaProposta } from '../../lib/proposte';
 
 export interface BanFormSheetProps {
   isOpen: boolean;
@@ -22,10 +24,12 @@ export function BanFormSheet({
   initialBan,
   existingNames,
 }: BanFormSheetProps) {
+  const { isAdmin } = useAdmin();
   const [nome, setNome] = useState('');
   const [testo, setTesto] = useState('');
   const [noteGesti, setNoteGesti] = useState('');
   const [link, setLink] = useState('');
+  const [proponenteNome, setProponenteNome] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -35,6 +39,7 @@ export function BanFormSheet({
       setTesto(initialBan?.testo || '');
       setNoteGesti(initialBan?.note_gesti || '');
       setLink(initialBan?.link || '');
+      setProponenteNome('');
       setErrorMessage(null);
     }
   }, [isOpen, initialBan]);
@@ -53,28 +58,62 @@ export function BanFormSheet({
     setErrorMessage(null);
 
     try {
-      const saved = await saveBan({
-        id: initialBan?.id,
-        nome,
-        testo,
-        note_gesti: noteGesti,
-        link: link.trim() || null,
-      });
-      setIsSaving(false);
-      onSaved(saved);
-      onClose();
+      if (isAdmin) {
+        const saved = await saveBan({
+          id: initialBan?.id,
+          nome,
+          testo,
+          note_gesti: noteGesti,
+          link: link.trim() || null,
+        });
+        setIsSaving(false);
+        onSaved(saved);
+        onClose();
+      } else {
+        const prop = await inviaProposta(
+          'bans',
+          nome,
+          {
+            nome,
+            testo,
+            note_gesti: noteGesti,
+            link: link.trim() || null,
+          },
+          proponenteNome
+        );
+        setIsSaving(false);
+        onSaved({
+          id: prop.id,
+          nome: prop.titolo,
+          testo,
+          note_gesti: noteGesti,
+          link: link.trim() || null,
+          created_at: prop.created_at,
+          updated_at: prop.created_at,
+          deleted_at: null,
+        });
+        onClose();
+      }
     } catch (err: any) {
       setIsSaving(false);
       setErrorMessage(err.message || I18N.dialogs.erroreSalvataggio);
     }
   };
 
+  const titleText = isAdmin
+    ? initialBan ? 'Modifica Ban' : I18N.bans.nuovoBan
+    : initialBan ? 'Modifica Ban' : 'Proponi un Ban al Clan';
+
+  const subtitleText = isAdmin
+    ? 'I campi contrassegnati da * sono obbligatori.'
+    : 'La proposta sarà inviata all\'Admin e sarà visibile subito su questo dispositivo.';
+
   return (
     <BottomSheet
       isOpen={isOpen}
       onClose={onClose}
-      title={initialBan ? 'Modifica Ban' : I18N.bans.nuovoBan}
-      subtitle="I campi contrassegnati da * sono obbligatori."
+      title={titleText}
+      subtitle={subtitleText}
       footer={
         <div style={{ display: 'flex', gap: '8px', width: '100%', justifyContent: 'flex-end' }}>
           <Button variant="ghost" onClick={onClose} disabled={isSaving}>
@@ -86,7 +125,7 @@ export function BanFormSheet({
             isLoading={isSaving}
             disabled={!isValid || isSaving}
           >
-            {I18N.dialogs.salva}
+            {isAdmin ? I18N.dialogs.salva : 'Invia proposta all\'Admin'}
           </Button>
         </div>
       }
@@ -219,6 +258,23 @@ export function BanFormSheet({
             {I18N.bans.linkHelper}
           </span>
         </div>
+
+        {!isAdmin ? (
+          <div className="ios-form-group">
+            <label className="ios-form-label" htmlFor="ban-proponente">
+              Il tuo nome o Pattuglia (opzionale)
+            </label>
+            <input
+              id="ban-proponente"
+              type="text"
+              className="ios-form-input"
+              placeholder="es. Pattuglia Lupi o Sara T."
+              value={proponenteNome}
+              onInput={(e) => setProponenteNome((e.target as HTMLInputElement).value)}
+              disabled={isSaving}
+            />
+          </div>
+        ) : null}
       </form>
     </BottomSheet>
   );

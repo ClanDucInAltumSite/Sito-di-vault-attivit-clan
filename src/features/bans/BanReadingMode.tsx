@@ -199,20 +199,26 @@ export function BanReadingMode({ ban, isOpen, onClose }: BanReadingModeProps) {
         style={{
           flex: 1,
           overflowY: 'auto',
-          padding: 'var(--space-6) var(--space-4)',
-          maxWidth: '800px',
-          margin: '0 auto',
           width: '100%',
           boxSizing: 'border-box',
           WebkitOverflowScrolling: 'touch',
         }}
       >
-        <h1
+        <div
           style={{
-            fontSize: `calc(${fontSize}px * 1.35)`,
-            lineHeight: 1.25,
-            fontWeight: 800,
-            color: 'var(--color-ink)',
+            maxWidth: '800px',
+            margin: '0 auto',
+            width: '100%',
+            padding: 'var(--space-6) var(--space-4)',
+            boxSizing: 'border-box',
+          }}
+        >
+          <h1
+            style={{
+              fontSize: `calc(${fontSize}px * 1.35)`,
+              lineHeight: 1.25,
+              fontWeight: 800,
+              color: 'var(--color-ink)',
             letterSpacing: '-0.02em',
             marginTop: 0,
             marginBottom: 'var(--space-6)',
@@ -304,6 +310,7 @@ export function BanReadingMode({ ban, isOpen, onClose }: BanReadingModeProps) {
         >
           {ban.testo}
         </section>
+        </div>
       </main>
     </div>
   );

@@ -3,19 +3,16 @@ import { I18N } from '../../lib/i18n';
 import { navigate } from '../../app/router';
 import { GroupedList } from '../../ui/GroupedList';
 import { GroupedRow } from '../../ui/GroupedRow';
-import { SearchField } from '../../ui/SearchField';
 import { Badge } from '../../ui/Badge';
 import { BrandLogo } from '../../ui/BrandLogo';
 import { HeaderBanner } from '../../ui/HeaderBanner';
 import { SectionIcon } from '../../ui/SectionIcon';
-import { TheTrail, CompassSync } from '../../ui/ScoutMotifs';
+import { TheTrail } from '../../ui/ScoutMotifs';
 import { Icon } from '../../ui/Icon';
 import { PwaInstallGuide } from '../../ui/PwaInstallGuide';
 import {
   getSectionCounts,
-  getRecentItems,
   getNextUpcomingEvent,
-  RecentItem,
   Evento,
 } from '../../lib/db';
 import {
@@ -27,35 +24,91 @@ import {
 } from '../../lib/calendario';
 import {
   subscribeSyncState,
-  syncNow,
-  SyncState,
-  getSyncState,
 } from '../../lib/sync';
 import { useAdmin } from '../../lib/auth';
+import { Button } from '../../ui/Button';
+import { lazy, Suspense } from 'preact/compat';
+import {
+  getVademecumItems,
+  subscribeVademecum,
+  deleteVademecumItem,
+  VademecumItem,
+  VademecumDocType,
+} from '../../lib/vademecum';
+import {
+  getPropostePerVisualizzazione,
+  approvaPropostaAdmin,
+  ritiraPropostaLocale,
+  subscribeProposte,
+  PropostaItem,
+} from '../../lib/proposte';
+import { RifiutaPropostaModal } from '../admin/RifiutaPropostaModal';
+import { QuadernoDocRenderer } from '../quaderno/QuadernoDocRenderer';
+import { HEADER_PHOTOS } from '../../lib/photos';
+
+const VademecumWideReadingMode = lazy(() =>
+  import('../vademecum/VademecumWideReadingMode').then((m) => ({ default: m.VademecumWideReadingMode }))
+);
+const VademecumEditSheet = lazy(() =>
+  import('../vademecum/VademecumEditSheet').then((m) => ({ default: m.VademecumEditSheet }))
+);
+const DeleteConfirmModal = lazy(() =>
+  import('../../ui/DeleteConfirmModal').then((m) => ({ default: m.DeleteConfirmModal }))
+);
 
 export function HomeView() {
   const { isAdmin } = useAdmin();
-  const [searchQuery, setSearchQuery] = useState('');
   const [counts, setCounts] = useState({ giochi: 0, bans: 0, canti: 0, calendario: 0, quaderno: 0 });
-  const [recentItems, setRecentItems] = useState<RecentItem[]>([]);
   const [nextEventData, setNextEventData] = useState<{
     evento: Evento;
     odgCount: number;
     openOdgCount: number;
   } | null>(null);
-  const [syncState, setSyncState] = useState<SyncState>(getSyncState());
+  const [vademecumItems, setVademecumItems] = useState<VademecumItem[]>([]);
+  const [pendingCanovacciIds, setPendingCanovacciIds] = useState<Set<string>>(new Set());
+  const [pendingProposteMap, setPendingProposteMap] = useState<Map<string, PropostaItem>>(new Map());
+  const [rejectingProposta, setRejectingProposta] = useState<PropostaItem | null>(null);
+  const [selectedWideDoc, setSelectedWideDoc] = useState<VademecumItem | null>(null);
+  const [isWideOpen, setIsWideOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<VademecumItem | null>(null);
+  const [editingSection, setEditingSection] = useState<VademecumDocType>('carta_clan');
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [deletingItem, setDeletingItem] = useState<VademecumItem | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const loadData = async () => {
     try {
-      const [secCounts, recents, nextEv] = await Promise.all([
+      const [secCounts, nextEv, vademecumData, proposteCanovacci] = await Promise.all([
         getSectionCounts(),
-        getRecentItems(4),
         getNextUpcomingEvent(),
+        getVademecumItems(),
+        getPropostePerVisualizzazione('canovacci', isAdmin),
       ]);
       setCounts(secCounts);
-      setRecentItems(recents);
       setNextEventData(nextEv);
+
+      const pendingMap = new Set<string>();
+      const propMap = new Map<string, PropostaItem>();
+      const convertedPending: VademecumItem[] = proposteCanovacci.map((p) => {
+        pendingMap.add(p.id);
+        propMap.set(p.id, p);
+        const d = p.dati as Partial<VademecumItem>;
+        return {
+          id: p.id,
+          section: 'canovaccio' as const,
+          titolo: p.titolo,
+          descrizioneBreve: d.descrizioneBreve || '',
+          contenuto: d.contenuto || '',
+          pdfNome: d.pdfNome || null,
+          pdfDataUrl: d.pdfDataUrl || null,
+          pdfSize: d.pdfSize || null,
+          updatedAt: p.created_at,
+        };
+      });
+      setPendingCanovacciIds(pendingMap);
+      setPendingProposteMap(propMap);
+      setVademecumItems([...convertedPending, ...vademecumData]);
     } catch (err) {
       console.error('Errore caricamento dati home da IndexedDB:', err);
     } finally {
@@ -67,13 +120,85 @@ export function HomeView() {
     loadData();
 
     // Aggiorna quando lo stato di sincronizzazione cambia
-    const unsubscribe = subscribeSyncState((state) => {
-      setSyncState(state);
+    const unsubscribeSync = subscribeSyncState(() => {
       loadData();
     });
 
-    return () => unsubscribe();
-  }, []);
+    // Aggiorna in tempo reale quando un documento Vademecum viene salvato
+    const unsubscribeVademecum = subscribeVademecum(() => {
+      loadData();
+    });
+
+    // Aggiorna in tempo reale quando una proposta locale viene aggiunta o ritirata
+    const unsubscribeProposte = subscribeProposte(() => {
+      loadData();
+    });
+
+    return () => {
+      unsubscribeSync();
+      unsubscribeVademecum();
+      unsubscribeProposte();
+    };
+  }, [isAdmin]);
+
+  const cartaDoc = vademecumItems.find((d) => d.section === 'carta_clan');
+  const regoleDoc = vademecumItems.find((d) => d.section === 'regole_clan');
+  const canovacciList = vademecumItems.filter((d) => d.section === 'canovaccio');
+
+  const handleOpenWideDoc = (item: VademecumItem | undefined) => {
+    if (!item) return;
+    setSelectedWideDoc(item);
+    setIsWideOpen(true);
+  };
+
+  const handleOpenEdit = (item: VademecumItem | undefined, section: VademecumDocType) => {
+    setEditingItem(item || null);
+    setEditingSection(section);
+    setIsEditOpen(true);
+  };
+
+  const handleCreateNewCanovaccio = () => {
+    setEditingItem(null);
+    setEditingSection('canovaccio');
+    setIsEditOpen(true);
+  };
+
+  const handleDeleteRequest = (item: VademecumItem) => {
+    setDeletingItem(item);
+    setIsDeleteOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deletingItem) return;
+    try {
+      await deleteVademecumItem(deletingItem.id);
+      await loadData();
+      setIsDeleteOpen(false);
+      setDeletingItem(null);
+    } catch (err) {
+      console.error('Errore eliminazione canovaccio:', err);
+    }
+  };
+
+  const handleRitiraProposta = async (id: string) => {
+    try {
+      await ritiraPropostaLocale(id);
+      await loadData();
+    } catch (err) {
+      console.error('Errore ritiro proposta canovaccio:', err);
+    }
+  };
+
+  const handleOpenPdf = (item: VademecumItem) => {
+    if (!item.pdfDataUrl) return;
+    const win = window.open();
+    if (win) {
+      win.document.write(
+        `<iframe src="${item.pdfDataUrl}" frameborder="0" style="border:0; top:0; left:0; bottom:0; right:0; width:100%; height:100%;" allowfullscreen></iframe>`
+      );
+      win.document.title = item.pdfNome || item.titolo;
+    }
+  };
 
   return (
     <div>
@@ -110,17 +235,7 @@ export function HomeView() {
         {/* 4. GUIDA DI INSTALLAZIONE PWA AL PRIMO UTILIZZO (DISMISSIBILE) */}
         <PwaInstallGuide />
 
-        {/* 5. BARRA DI RICERCA GLOBALE RAPIDA */}
-        <div style={{ marginBottom: 'var(--space-6)' }}>
-          <SearchField
-            value={searchQuery}
-            onInput={setSearchQuery}
-            placeholder={I18N.search.placeholderGlobale}
-            aria-label={I18N.search.placeholderGlobale}
-          />
-        </div>
-
-        {/* 6. CARD PROSSIMO EVENTO (CALENDARIO DA PARETE) CON STATO VUOTO CURATO */}
+        {/* 5. CARD PROSSIMO EVENTO (CALENDARIO DA PARETE) CON STATO VUOTO CURATO */}
         {nextEventData ? (
           (() => {
             const dateInfo = getWallCalendarDate(nextEventData.evento.inizio, false, nextEventData.evento.tipo);
@@ -356,74 +471,260 @@ export function HomeView() {
           </div>
         </div>
 
-        {/* 8. AGGIUNTI DI RECENTE (DINAMICO DA INDEXEDDB LOCALE) */}
-        <GroupedList header="AGGIUNTI DI RECENTE">
-          {recentItems.length > 0 ? (
-            recentItems.map((item) => (
-              <GroupedRow
-                key={`${item.section}-${item.id}`}
-                leading={<SectionIcon section={item.section} size="sm" />}
-                title={item.title}
-                subtitle={item.subtitle}
-                trailing={
-                  item.isNew ? (
-                    <Badge variant="nuovo" size="sm">Nuovo</Badge>
-                  ) : undefined
-                }
-                chevron
-                onClick={() => navigate(item.section)}
-              />
-            ))
-          ) : (
-            <GroupedRow
-              leading={<Icon name="info" size={20} />}
-              title="Nessun elemento recente nell'archivio locale"
-              subtitle={syncState.status === 'syncing' ? 'Sincronizzazione in corso...' : 'Tocca qui per avviare il download dei dati.'}
-              onClick={() => syncNow({ trigger: 'home_empty_click' })}
-            />
-          )}
-        </GroupedList>
+        {/* 7. CARTA DI CLAN (FOTO HERO CARD CON LETTURA AMPIA) */}
+        <div style={{ marginBottom: 'var(--space-2)' }}>
+          <span className="section-title-sm">CARTA DI CLAN</span>
+        </div>
 
-        {/* 9. STATO E BUSSOLA SCOUT VIVA */}
-        <GroupedList header="STATO E SINCRONIZZAZIONE">
-          <GroupedRow
-            leading={<CompassSync isSyncing={syncState.status === 'syncing'} size={24} />}
-            title={
-              syncState.status === 'syncing'
-                ? 'Sincronizzazione in corso…'
-                : syncState.isOnline
-                ? 'Archivio Locale e Offline'
-                : 'Modalità Offline (Sola Lettura)'
+        <div
+          className="carta-hero-card"
+          role="button"
+          tabIndex={0}
+          onClick={() => handleOpenWideDoc(cartaDoc)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              handleOpenWideDoc(cartaDoc);
             }
-            subtitle={
-              syncState.lastSyncCompletedAt
-                ? `Ultimo aggiornamento: ${new Date(syncState.lastSyncCompletedAt).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })} • 100% disponibile offline`
-                : 'In attesa di completamento primo download'
-            }
-            trailing={
-              <Badge
-                variant={
-                  syncState.status === 'syncing'
-                    ? 'azzurro'
-                    : syncState.isOnline
-                    ? 'azzurro'
-                    : 'giallo'
-                }
-                size="sm"
-              >
-                {syncState.status === 'syncing'
-                  ? 'In corso'
-                  : syncState.isOnline
-                  ? 'Aggiornato'
-                  : 'Offline'}
-              </Badge>
-            }
-            chevron={isAdmin}
-            onClick={isAdmin ? () => navigate('stato-dati') : undefined}
+          }}
+          aria-label={`Apri Carta di Clan: ${cartaDoc?.titolo || 'Carta di Clan'}`}
+        >
+          <img
+            src={cartaDoc?.fotoCopertinaUrl || HEADER_PHOTOS.home.src}
+            srcSet={cartaDoc?.fotoCopertinaUrl ? undefined : HEADER_PHOTOS.home.srcset}
+            sizes="(max-width: 600px) 400px, 800px"
+            alt={cartaDoc?.fotoCopertinaUrl ? `Foto di copertina per ${cartaDoc.titolo}` : HEADER_PHOTOS.home.alt}
+            className="carta-hero-img"
+            loading="lazy"
+            width={800}
+            height={400}
           />
-        </GroupedList>
+          <div className="carta-hero-scrim" />
+          <div className="carta-hero-content">
+            <div className="carta-hero-badge-wrap">
+              <Badge variant="azzurro" size="sm">Documento Fondamentale</Badge>
+              {cartaDoc?.pdfNome && <Badge variant="nuovo" size="sm">PDF Disponibile</Badge>}
+              {isAdmin && (
+                <button
+                  type="button"
+                  className="carta-hero-admin-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpenEdit(cartaDoc, 'carta_clan');
+                  }}
+                  title="Modifica Carta di Clan"
+                  aria-label="Modifica Carta di Clan"
+                >
+                  <Icon name="edit" size={13} />
+                  <span>Modifica</span>
+                </button>
+              )}
+            </div>
+            <h3 className="carta-hero-title">{cartaDoc?.titolo || 'Carta di Clan'}</h3>
+            <p className="carta-hero-desc">
+              {cartaDoc?.descrizioneBreve || 'I valori, la legge della strada e gli impegni comunitari del Clan'}
+            </p>
+            <div className="carta-hero-cta">
+              <span>Leggi la Carta a grande schermo</span>
+              <Icon name="chevron-right" size={15} />
+            </div>
+          </div>
+        </div>
 
-        {/* 10. STRUMENTI */}
+        {/* 10. REGOLE DEL CLAN (GIÀ ESPANSE IN HOME) */}
+        <div className="regole-section">
+          <div className="regole-expanded-card">
+            <div className="regole-expanded-header">
+              <div className="regole-expanded-title-wrap">
+                <div className="section-sq-icon section-sq-quaderno section-sq-md" aria-hidden="true">
+                  <Icon name="file-text" size={18} />
+                </div>
+                <div>
+                  <h3 className="regole-expanded-title">{regoleDoc?.titolo || 'Regole del Clan'}</h3>
+                  <p className="regole-expanded-desc">
+                    {regoleDoc?.descrizioneBreve || 'Patto di convivenza, orari, sede, telefoni e cassa'}
+                  </p>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                {regoleDoc?.pdfDataUrl && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handleOpenPdf(regoleDoc)}
+                  >
+                    <Icon name="file" size={14} />
+                    <span>Apri PDF</span>
+                  </Button>
+                )}
+                {isAdmin && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleOpenEdit(regoleDoc, 'regole_clan')}
+                  >
+                    <Icon name="edit" size={14} />
+                    <span>Modifica Regole</span>
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            <div className="regole-expanded-content doc-rendered">
+              <QuadernoDocRenderer content={regoleDoc?.contenuto || ''} />
+            </div>
+          </div>
+        </div>
+
+        {/* 11. CANOVACCI PER PATTUGLIE (GRIGLIA IN EVIDENZA) */}
+        <div className="canovacci-section">
+          <div className="canovacci-section-header">
+            <div className="canovacci-section-title-wrap">
+              <div className="section-sq-icon section-sq-giochi section-sq-md" aria-hidden="true">
+                <Icon name="file" size={18} />
+              </div>
+              <div>
+                <h3 className="canovacci-section-title">Canovacci per Pattuglie</h3>
+                <p style={{ margin: '2px 0 0', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
+                  Tracce operative e presentazioni per uscite, veglie e attività
+                </p>
+              </div>
+            </div>
+
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleCreateNewCanovaccio}
+            >
+              <Icon name="plus" size={14} />
+              <span>{isAdmin ? 'Nuovo Canovaccio' : 'Proponi Canovaccio'}</span>
+            </Button>
+          </div>
+
+          <div className="canovacci-grid">
+            {canovacciList.map((item) => {
+              const isPending = pendingCanovacciIds.has(item.id);
+              return (
+                <div
+                  key={item.id}
+                  className={`canovaccio-home-card ${isPending ? 'proposta-pending-card' : ''}`}
+                >
+                  {isPending && (
+                    <div className="proposta-pending-badge-row">
+                      <Badge variant="giallo" size="sm">In attesa di approvazione</Badge>
+                    </div>
+                  )}
+                  <div className="canovaccio-home-header">
+                    <div className="canovaccio-home-info">
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                        <h4 className="canovaccio-home-title">{item.titolo}</h4>
+                        {item.pdfNome && <Badge variant="azzurro" size="sm">PDF</Badge>}
+                      </div>
+                      {item.descrizioneBreve && (
+                        <p className="canovaccio-home-desc">{item.descrizioneBreve}</p>
+                      )}
+                      {isPending && (
+                        <div className="proposta-pending-caption">
+                          {isAdmin && pendingProposteMap.get(item.id)?.proponente_nome
+                            ? `Proposto da: ${pendingProposteMap.get(item.id)?.proponente_nome} • In attesa di approvazione`
+                            : isAdmin
+                            ? 'In attesa di approvazione dell\'Admin'
+                            : 'Visibile solo su questo dispositivo fino all\'approvazione dell\'Admin'}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="canovaccio-home-actions">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                      {item.pdfDataUrl && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => handleOpenPdf(item)}
+                        >
+                          <Icon name="file" size={14} />
+                          <span>Apri PDF</span>
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleOpenWideDoc(item)}
+                      >
+                        <Icon name="book-open" size={14} />
+                        <span>Leggi traccia</span>
+                      </Button>
+                    </div>
+
+                    {isAdmin && isPending ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          onClick={() => {
+                            const prop = pendingProposteMap.get(item.id);
+                            if (prop) setRejectingProposta(prop);
+                          }}
+                        >
+                          <Icon name="close" size={14} />
+                          <span>Rifiuta</span>
+                        </Button>
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={async () => {
+                            const prop = pendingProposteMap.get(item.id);
+                            if (prop) {
+                              await approvaPropostaAdmin(prop);
+                              await loadData();
+                            }
+                          }}
+                        >
+                          <Icon name="check" size={14} />
+                          <span>Approva</span>
+                        </Button>
+                      </div>
+                    ) : isPending ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRitiraProposta(item.id)}
+                        style={{ color: 'var(--color-bans)' }}
+                      >
+                        <Icon name="trash" size={14} />
+                        <span>Ritira</span>
+                      </Button>
+                    ) : isAdmin ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleOpenEdit(item, 'canovaccio')}
+                          aria-label={`Modifica ${item.titolo}`}
+                        >
+                          <Icon name="edit" size={14} />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteRequest(item)}
+                          style={{ color: 'var(--color-bans)' }}
+                          aria-label={`Elimina ${item.titolo}`}
+                        >
+                          <Icon name="trash" size={14} />
+                        </Button>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* 12. STRUMENTI */}
         <GroupedList header="STRUMENTI">
           <GroupedRow
             leading={<SectionIcon section="stampa" size="sm" />}
@@ -433,6 +734,54 @@ export function HomeView() {
             onClick={() => navigate('stampa')}
           />
         </GroupedList>
+
+        {/* 14. MODALI E FOGLI LAZY */}
+        <Suspense fallback={null}>
+          {isWideOpen && (
+            <VademecumWideReadingMode
+              item={selectedWideDoc}
+              isOpen={isWideOpen}
+              onClose={() => setIsWideOpen(false)}
+              onItemUpdated={(updated) => {
+                setSelectedWideDoc(updated);
+                loadData();
+              }}
+            />
+          )}
+
+          {isEditOpen && (
+            <VademecumEditSheet
+              item={editingItem}
+              section={editingSection}
+              isOpen={isEditOpen}
+              onClose={() => setIsEditOpen(false)}
+              onSaved={() => {
+                loadData();
+                setIsEditOpen(false);
+              }}
+            />
+          )}
+
+          {isDeleteOpen && (
+            <DeleteConfirmModal
+              isOpen={isDeleteOpen}
+              onClose={() => setIsDeleteOpen(false)}
+              onConfirm={handleDeleteConfirm}
+              itemName={deletingItem?.titolo || ''}
+              itemTypeLabel="canovaccio"
+            />
+          )}
+
+          {/* Modal In-App Rifiuta Proposta e Blocco Utente (Admin) */}
+          <RifiutaPropostaModal
+            proposta={rejectingProposta}
+            isOpen={Boolean(rejectingProposta)}
+            onClose={() => setRejectingProposta(null)}
+            onSuccess={async () => {
+              await loadData();
+            }}
+          />
+        </Suspense>
       </div>
     </div>
   );

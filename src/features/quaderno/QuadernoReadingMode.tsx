@@ -36,7 +36,11 @@ export function QuadernoReadingMode({
   useEffect(() => {
     if (!isOpen || !pagina) return;
 
-    window.history.pushState({ quadernoReadingOpen: true, paginaId: pagina.id }, '');
+    if (window.history.state?.quadernoEditorOpen) {
+      window.history.replaceState({ quadernoReadingOpen: true, paginaId: pagina.id }, '');
+    } else if (!window.history.state?.quadernoReadingOpen) {
+      window.history.pushState({ quadernoReadingOpen: true, paginaId: pagina.id }, '');
+    }
 
     const handlePopState = () => {
       onClose();

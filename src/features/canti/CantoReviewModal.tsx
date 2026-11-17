@@ -15,8 +15,8 @@ import { Badge } from '../../ui/Badge';
 import { Icon } from '../../ui/Icon';
 import { Canto, CategoriaCanto } from '../../lib/db';
 import { saveCanto } from '../../lib/admin_actions';
-import { layoutCanzoniereSong } from './canzoniere_layout';
-import { CanzonierePageRenderer } from './CanzonierePageRenderer';
+import { useAdmin } from '../../lib/auth';
+import { inviaProposta } from '../../lib/proposte';
 import { ChordProRenderer } from '../../lib/chordpro';
 import {
   saveCantoDraft,
@@ -65,6 +65,8 @@ export function CantoReviewModal({
 }: CantoReviewModalProps) {
   if (!isOpen) return null;
 
+  const { isAdmin } = useAdmin();
+
   // Campi del Canto
   const [titolo, setTitolo] = useState(
     importedData?.titolo || initialCanto?.titolo || ''
@@ -75,6 +77,7 @@ export function CantoReviewModal({
   const [autore, setAutore] = useState(
     importedData?.autore || initialCanto?.autore || ''
   );
+  const [proponenteNome, setProponenteNome] = useState('');
   const [tonalita, setTonalita] = useState(
     importedData?.tonalita || initialCanto?.tonalita || ''
   );
@@ -106,14 +109,18 @@ export function CantoReviewModal({
     importedData?.nota_fonte || (initialCanto as any)?.nota_fonte || ''
   );
 
-  // Sezione richiudibile "Altre informazioni"
+  // Sezione richiudibile info metadati canto (Titolo, Autore, Categoria): parte chiusa se c'è già un titolo
+  const [showMetadata, setShowMetadata] = useState<boolean>(!initialCanto?.titolo && !importedData?.titolo);
+
+  // Sezione richiudibile "Altre informazioni musicali"
   const [showExtraInfo, setShowExtraInfo] = useState(false);
+
+  // Sezione richiudibile tastiera completa bottoni accordi
+  const [showChordKeyboard, setShowChordKeyboard] = useState(false);
 
   // Tab per dispositivi mobili: 'testo' | 'anteprima'
   const [mobileTab, setMobileTab] = useState<'testo' | 'anteprima'>('testo');
 
-  // Modalità Anteprima: 'reading' (stile sito) | 'print' (impaginazione A4)
-  const [previewMode, setPreviewMode] = useState<'reading' | 'print'>('reading');
   const [showPreviewChords, setShowPreviewChords] = useState<boolean>(true);
   const [previewFontSize, setPreviewFontSize] = useState<number>(16);
 
@@ -173,6 +180,18 @@ export function CantoReviewModal({
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const pdfCanvasRef = useRef<HTMLCanvasElement>(null);
+
+  // Blocco scroll di documentElement e body per prevenire doppie barre di scorrimento contemporanee
+  useEffect(() => {
+    const origHtmlOverflow = document.documentElement.style.overflow;
+    const origBodyOverflow = document.body.style.overflow;
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.documentElement.style.overflow = origHtmlOverflow;
+      document.body.style.overflow = origBodyOverflow;
+    };
+  }, []);
 
   // Controllo bozze salvate al montaggio
   useEffect(() => {
@@ -384,42 +403,16 @@ export function CantoReviewModal({
     };
   }, [showOriginalPdf, currentPdfPage, importedData?.pdfBytes]);
 
-  // Calcolo pagine anteprima Canzoniere A4 in tempo reale
-  const previewPages = useMemo(() => {
-    if (!testoChordpro.trim()) return [];
-    try {
-      const capoNum = capotasto ? parseInt(capotasto, 10) : null;
-      const bpmNum = bpmTesto.match(/\d+/) ? parseInt(bpmTesto.match(/\d+/)![0]!, 10) : null;
-      const res = layoutCanzoniereSong({
-        id: initialCanto?.id || 'preview',
-        titolo: titolo.trim() || 'TITOLO CANTO',
-        autore: autore.trim() || null,
-        categoria: (categoria || null) as CategoriaCanto | null,
-        tonalita: tonalita.trim() || null,
-        ritmo: ritmo.trim() || null,
-        tempo_bpm: bpmNum,
-        bpm_testo: bpmTesto.trim() || null,
-        misura: misura.trim() || null,
-        capotasto: isNaN(capoNum as number) ? null : capoNum,
-        testo_chordpro: testoChordpro,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        deleted_at: null,
-      });
-      return res.pages;
-    } catch (err) {
-      console.warn('Errore layout anteprima A4:', err);
-      return [];
-    }
-  }, [titolo, autore, categoria, tonalita, misura, bpmTesto, ritmo, capotasto, testoChordpro, initialCanto]);
 
   // Azione Salva
   const handleSave = async () => {
     if (!titolo.trim()) {
+      setShowMetadata(true);
       setErrorMessage('Il titolo del canto è obbligatorio.');
       return;
     }
     if (!categoria) {
+      setShowMetadata(true);
       setErrorMessage('La categoria del canto è obbligatoria.');
       return;
     }
@@ -450,27 +443,71 @@ export function CantoReviewModal({
       const capoNum = capotasto ? parseInt(capotasto, 10) : null;
       const bpmNum = bpmTesto.match(/\d+/) ? parseInt(bpmTesto.match(/\d+/)![0]!, 10) : null;
 
-      const saved = await saveCanto({
-        id: initialCanto?.id,
-        titolo: titolo.trim(),
-        autore: autore.trim() || null,
-        categoria: categoria as CategoriaCanto,
-        tonalita: tonalita.trim() || null,
-        misura: misura.trim() || null,
-        tempo_bpm: bpmNum,
-        bpm_testo: bpmTesto.trim() || null,
-        ritmo: ritmo.trim() || null,
-        capotasto: isNaN(capoNum as number) ? null : capoNum,
-        origine: (origine as 'import_pdf' | 'import_docx' | 'manuale') || 'manuale',
-        nota_fonte: notaFonte.trim() || null,
-        testo_chordpro: testoChordpro.trim(),
-      });
+      if (isAdmin) {
+        const saved = await saveCanto({
+          id: initialCanto?.id,
+          titolo: titolo.trim(),
+          autore: autore.trim() || null,
+          categoria: categoria as CategoriaCanto,
+          tonalita: tonalita.trim() || null,
+          misura: misura.trim() || null,
+          tempo_bpm: bpmNum,
+          bpm_testo: bpmTesto.trim() || null,
+          ritmo: ritmo.trim() || null,
+          capotasto: isNaN(capoNum as number) ? null : capoNum,
+          origine: (origine as 'import_pdf' | 'import_docx' | 'manuale') || 'manuale',
+          nota_fonte: notaFonte.trim() || null,
+          testo_chordpro: testoChordpro.trim(),
+        });
 
-      // Cancella bozza locale confermata
-      await clearCantoDraft(initialCanto?.id || null);
+        // Cancella bozza locale confermata
+        await clearCantoDraft(initialCanto?.id || null);
 
-      onSaved(saved);
-      onClose();
+        onSaved(saved);
+        onClose();
+      } else {
+        const prop = await inviaProposta(
+          'canti',
+          titolo.trim(),
+          {
+            titolo: titolo.trim(),
+            autore: autore.trim() || null,
+            categoria: categoria as CategoriaCanto,
+            tonalita: tonalita.trim() || null,
+            misura: misura.trim() || null,
+            tempo_bpm: bpmNum,
+            bpm_testo: bpmTesto.trim() || null,
+            ritmo: ritmo.trim() || null,
+            capotasto: isNaN(capoNum as number) ? null : capoNum,
+            origine: (origine as 'import_pdf' | 'import_docx' | 'manuale') || 'manuale',
+            nota_fonte: notaFonte.trim() || null,
+            testo_chordpro: testoChordpro.trim(),
+          },
+          proponenteNome
+        );
+
+        await clearCantoDraft(initialCanto?.id || null);
+
+        onSaved({
+          id: prop.id,
+          titolo: prop.titolo,
+          autore: autore.trim() || null,
+          categoria: categoria as CategoriaCanto,
+          tonalita: tonalita.trim() || null,
+          misura: misura.trim() || null,
+          tempo_bpm: bpmNum,
+          bpm_testo: bpmTesto.trim() || null,
+          ritmo: ritmo.trim() || null,
+          capotasto: isNaN(capoNum as number) ? null : capoNum,
+          origine: (origine as 'import_pdf' | 'import_docx' | 'manuale') || 'manuale',
+          nota_fonte: notaFonte.trim() || null,
+          testo_chordpro: testoChordpro.trim(),
+          created_at: prop.created_at,
+          updated_at: prop.created_at,
+          deleted_at: null,
+        });
+        onClose();
+      }
     } catch (err) {
       setErrorMessage(
         err instanceof Error ? err.message : 'Errore durante il salvataggio del canto'
@@ -564,58 +601,225 @@ export function CantoReviewModal({
               style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
             >
               <Icon name="check" size={16} />
-              <span className="canto-btn-label-desktop">{isSaving ? 'Salvataggio...' : 'Salva nel canzoniere'}</span>
-              <span className="canto-btn-label-mobile">{isSaving ? 'Salvo...' : 'Salva'}</span>
+              <span className="canto-btn-label-desktop">
+                {isSaving
+                  ? 'Salvataggio...'
+                  : isAdmin
+                  ? 'Salva nel canzoniere'
+                  : 'Invia proposta all\'Admin'}
+              </span>
+              <span className="canto-btn-label-mobile">
+                {isSaving ? 'Salvo...' : isAdmin ? 'Salva' : 'Proponi'}
+              </span>
             </Button>
           </div>
         </div>
 
-        {/* Riga Titolo Canto */}
-        <div style={{ width: '100%' }}>
-          <input
-            type="text"
-            className="ios-form-input"
-            placeholder="Titolo del canto (obbligatorio)*"
-            value={titolo}
-            onInput={(e) => {
-              setTitolo((e.target as HTMLInputElement).value);
-              setIsDirty(true);
-            }}
+        {/* Barra compatta a fisarmonica / menu a tendina per Info Canto */}
+        <button
+          type="button"
+          onClick={() => setShowMetadata(!showMetadata)}
+          style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '0.35rem 0.65rem',
+            background: showMetadata ? 'var(--color-surface-hover)' : 'var(--color-bg)',
+            border: '1px solid var(--color-border)',
+            borderRadius: 'var(--radius-md)',
+            cursor: 'pointer',
+            textAlign: 'left',
+            boxSizing: 'border-box',
+          }}
+          aria-expanded={showMetadata}
+          aria-label="Mostra o nascondi informazioni e dettagli del canto"
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', minWidth: 0, overflow: 'hidden' }}>
+            <Icon name="canti" size={14} style={{ color: 'var(--color-canti)', flexShrink: 0 }} />
+            <span
+              style={{
+                fontSize: '0.84rem',
+                fontWeight: 700,
+                color: 'var(--color-ink)',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              {titolo.trim() || 'Titolo non inserito'}
+            </span>
+            {autore.trim() && (
+              <span
+                style={{
+                  fontSize: '0.78rem',
+                  color: 'var(--color-text-secondary)',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+              >
+                · {autore.trim()}
+              </span>
+            )}
+            {categoria && (
+              <span
+                style={{
+                  fontSize: '0.66rem',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  padding: '1px 7px',
+                  borderRadius: 'var(--radius-full)',
+                  backgroundColor:
+                    categoria === 'scout'
+                      ? 'var(--color-interactive-tenue)'
+                      : categoria === 'chiesa'
+                      ? 'var(--color-giochi-tenue)'
+                      : 'var(--color-bans-tenue)',
+                  color:
+                    categoria === 'scout'
+                      ? 'var(--color-interactive)'
+                      : categoria === 'chiesa'
+                      ? 'var(--color-giochi-badge-text)'
+                      : 'var(--color-bans)',
+                  flexShrink: 0,
+                }}
+              >
+                {categoria === 'scout' ? 'Scout' : categoria === 'chiesa' ? 'Chiesa' : 'Esterni'}
+              </span>
+            )}
+          </div>
+          <span
             style={{
-              width: '100%',
-              padding: '0.55rem 0.85rem',
-              fontSize: '1rem',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '3px',
+              fontSize: '0.74rem',
               fontWeight: 600,
-              border: '1px solid var(--color-border)',
-              borderRadius: 'var(--radius-md)',
-              background: 'var(--color-bg)',
-              color: 'var(--color-text)',
-              boxSizing: 'border-box',
+              color: 'var(--color-interactive)',
+              flexShrink: 0,
+              marginLeft: '0.5rem',
             }}
-            required
-          />
+          >
+            {showMetadata ? 'Chiudi info ▲' : 'Modifica info ▾'}
+          </span>
+        </button>
+
+        {showMetadata && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+            {/* Campi Principali del Canto: Titolo e Autore */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                gap: '0.6rem',
+                width: '100%',
+              }}
+            >
+          <div>
+            <label
+              style={{
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                color: 'var(--color-text-secondary)',
+                display: 'block',
+                marginBottom: '3px',
+              }}
+            >
+              Titolo del Canto *
+            </label>
+            <input
+              type="text"
+              className="ios-form-input"
+              placeholder="es. Alba Chiara, Canto della Promessa..."
+              value={titolo}
+              onInput={(e) => {
+                setTitolo((e.target as HTMLInputElement).value);
+                setIsDirty(true);
+              }}
+              style={{
+                width: '100%',
+                padding: '0.5rem 0.75rem',
+                fontSize: '0.95rem',
+                fontWeight: 600,
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-md)',
+                background: 'var(--color-bg)',
+                color: 'var(--color-text)',
+                boxSizing: 'border-box',
+              }}
+              required
+            />
+          </div>
+
+          <div>
+            <label
+              style={{
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                color: 'var(--color-text-secondary)',
+                display: 'block',
+                marginBottom: '3px',
+              }}
+            >
+              Autore / Artista
+            </label>
+            <input
+              type="text"
+              className="ios-form-input"
+              placeholder="es. B.-P., Nomadi, Tradizionale..."
+              value={autore}
+              onInput={(e) => {
+                setAutore((e.target as HTMLInputElement).value);
+                setIsDirty(true);
+              }}
+              style={{
+                width: '100%',
+                padding: '0.5rem 0.75rem',
+                fontSize: '0.95rem',
+                fontWeight: 500,
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-md)',
+                background: 'var(--color-bg)',
+                color: 'var(--color-text)',
+                boxSizing: 'border-box',
+              }}
+            />
+          </div>
         </div>
 
-        {/* Riga Categoria in Evidenza (3 Pillole Grandi) + Toggle Dettagli */}
+        {/* Riga Categoria in Evidenza + Toggle Dettagli Musicali */}
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            gap: '0.5rem',
+            gap: '0.6rem',
             flexWrap: 'wrap',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flex: '1 1 auto', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-ink)', textTransform: 'uppercase', letterSpacing: '0.04em', marginRight: '0.25rem' }}>
-              Categoria*:
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+            <span
+              style={{
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                color: 'var(--color-ink)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em',
+                marginRight: '0.2rem',
+              }}
+            >
+              Categoria *:
             </span>
             {/* Scout */}
             <button
               type="button"
-              onClick={() => { setCategoria('scout'); setIsDirty(true); }}
+              onClick={() => {
+                setCategoria('scout');
+                setIsDirty(true);
+              }}
               style={{
-                padding: '0.4rem 0.8rem',
+                padding: '0.35rem 0.8rem',
                 borderRadius: 'var(--radius-full)',
                 fontWeight: 600,
                 fontSize: '0.82rem',
@@ -635,9 +839,12 @@ export function CantoReviewModal({
             {/* Chiesa */}
             <button
               type="button"
-              onClick={() => { setCategoria('chiesa'); setIsDirty(true); }}
+              onClick={() => {
+                setCategoria('chiesa');
+                setIsDirty(true);
+              }}
               style={{
-                padding: '0.4rem 0.8rem',
+                padding: '0.35rem 0.8rem',
                 borderRadius: 'var(--radius-full)',
                 fontWeight: 600,
                 fontSize: '0.82rem',
@@ -657,9 +864,12 @@ export function CantoReviewModal({
             {/* Esterni */}
             <button
               type="button"
-              onClick={() => { setCategoria('esterni'); setIsDirty(true); }}
+              onClick={() => {
+                setCategoria('esterni');
+                setIsDirty(true);
+              }}
               style={{
-                padding: '0.4rem 0.8rem',
+                padding: '0.35rem 0.8rem',
                 borderRadius: 'var(--radius-full)',
                 fontWeight: 600,
                 fontSize: '0.82rem',
@@ -674,7 +884,7 @@ export function CantoReviewModal({
                 boxShadow: categoria === 'esterni' ? 'var(--shadow-subtle)' : 'none',
               }}
             >
-              <span>Canti esterni</span>
+              <span>Esterni</span>
             </button>
 
             <select
@@ -700,18 +910,51 @@ export function CantoReviewModal({
 
             {!categoria && (
               <span style={{ fontSize: '0.75rem', color: 'var(--color-bans)', fontWeight: 600, marginLeft: '0.25rem' }}>
-                (Scegli categoria per salvare)
+                (Seleziona per salvare)
               </span>
             )}
           </div>
 
-          {/* Toggle Dettagli Opzionali */}
+          {!isAdmin && (
+            <div style={{ flex: '1 1 200px', minWidth: '180px' }}>
+              <label
+                style={{
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  color: 'var(--color-text-secondary)',
+                  display: 'block',
+                  marginBottom: '3px',
+                }}
+              >
+                Il tuo nome o Pattuglia (opzionale)
+              </label>
+              <input
+                type="text"
+                className="ios-form-input"
+                placeholder="es. Pattuglia Castori o Giovanni M."
+                value={proponenteNome}
+                onInput={(e) => setProponenteNome((e.target as HTMLInputElement).value)}
+                style={{
+                  width: '100%',
+                  padding: '0.45rem 0.65rem',
+                  fontSize: '0.88rem',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'var(--color-bg)',
+                  color: 'var(--color-text)',
+                  boxSizing: 'border-box',
+                }}
+              />
+            </div>
+          )}
+
+          {/* Toggle Dettagli Musicali e Riferimenti */}
           <button
             type="button"
             onClick={() => setShowExtraInfo(!showExtraInfo)}
-            aria-label="Altre informazioni"
+            aria-label="Dettagli musicali e avanzati"
             style={{
-              padding: '0.4rem 0.75rem',
+              padding: '0.35rem 0.75rem',
               borderRadius: 'var(--radius-md)',
               border: '1px solid var(--color-border)',
               background: showExtraInfo ? 'var(--color-surface-hover)' : 'var(--color-surface)',
@@ -722,62 +965,45 @@ export function CantoReviewModal({
               whiteSpace: 'nowrap',
               display: 'flex',
               alignItems: 'center',
-              gap: '4px',
+              gap: '6px',
             }}
           >
-            <span>{showExtraInfo ? 'Chiudi dettagli ▲' : 'Altre informazioni ▾'}</span>
+            <span>{showExtraInfo ? 'Nascondi dettagli ▲' : 'Dettagli musicali (BPM, ritmo, capotasto) ▾'}</span>
           </button>
         </div>
 
-        {/* Sezione Richiudibile "Altre informazioni / Dettagli musicali" (Stile Apple, solo campi utili) */}
+        {/* Sezione Richiudibile "Dettagli Musicali e Informazioni Aggiuntive" */}
         {showExtraInfo && (
           <div
             style={{
               background: 'var(--color-surface)',
               border: '1px solid var(--color-border)',
               borderRadius: 'var(--radius-md)',
-              padding: '0.75rem',
+              padding: '0.85rem',
               display: 'flex',
               flexDirection: 'column',
-              gap: '0.65rem',
+              gap: '0.75rem',
               boxShadow: 'var(--shadow-subtle)',
             }}
           >
-            {/* Griglia parametri brano */}
+            {/* Griglia parametri musicali */}
             <div
               style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
-                gap: '0.6rem',
+                gap: '0.65rem',
               }}
             >
               <div>
-                <label style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--color-text-secondary)', display: 'block', marginBottom: '2px' }}>
-                  Autore / Evento
-                </label>
-                <input
-                  type="text"
-                  value={autore}
-                  placeholder="es. B.-P., Clan, Nomadi..."
-                  onInput={(e) => {
-                    setAutore((e.target as HTMLInputElement).value);
-                    setIsDirty(true);
-                  }}
+                <label
                   style={{
-                    width: '100%',
-                    padding: '0.4rem 0.6rem',
-                    fontSize: '0.85rem',
-                    background: 'var(--color-bg)',
-                    color: 'var(--color-text)',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: 'var(--radius-sm)',
-                    boxSizing: 'border-box',
+                    fontSize: '0.72rem',
+                    fontWeight: 600,
+                    color: 'var(--color-text-secondary)',
+                    display: 'block',
+                    marginBottom: '2px',
                   }}
-                />
-              </div>
-
-              <div>
-                <label style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--color-text-secondary)', display: 'block', marginBottom: '2px' }}>
+                >
                   Tonalità
                 </label>
                 <input
@@ -802,57 +1028,15 @@ export function CantoReviewModal({
               </div>
 
               <div>
-                <label style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--color-text-secondary)', display: 'block', marginBottom: '2px' }}>
-                  Misura (Tempo)
-                </label>
-                <input
-                  type="text"
-                  value={misura}
-                  placeholder="es. 4/4, 3/4, 6/8"
-                  onInput={(e) => {
-                    setMisura((e.target as HTMLInputElement).value);
-                    setIsDirty(true);
-                  }}
+                <label
                   style={{
-                    width: '100%',
-                    padding: '0.4rem 0.6rem',
-                    fontSize: '0.85rem',
-                    background: 'var(--color-bg)',
-                    color: 'var(--color-text)',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: 'var(--radius-sm)',
-                    boxSizing: 'border-box',
+                    fontSize: '0.72rem',
+                    fontWeight: 600,
+                    color: 'var(--color-text-secondary)',
+                    display: 'block',
+                    marginBottom: '2px',
                   }}
-                />
-              </div>
-
-              <div>
-                <label style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--color-text-secondary)', display: 'block', marginBottom: '2px' }}>
-                  BPM (Testo)
-                </label>
-                <input
-                  type="text"
-                  value={bpmTesto}
-                  placeholder="es. 92, circa 90"
-                  onInput={(e) => {
-                    setBpmTesto((e.target as HTMLInputElement).value);
-                    setIsDirty(true);
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '0.4rem 0.6rem',
-                    fontSize: '0.85rem',
-                    background: 'var(--color-bg)',
-                    color: 'var(--color-text)',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: 'var(--radius-sm)',
-                    boxSizing: 'border-box',
-                  }}
-                />
-              </div>
-
-              <div>
-                <label style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--color-text-secondary)', display: 'block', marginBottom: '2px' }}>
+                >
                   Capotasto
                 </label>
                 <input
@@ -879,8 +1063,290 @@ export function CantoReviewModal({
               </div>
 
               <div>
-                <label style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--color-text-secondary)', display: 'block', marginBottom: '2px' }}>
-                  Origine
+                <label
+                  style={{
+                    fontSize: '0.72rem',
+                    fontWeight: 600,
+                    color: 'var(--color-text-secondary)',
+                    display: 'block',
+                    marginBottom: '2px',
+                  }}
+                >
+                  Misura (Tempo)
+                </label>
+                <input
+                  type="text"
+                  value={misura}
+                  placeholder="es. 4/4, 3/4, 6/8"
+                  onInput={(e) => {
+                    setMisura((e.target as HTMLInputElement).value);
+                    setIsDirty(true);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '0.4rem 0.6rem',
+                    fontSize: '0.85rem',
+                    background: 'var(--color-bg)',
+                    color: 'var(--color-text)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 'var(--radius-sm)',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+
+              <div>
+                <label
+                  style={{
+                    fontSize: '0.72rem',
+                    fontWeight: 600,
+                    color: 'var(--color-text-secondary)',
+                    display: 'block',
+                    marginBottom: '2px',
+                  }}
+                >
+                  BPM (Velocità)
+                </label>
+                <input
+                  type="text"
+                  value={bpmTesto}
+                  placeholder="es. 92, circa 90"
+                  onInput={(e) => {
+                    setBpmTesto((e.target as HTMLInputElement).value);
+                    setIsDirty(true);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '0.4rem 0.6rem',
+                    fontSize: '0.85rem',
+                    background: 'var(--color-bg)',
+                    color: 'var(--color-text)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 'var(--radius-sm)',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Pennata / Ritmo con bottoni simboli rapidi e preset chiari */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <label
+                  style={{
+                    fontSize: '0.72rem',
+                    fontWeight: 600,
+                    color: 'var(--color-text-secondary)',
+                  }}
+                >
+                  Ritmo / Pennata Chitarra
+                </label>
+                {ritmo && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRitmo('');
+                      setIsDirty(true);
+                    }}
+                    style={{
+                      border: 'none',
+                      background: 'transparent',
+                      color: 'var(--color-bans)',
+                      fontSize: '0.74rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      padding: '2px 4px',
+                      borderRadius: 'var(--radius-xs)',
+                    }}
+                    title="Cancella pennata inserita"
+                  >
+                    <Icon name="trash" size={12} />
+                    <span>Azzera</span>
+                  </button>
+                )}
+              </div>
+
+              <input
+                type="text"
+                value={ritmo}
+                placeholder="es. ↓ ↑ ↓↑ oppure clicca i simboli/preset sotto"
+                onInput={(e) => {
+                  setRitmo((e.target as HTMLInputElement).value);
+                  setIsDirty(true);
+                }}
+                style={{
+                  width: '100%',
+                  padding: '0.45rem 0.75rem',
+                  fontSize: '0.85rem',
+                  background: 'var(--color-bg)',
+                  color: 'var(--color-text)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 'var(--radius-sm)',
+                  boxSizing: 'border-box',
+                }}
+              />
+
+              {/* Riga Simboli e Preset perfettamente integrati nel Design System */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  flexWrap: 'wrap',
+                  marginTop: '2px',
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: '0.68rem',
+                    fontWeight: 700,
+                    color: 'var(--color-text-secondary)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.04em',
+                    marginRight: '2px',
+                  }}
+                >
+                  Simboli:
+                </span>
+                <button
+                  type="button"
+                  className="pennata-sym-btn"
+                  onClick={() => {
+                    setRitmo((r) => `${r}↓ `);
+                    setIsDirty(true);
+                  }}
+                  title="Pennata giù (↓)"
+                >
+                  ↓
+                </button>
+                <button
+                  type="button"
+                  className="pennata-sym-btn"
+                  onClick={() => {
+                    setRitmo((r) => `${r}↑ `);
+                    setIsDirty(true);
+                  }}
+                  title="Pennata su (↑)"
+                >
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  className="pennata-sym-btn"
+                  onClick={() => {
+                    setRitmo((r) => `${r}(↓) `);
+                    setIsDirty(true);
+                  }}
+                  title="Accento / pennata debole ((↓))"
+                >
+                  (↓)
+                </button>
+                <button
+                  type="button"
+                  className="pennata-sym-btn"
+                  onClick={() => {
+                    setRitmo((r) => `${r}x `);
+                    setIsDirty(true);
+                  }}
+                  title="Stoppato (x)"
+                >
+                  x
+                </button>
+
+                <span style={{ color: 'var(--color-border)', margin: '0 3px' }}>|</span>
+
+                {/* Menu a tendina Preset Ritmo per risparmiare spazio */}
+                <select
+                  aria-label="Preset ritmo o pennata"
+                  onChange={(e) => {
+                    const val = (e.target as HTMLSelectElement).value;
+                    if (val) {
+                      setRitmo(val);
+                      setIsDirty(true);
+                      (e.target as HTMLSelectElement).value = '';
+                    }
+                  }}
+                  defaultValue=""
+                  style={{
+                    padding: '0.2rem 0.6rem',
+                    fontSize: '0.74rem',
+                    fontWeight: 600,
+                    borderRadius: 'var(--radius-full)',
+                    background: 'var(--color-surface)',
+                    color: 'var(--color-ink)',
+                    border: '1px solid var(--color-border)',
+                    cursor: 'pointer',
+                    height: '28px',
+                    outline: 'none',
+                  }}
+                >
+                  <option value="" disabled>Preset Ritmo ▾</option>
+                  <option value="↓  ↓↑  ↑↓↑">Pop / Folk: ↓ ↓↑ ↑↓↑</option>
+                  <option value="↓  ↓↑  ↑↓">Ballad: ↓ ↓↑ ↑↓</option>
+                  <option value="p-i-m-a">Arpeggio: p-i-m-a</option>
+                  <option value="↓  ↑  ↓  ↑">4/4 Base: ↓ ↑ ↓ ↑</option>
+                  <option value="↓  ↓  ↓">3/4 Valzer: ↓ ↓ ↓</option>
+                  <option value="↓  x  ↓  x">Stoppato Rock: ↓ x ↓ x</option>
+                </select>
+
+                <button
+                  type="button"
+                  className="pennata-preset-btn"
+                  onClick={() => {
+                    setRitmo('↓  ↓↑  ↑↓↑');
+                    setIsDirty(true);
+                  }}
+                  title="Ritmo Pop / Folk classico"
+                >
+                  Pop: ↓ ↓↑ ↑↓↑
+                </button>
+                <button
+                  type="button"
+                  className="pennata-preset-btn"
+                  onClick={() => {
+                    setRitmo('↓  ↓↑  ↑↓');
+                    setIsDirty(true);
+                  }}
+                  title="Ritmo Ballad lento"
+                >
+                  Ballad: ↓ ↓↑ ↑↓
+                </button>
+                <button
+                  type="button"
+                  className="pennata-preset-btn"
+                  onClick={() => {
+                    setRitmo('p-i-m-a');
+                    setIsDirty(true);
+                  }}
+                  title="Arpeggio classico pollice-indice-medio-anulare"
+                >
+                  Arpeggio: p-i-m-a
+                </button>
+              </div>
+            </div>
+
+            {/* Riferimento e Origine */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                gap: '0.65rem',
+              }}
+            >
+              <div>
+                <label
+                  style={{
+                    fontSize: '0.72rem',
+                    fontWeight: 600,
+                    color: 'var(--color-text-secondary)',
+                    display: 'block',
+                    marginBottom: '2px',
+                  }}
+                >
+                  Origine Acquisizione
                 </label>
                 <select
                   aria-label="Origine del canto"
@@ -900,21 +1366,29 @@ export function CantoReviewModal({
                     boxSizing: 'border-box',
                   }}
                 >
-                  <option value="manuale">Manuale</option>
-                  <option value="import_pdf">PDF</option>
-                  <option value="import_docx">Word (.docx)</option>
-                  <option value="ocr">Immagine / OCR</option>
+                  <option value="manuale">Inserimento manuale</option>
+                  <option value="import_pdf">Importato da PDF</option>
+                  <option value="import_docx">Importato da Word (.docx)</option>
+                  <option value="ocr">Scansione / OCR Immagine</option>
                 </select>
               </div>
 
               <div>
-                <label style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--color-text-secondary)', display: 'block', marginBottom: '2px' }}>
-                  Nota Fonte
+                <label
+                  style={{
+                    fontSize: '0.72rem',
+                    fontWeight: 600,
+                    color: 'var(--color-text-secondary)',
+                    display: 'block',
+                    marginBottom: '2px',
+                  }}
+                >
+                  Nota Fonte / Riferimento
                 </label>
                 <input
                   type="text"
                   value={notaFonte}
-                  placeholder="es. Canzoniere Scout"
+                  placeholder="es. Canzoniere Scout 2024, Libretto Parrocchia..."
                   onInput={(e) => {
                     setNotaFonte((e.target as HTMLInputElement).value);
                     setIsDirty(true);
@@ -933,102 +1407,13 @@ export function CantoReviewModal({
               </div>
             </div>
 
-            {/* Pennata / Ritmo con bottoni simboli rapidi */}
-            <div>
-              <label style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--color-text-secondary)', display: 'block', marginBottom: '2px' }}>
-                Ritmo / Pennata Chitarra
-              </label>
-              <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                <input
-                  type="text"
-                  value={ritmo}
-                  placeholder="es. ↓ ↑ ↓↑ oppure usa i pulsanti sotto"
-                  onInput={(e) => {
-                    setRitmo((e.target as HTMLInputElement).value);
-                    setIsDirty(true);
-                  }}
-                  style={{
-                    flex: '1 1 200px',
-                    padding: '0.4rem 0.6rem',
-                    fontSize: '0.85rem',
-                    background: 'var(--color-bg)',
-                    color: 'var(--color-text)',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: 'var(--radius-sm)',
-                    boxSizing: 'border-box',
-                  }}
-                />
-                <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap', alignItems: 'center' }}>
-                  <button
-                    type="button"
-                    className="pennata-sym-btn"
-                    onClick={() => { setRitmo((r) => `${r}↓ `); setIsDirty(true); }}
-                    title="Aggiungi pennata in giù (↓)"
-                  >
-                    ↓
-                  </button>
-                  <button
-                    type="button"
-                    className="pennata-sym-btn"
-                    onClick={() => { setRitmo((r) => `${r}↑ `); setIsDirty(true); }}
-                    title="Aggiungi pennata in su (↑)"
-                  >
-                    ↑
-                  </button>
-                  <button
-                    type="button"
-                    className="pennata-sym-btn"
-                    onClick={() => { setRitmo((r) => `${r}(↓) `); setIsDirty(true); }}
-                    title="Pennata debole / accento ((↓))"
-                  >
-                    (↓)
-                  </button>
-                  <button
-                    type="button"
-                    className="pennata-sym-btn"
-                    onClick={() => { setRitmo((r) => `${r}x `); setIsDirty(true); }}
-                    title="Stoppato percussivo (x)"
-                  >
-                    x
-                  </button>
-                  <button
-                    type="button"
-                    className="pennata-preset-btn"
-                    onClick={() => { setRitmo('↓  ↓↑  ↑↓↑'); setIsDirty(true); }}
-                    title="Pattern universale pop/folk"
-                  >
-                    Preset: ↓ ↓↑ ↑↓↑
-                  </button>
-                  <button
-                    type="button"
-                    className="pennata-preset-btn"
-                    onClick={() => { setRitmo('↓  ↓↑  ↑↓'); setIsDirty(true); }}
-                    title="Pattern ballad lento"
-                  >
-                    Ballad: ↓ ↓↑ ↑↓
-                  </button>
-                  {ritmo && (
-                    <button
-                      type="button"
-                      className="pennata-sym-btn"
-                      onClick={() => { setRitmo(''); setIsDirty(true); }}
-                      title="Cancella pennata"
-                      style={{ color: 'var(--color-bans)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-                    >
-                      <Icon name="trash" size={12} />
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Suggerimento IA */}
+            {/* Suggerimento IA Discreto */}
             <div
               style={{
                 fontSize: '0.72rem',
                 color: 'var(--color-text-secondary)',
                 background: 'var(--color-bg)',
-                padding: '0.4rem 0.6rem',
+                padding: '0.35rem 0.6rem',
                 borderRadius: 'var(--radius-sm)',
                 border: '1px dashed var(--color-border)',
                 display: 'flex',
@@ -1038,10 +1423,12 @@ export function CantoReviewModal({
             >
               <Icon name="info" size={13} />
               <span>
-                <strong>Suggerimento rapido:</strong> puoi chiedere all'IA (Gemini o ChatGPT) <em>«Qual è l'autore, il tempo (es. 4/4) e i BPM del canto {titolo || '<titolo>'}?»</em> per compilare questi campi al volo.
+                <strong>Suggerimento:</strong> Puoi chiedere a un'IA (Gemini/ChatGPT): <em>«Autore, tonalità, tempo e BPM di {titolo || 'questo canto'}»</em> per compilare rapidamente i dettagli.
               </span>
             </div>
           </div>
+        )}
+        </div>
         )}
 
         {errorMessage && (
@@ -1175,7 +1562,7 @@ export function CantoReviewModal({
             cursor: 'pointer',
           }}
         >
-          Anteprima A4
+          Anteprima Sito
         </button>
       </div>
 
@@ -1220,93 +1607,100 @@ export function CantoReviewModal({
               flexShrink: 0,
             }}
           >
-            {/* Riga 1: Accordi Diretti Più Usati (Maggiori, Minori, Settima) */}
-            <div className="chord-toolbar-row" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-              {/* Maggiori */}
-              <div className="chord-group" style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-                <span className="chord-group-label" style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--color-text-secondary)', marginRight: '2px' }}>
-                  Maggiori:
-                </span>
-                {['Do', 'Re', 'Mi', 'Fa', 'Sol', 'La', 'Si'].map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    className="canto-review-toolbar-btn chord-btn-major"
-                    onClick={() => insertAtCursor(`[${c}]`)}
-                    style={{
-                      padding: '0.25rem 0.45rem',
-                      fontSize: '0.8rem',
-                      fontWeight: 700,
-                    }}
-                    title={`Inserisci accordo [${c}]`}
-                  >
-                    {c}
-                  </button>
-                ))}
-              </div>
+            {/* Riga Principale Compatta: Menu a tendina Accordi, Ritornello, Toggle Tastiera, Font, Undo/Redo */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '0.4rem',
+                flexWrap: 'wrap',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+                {/* 1. MENU A TENDINA: Inserisci Accordo */}
+                <select
+                  aria-label="Menu a tendina inserisci accordo"
+                  onChange={(e) => {
+                    const val = (e.target as HTMLSelectElement).value;
+                    if (val) {
+                      insertAtCursor(val);
+                      (e.target as HTMLSelectElement).value = '';
+                    }
+                  }}
+                  defaultValue=""
+                  style={{
+                    padding: '0.22rem 0.45rem',
+                    fontSize: '0.76rem',
+                    fontWeight: 700,
+                    borderRadius: 'var(--radius-sm)',
+                    background: 'var(--color-bg)',
+                    color: 'var(--color-ink)',
+                    border: '1px solid var(--color-border)',
+                    cursor: 'pointer',
+                    outline: 'none',
+                  }}
+                >
+                  <option value="" disabled>+ Inserisci Accordo ▾</option>
+                  <optgroup label="Accordi Maggiori">
+                    <option value="[Do]">Do</option>
+                    <option value="[Re]">Re</option>
+                    <option value="[Mi]">Mi</option>
+                    <option value="[Fa]">Fa</option>
+                    <option value="[Sol]">Sol</option>
+                    <option value="[La]">La</option>
+                    <option value="[Si]">Si</option>
+                  </optgroup>
+                  <optgroup label="Accordi Minori">
+                    <option value="[Dom]">Dom</option>
+                    <option value="[Rem]">Rem</option>
+                    <option value="[Mim]">Mim</option>
+                    <option value="[Fam]">Fam</option>
+                    <option value="[Solm]">Solm</option>
+                    <option value="[Lam]">Lam</option>
+                    <option value="[Sim]">Sim</option>
+                  </optgroup>
+                  <optgroup label="Accordi Settima (7)">
+                    <option value="[Do7]">Do7</option>
+                    <option value="[Re7]">Re7</option>
+                    <option value="[Mi7]">Mi7</option>
+                    <option value="[Fa7]">Fa7</option>
+                    <option value="[Sol7]">Sol7</option>
+                    <option value="[La7]">La7</option>
+                    <option value="[Si7]">Si7</option>
+                    <option value="[Lam7]">Lam7</option>
+                    <option value="[Rem7]">Rem7</option>
+                    <option value="[Mim7]">Mim7</option>
+                  </optgroup>
+                  <optgroup label="Diesis & Bemolle">
+                    <option value="[Do#]">Do#</option>
+                    <option value="[Fa#]">Fa#</option>
+                    <option value="[Sol#]">Sol#</option>
+                    <option value="[Sib]">Sib</option>
+                    <option value="[Mib]">Mib</option>
+                    <option value="[Lab]">Lab</option>
+                    <option value="[Fa#m]">Fa#m</option>
+                    <option value="[Do#m]">Do#m</option>
+                    <option value="[Sol#m]">Sol#m</option>
+                  </optgroup>
+                  <optgroup label="Modificatori & Sospesi">
+                    <option value="[Dosus4]">Dosus4</option>
+                    <option value="[Resus4]">Resus4</option>
+                    <option value="[Solsus4]">Solsus4</option>
+                    <option value="[Domaj7]">Domaj7</option>
+                    <option value="[Famaj7]">Famaj7</option>
+                    <option value="[Solmaj7]">Solmaj7</option>
+                  </optgroup>
+                </select>
 
-              <span style={{ color: 'var(--color-border)' }}>|</span>
-
-              {/* Minori */}
-              <div className="chord-group" style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-                <span className="chord-group-label" style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--color-canti)', marginRight: '2px' }}>
-                  Minori:
-                </span>
-                {['Dom', 'Rem', 'Mim', 'Fam', 'Solm', 'Lam', 'Sim'].map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    className="canto-review-toolbar-btn chord-btn-minor"
-                    onClick={() => insertAtCursor(`[${c}]`)}
-                    style={{
-                      padding: '0.25rem 0.45rem',
-                      fontSize: '0.8rem',
-                      fontWeight: 600,
-                    }}
-                    title={`Inserisci accordo [${c}]`}
-                  >
-                    {c}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Riga 2: Modificatori, Sezioni Ritornello, Font & Storia */}
-            <div className="chord-toolbar-row" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-              {/* Modificatori */}
-              <div className="chord-group" style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-                <span className="chord-group-label" style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--color-text-secondary)', marginRight: '2px' }}>
-                  Mod.:
-                </span>
-                {['#', 'b', '4', 'sus4', '7'].map((mod) => (
-                  <button
-                    key={mod}
-                    type="button"
-                    className="canto-review-toolbar-btn"
-                    onClick={() => insertChordModifier(mod)}
-                    style={{
-                      padding: '0.25rem 0.35rem',
-                      fontSize: '0.75rem',
-                      fontWeight: 600,
-                    }}
-                    title={`Aggiungi modificatore ${mod}`}
-                  >
-                    {mod}
-                  </button>
-                ))}
-              </div>
-
-              <span style={{ color: 'var(--color-border)' }}>|</span>
-
-              {/* Sezioni Ritornello */}
-              <div className="chord-group" style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                {/* Sezioni Ritornello */}
                 <button
                   type="button"
                   className="canto-review-toolbar-btn chord-btn-rit"
                   onClick={() => insertAtCursor('\n{soc}\nRIT.\n')}
                   style={{
-                    padding: '0.25rem 0.5rem',
-                    fontSize: '0.75rem',
+                    padding: '0.2rem 0.45rem',
+                    fontSize: '0.74rem',
                     fontWeight: 700,
                   }}
                   title="Inizia ritornello (barra laterale colorata)"
@@ -1318,67 +1712,86 @@ export function CantoReviewModal({
                   className="canto-review-toolbar-btn"
                   onClick={() => insertAtCursor('\n{eoc}\n')}
                   style={{
-                    padding: '0.25rem 0.45rem',
-                    fontSize: '0.75rem',
+                    padding: '0.2rem 0.4rem',
+                    fontSize: '0.74rem',
                   }}
                   title="Fine blocco ritornello"
                 >
                   Fine Rit.
                 </button>
+
+                {/* Toggle Tastiera Bottoni Accordi */}
+                <button
+                  type="button"
+                  className="canto-review-toolbar-btn"
+                  onClick={() => setShowChordKeyboard(!showChordKeyboard)}
+                  style={{
+                    padding: '0.2rem 0.45rem',
+                    fontSize: '0.74rem',
+                    fontWeight: 600,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '3px',
+                    background: showChordKeyboard ? 'var(--color-surface-hover)' : 'var(--color-surface)',
+                    color: showChordKeyboard ? 'var(--color-canti)' : 'var(--color-text)',
+                  }}
+                  title="Mostra/nascondi bottoni rapidi per ogni singolo accordo"
+                >
+                  <Icon name="canti" size={13} />
+                  <span>Tastiera accordi</span>
+                  <span>{showChordKeyboard ? '▲' : '▾'}</span>
+                </button>
               </div>
 
-              <span style={{ color: 'var(--color-border)' }}>|</span>
-
-              {/* Regolazione Font Size */}
+              {/* Regolazione Font Size, Undo/Redo */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                  <button
+                    type="button"
+                    className="canto-review-toolbar-btn"
+                    onClick={() => setEditorFontSize((s) => Math.max(12, s - 1))}
+                    style={{ padding: '0.18rem 0.35rem', fontSize: '0.72rem' }}
+                    title="Riduci dimensione carattere"
+                  >
+                    A-
+                  </button>
+                  <span style={{ fontSize: '0.72rem', minWidth: '2rem', textAlign: 'center', color: 'var(--color-text)' }}>
+                    {editorFontSize}px
+                  </span>
+                  <button
+                    type="button"
+                    className="canto-review-toolbar-btn"
+                    onClick={() => setEditorFontSize((s) => Math.min(18, s + 1))}
+                    style={{ padding: '0.18rem 0.35rem', fontSize: '0.72rem' }}
+                    title="Aumenta dimensione carattere"
+                  >
+                    A+
+                  </button>
+                </div>
+
+                <span style={{ color: 'var(--color-border)', margin: '0 1px' }}>|</span>
+
                 <button
                   type="button"
                   className="canto-review-toolbar-btn"
-                  onClick={() => setEditorFontSize((s) => Math.max(12, s - 1))}
-                  style={{ padding: '0.2rem 0.4rem', fontSize: '0.75rem' }}
-                  title="Riduci dimensione carattere"
+                  onClick={handleUndo}
+                  disabled={historyIndex <= 0}
+                  style={{ padding: '0.18rem 0.35rem', fontSize: '0.76rem' }}
+                  title="Annulla ultima modifica (Ctrl+Z)"
                 >
-                  A-
+                  ↶
                 </button>
-                <span style={{ fontSize: '0.75rem', minWidth: '2.5rem', textAlign: 'center', color: 'var(--color-text)' }}>
-                  {editorFontSize}px
-                </span>
                 <button
                   type="button"
                   className="canto-review-toolbar-btn"
-                  onClick={() => setEditorFontSize((s) => Math.min(18, s + 1))}
-                  style={{ padding: '0.2rem 0.4rem', fontSize: '0.75rem' }}
-                  title="Aumenta dimensione carattere"
+                  onClick={handleRedo}
+                  disabled={historyIndex >= history.length - 1}
+                  style={{ padding: '0.18rem 0.35rem', fontSize: '0.76rem' }}
+                  title="Ripeti modifica (Ctrl+Y)"
                 >
-                  A+
+                  ↷
                 </button>
               </div>
-
-              <span style={{ color: 'var(--color-border)' }}>|</span>
-
-              {/* Undo / Redo */}
-              <button
-                type="button"
-                className="canto-review-toolbar-btn"
-                onClick={handleUndo}
-                disabled={historyIndex <= 0}
-                style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '2px' }}
-                title="Annulla ultima modifica (Ctrl+Z)"
-              >
-                <span>↶</span>
-                <span style={{ fontSize: '0.7rem' }}>Annulla</span>
-              </button>
-              <button
-                type="button"
-                className="canto-review-toolbar-btn"
-                onClick={handleRedo}
-                disabled={historyIndex >= history.length - 1}
-                style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '2px' }}
-                title="Ripeti modifica (Ctrl+Y)"
-              >
-                <span>↷</span>
-                <span style={{ fontSize: '0.7rem' }}>Ripeti</span>
-              </button>
 
               <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                 {/* Pulsante discreto per visualizzare righe filtrate */}
@@ -1441,6 +1854,81 @@ export function CantoReviewModal({
                 )}
               </div>
             </div>
+
+            {/* Griglia espandibile di tutti i bottoni rapidi accordi (visibile SOLO al click su Tastiera accordi) */}
+            {showChordKeyboard && (
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.35rem',
+                  paddingTop: '0.3rem',
+                  borderTop: '1px dashed var(--color-border)',
+                }}
+              >
+                {/* Riga Maggiori e Minori */}
+                <div className="chord-toolbar-row" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+                  <div className="chord-group" style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                    <span className="chord-group-label" style={{ fontSize: '0.66rem', fontWeight: 700, color: 'var(--color-text-secondary)', marginRight: '2px' }}>
+                      Maggiori:
+                    </span>
+                    {['Do', 'Re', 'Mi', 'Fa', 'Sol', 'La', 'Si'].map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        className="canto-review-toolbar-btn chord-btn-major"
+                        onClick={() => insertAtCursor(`[${c}]`)}
+                        style={{ padding: '0.2rem 0.4rem', fontSize: '0.78rem', fontWeight: 700 }}
+                        title={`Inserisci accordo [${c}]`}
+                      >
+                        {c}
+                      </button>
+                    ))}
+                  </div>
+
+                  <span style={{ color: 'var(--color-border)' }}>|</span>
+
+                  <div className="chord-group" style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                    <span className="chord-group-label" style={{ fontSize: '0.66rem', fontWeight: 700, color: 'var(--color-canti)', marginRight: '2px' }}>
+                      Minori:
+                    </span>
+                    {['Dom', 'Rem', 'Mim', 'Fam', 'Solm', 'Lam', 'Sim'].map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        className="canto-review-toolbar-btn chord-btn-minor"
+                        onClick={() => insertAtCursor(`[${c}]`)}
+                        style={{ padding: '0.2rem 0.4rem', fontSize: '0.78rem', fontWeight: 600 }}
+                        title={`Inserisci accordo [${c}]`}
+                      >
+                        {c}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Riga Modificatori */}
+                <div className="chord-toolbar-row" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+                  <div className="chord-group" style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                    <span className="chord-group-label" style={{ fontSize: '0.66rem', fontWeight: 700, color: 'var(--color-text-secondary)', marginRight: '2px' }}>
+                      Modificatori:
+                    </span>
+                    {['#', 'b', '4', 'sus4', '7'].map((mod) => (
+                      <button
+                        key={mod}
+                        type="button"
+                        className="canto-review-toolbar-btn"
+                        onClick={() => insertChordModifier(mod)}
+                        style={{ padding: '0.2rem 0.35rem', fontSize: '0.74rem', fontWeight: 600 }}
+                        title={`Aggiungi modificatore ${mod}`}
+                      >
+                        {mod}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {importedData?.imageUrl && (
@@ -1732,7 +2220,7 @@ export function CantoReviewModal({
           </div>
         )}
 
-        {/* PANNELLO 3: ANTEPRIMA IN TEMPO REALE (VISTA CANZONE SITO O STAMPA A4) */}
+        {/* PANNELLO 3: ANTEPRIMA IN TEMPO REALE DEL SITO */}
         <div
           className={`canto-review-panel-preview ${mobileTab === 'anteprima' ? 'active-mobile' : 'hidden-mobile'}`}
           style={{
@@ -1747,7 +2235,7 @@ export function CantoReviewModal({
           <div
             className="canto-preview-toolbar"
             style={{
-              padding: '0.4rem 0.75rem',
+              padding: '0.45rem 0.75rem',
               background: 'var(--color-surface)',
               borderBottom: '1px solid var(--color-border)',
               display: 'flex',
@@ -1758,109 +2246,75 @@ export function CantoReviewModal({
               flexWrap: 'wrap',
             }}
           >
-            {/* Modalità Anteprima: Vista Canzone (default) vs Stampa A4 */}
+            {/* Etichetta Anteprima */}
             <div
               style={{
                 display: 'inline-flex',
-                background: 'var(--color-surface-hover, oklch(0.5 0 0 / 0.08))',
-                borderRadius: 'var(--radius-md)',
-                padding: '2px',
-                gap: '2px',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '0.82rem',
+                fontWeight: 600,
+                color: 'var(--color-ink)',
               }}
             >
-              <button
-                type="button"
-                onClick={() => setPreviewMode('reading')}
-                style={{
-                  padding: '0.25rem 0.6rem',
-                  fontSize: '0.78rem',
-                  fontWeight: 600,
-                  border: 'none',
-                  borderRadius: 'var(--radius-sm)',
-                  background: previewMode === 'reading' ? 'var(--color-bg)' : 'transparent',
-                  color: previewMode === 'reading' ? 'var(--color-ink)' : 'var(--color-text-secondary)',
-                  boxShadow: previewMode === 'reading' ? 'var(--shadow-subtle)' : 'none',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                }}
-              >
-                <Icon name="eye" size={14} />
-                <span>Vista Canzone</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setPreviewMode('print')}
-                style={{
-                  padding: '0.25rem 0.6rem',
-                  fontSize: '0.78rem',
-                  fontWeight: 600,
-                  border: 'none',
-                  borderRadius: 'var(--radius-sm)',
-                  background: previewMode === 'print' ? 'var(--color-bg)' : 'transparent',
-                  color: previewMode === 'print' ? 'var(--color-ink)' : 'var(--color-text-secondary)',
-                  boxShadow: previewMode === 'print' ? 'var(--shadow-subtle)' : 'none',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                }}
-              >
-                <Icon name="stampa" size={14} />
-                <span>Stampa A4 ({previewPages.length})</span>
-              </button>
+              <Icon name="eye" size={16} style={{ color: 'var(--color-interactive)' }} />
+              <span>Anteprima Canto (come nel sito)</span>
             </div>
 
             {/* Controlli Vista Canzone */}
-            {previewMode === 'reading' && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                {/* Toggle Accordi */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              {/* Toggle Accordi */}
+              <button
+                type="button"
+                className="canto-review-toolbar-btn"
+                onClick={() => setShowPreviewChords(!showPreviewChords)}
+                style={{
+                  padding: '0.25rem 0.55rem',
+                  fontSize: '0.76rem',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  color: showPreviewChords ? 'var(--color-canti)' : 'var(--color-text-secondary)',
+                }}
+                title={showPreviewChords ? 'Nascondi accordi' : 'Mostra accordi'}
+              >
+                <Icon name="canti" size={14} />
+                <span>{showPreviewChords ? 'Accordi ON' : 'Accordi OFF'}</span>
+              </button>
+
+              {/* Font Size Anteprima */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
                 <button
                   type="button"
                   className="canto-review-toolbar-btn"
-                  onClick={() => setShowPreviewChords(!showPreviewChords)}
-                  style={{
-                    padding: '0.25rem 0.5rem',
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    color: showPreviewChords ? 'var(--color-canti)' : 'var(--color-text-secondary)',
-                  }}
-                  title={showPreviewChords ? 'Nascondi accordi' : 'Mostra accordi'}
+                  onClick={() => setPreviewFontSize((s) => Math.max(12, s - 1))}
+                  style={{ padding: '0.2rem 0.4rem', fontSize: '0.75rem' }}
+                  title="Riduci carattere anteprima"
                 >
-                  <Icon name="canti" size={14} />
-                  <span>{showPreviewChords ? 'Accordi ON' : 'Accordi OFF'}</span>
+                  A-
                 </button>
-
-                {/* Font Size Anteprima */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-                  <button
-                    type="button"
-                    className="canto-review-toolbar-btn"
-                    onClick={() => setPreviewFontSize((s) => Math.max(12, s - 1))}
-                    style={{ padding: '0.2rem 0.4rem', fontSize: '0.75rem' }}
-                    title="Riduci carattere anteprima"
-                  >
-                    A-
-                  </button>
-                  <span style={{ fontSize: '0.72rem', minWidth: '2.2rem', textAlign: 'center', color: 'var(--color-text)' }}>
-                    {previewFontSize}px
-                  </span>
-                  <button
-                    type="button"
-                    className="canto-review-toolbar-btn"
-                    onClick={() => setPreviewFontSize((s) => Math.min(24, s + 1))}
-                    style={{ padding: '0.2rem 0.4rem', fontSize: '0.75rem' }}
-                    title="Aumenta carattere anteprima"
-                  >
-                    A+
-                  </button>
-                </div>
+                <span
+                  style={{
+                    fontSize: '0.72rem',
+                    minWidth: '2.2rem',
+                    textAlign: 'center',
+                    color: 'var(--color-text)',
+                  }}
+                >
+                  {previewFontSize}px
+                </span>
+                <button
+                  type="button"
+                  className="canto-review-toolbar-btn"
+                  onClick={() => setPreviewFontSize((s) => Math.min(24, s + 1))}
+                  style={{ padding: '0.2rem 0.4rem', fontSize: '0.75rem' }}
+                  title="Aumenta carattere anteprima"
+                >
+                  A+
+                </button>
               </div>
-            )}
+            </div>
           </div>
 
           {/* AREA SCORREVOLE ANTEPRIMA */}
@@ -1868,240 +2322,235 @@ export function CantoReviewModal({
             style={{
               flex: 1,
               overflowY: 'auto',
-              padding: previewMode === 'reading' ? '1.5rem 1rem' : '1.5rem',
+              padding: '1.25rem 1rem',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               gap: '1.5rem',
               minHeight: 0,
-              background: previewMode === 'reading' ? 'var(--color-bg)' : 'var(--color-surface-raised, #e5e7eb)',
+              background: 'var(--color-bg)',
             }}
           >
-            {previewMode === 'reading' ? (
-              /* CARD ELEGANTE STILE APERTURA CANZONE NEL SITO */
-              <div
-                className="canto-review-reading-card"
+            {/* CARD ELEGANTE STILE APERTURA CANZONE NEL SITO */}
+            <div
+              className="canto-review-reading-card"
+              style={{
+                width: '100%',
+                maxWidth: '750px',
+                background: 'var(--color-surface)',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-lg)',
+                padding: '1.5rem',
+                boxShadow: 'var(--shadow-sm)',
+                boxSizing: 'border-box',
+              }}
+            >
+              {/* Testata Canto */}
+              <h1
+                className="song-title-display"
                 style={{
-                  width: '100%',
-                  maxWidth: '750px',
-                  background: 'var(--color-surface)',
-                  border: '1px solid var(--color-border)',
-                  borderRadius: 'var(--radius-lg)',
-                  padding: '1.5rem',
-                  boxShadow: 'var(--shadow-sm)',
-                  boxSizing: 'border-box',
+                  margin: '0 0 0.35rem',
+                  fontSize: '1.65rem',
+                  fontWeight: 700,
+                  color: 'var(--color-ink)',
+                  lineHeight: 1.25,
                 }}
               >
-                {/* Testata Canto */}
-                <h1
-                  className="song-title-display"
+                {titolo.trim() || 'Titolo del Canto'}
+              </h1>
+
+              {autore.trim() && (
+                <div
                   style={{
-                    margin: '0 0 0.35rem',
-                    fontSize: '1.65rem',
-                    fontWeight: 700,
-                    color: 'var(--color-ink)',
-                    lineHeight: 1.25,
+                    fontSize: '0.92rem',
+                    color: 'var(--color-text-secondary)',
+                    fontWeight: 500,
+                    marginBottom: '0.75rem',
                   }}
                 >
-                  {titolo.trim() || 'Titolo del Canto'}
-                </h1>
+                  {autore.trim()}
+                </div>
+              )}
 
-                {autore.trim() && (
-                  <div
-                    style={{
-                      fontSize: '0.92rem',
-                      color: 'var(--color-text-secondary)',
-                      fontWeight: 500,
-                      marginBottom: '0.75rem',
-                    }}
-                  >
-                    {autore.trim()}
-                  </div>
+              {/* Chips Metadati */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginBottom: '1.25rem' }}>
+                {categoria === 'scout' && <Badge variant="azzurro" size="sm">Canti scout</Badge>}
+                {categoria === 'chiesa' && <Badge variant="giallo" size="sm">Canti di chiesa</Badge>}
+                {categoria === 'esterni' && <Badge variant="rosso" size="sm">Canti esterni</Badge>}
+
+                {tonalita.trim() && (
+                  <Badge variant="neutral" size="sm">
+                    Tonalità: {tonalita.trim()}
+                  </Badge>
                 )}
 
-                {/* Chips Metadati */}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginBottom: '1.25rem' }}>
-                  {categoria === 'scout' && <Badge variant="azzurro" size="sm">Canti scout</Badge>}
-                  {categoria === 'chiesa' && <Badge variant="giallo" size="sm">Canti di chiesa</Badge>}
-                  {categoria === 'esterni' && <Badge variant="rosso" size="sm">Canti esterni</Badge>}
+                {bpmTesto.trim() && (
+                  <Badge variant="neutral" size="sm">
+                    {bpmTesto.trim().toLowerCase().includes('bpm') ? bpmTesto.trim() : `${bpmTesto.trim()} BPM`}
+                  </Badge>
+                )}
 
-                  {bpmTesto.trim() && (
-                    <Badge variant="neutral" size="sm">
-                      {bpmTesto.trim().toLowerCase().includes('bpm') ? bpmTesto.trim() : `${bpmTesto.trim()} BPM`}
-                    </Badge>
-                  )}
+                {misura.trim() && (
+                  <Badge variant="neutral" size="sm">
+                    Misura: {misura.trim()}
+                  </Badge>
+                )}
 
-                  {misura.trim() && (
-                    <Badge variant="neutral" size="sm">
-                      Misura: {misura.trim()}
-                    </Badge>
-                  )}
+                {ritmo.trim() && (
+                  <Badge variant="neutral" size="sm">
+                    Ritmo: {ritmo.trim()}
+                  </Badge>
+                )}
 
-                  {ritmo.trim() && (
-                    <Badge variant="neutral" size="sm">
-                      Ritmo: {ritmo.trim()}
-                    </Badge>
-                  )}
-
-                  {capotasto.trim() && (
-                    <Badge variant="giallo" size="sm">
-                      Capotasto: {capotasto.trim()}°
-                    </Badge>
-                  )}
-                </div>
-
-                <hr style={{ border: 'none', borderTop: '1px solid var(--color-border)', margin: '0 0 1.25rem' }} />
-
-                {/* Corpo del canto renderizzato esattamente come nel sito */}
-                {testoChordpro.trim() ? (
-                  <ChordProRenderer
-                    chordproText={testoChordpro}
-                    showChords={showPreviewChords}
-                    fontSizeRem={previewFontSize / 16}
-                  />
-                ) : (
-                  <div style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: '2.5rem 0', fontSize: '0.9rem' }}>
-                    Inserisci o modifica il testo ChordPro a sinistra per visualizzare qui l'anteprima.
-                  </div>
+                {capotasto.trim() && (
+                  <Badge variant="giallo" size="sm">
+                    Capotasto: {capotasto.trim()}°
+                  </Badge>
                 )}
               </div>
-            ) : (
-              /* ANTEPRIMA STAMPA A4 */
-              previewPages.length > 0 ? (
-                previewPages.map((page, idx) => (
-                  <div
-                    key={`page-${idx}`}
-                    className="canto-review-preview-sheet"
-                    style={{
-                      background: 'white',
-                      color: 'black',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                      width: '100%',
-                      maxWidth: '750px',
-                    }}
-                  >
-                    <CanzonierePageRenderer page={page} isScreenPreview={true} />
-                  </div>
-                ))
+
+              <hr style={{ border: 'none', borderTop: '1px solid var(--color-border)', margin: '0 0 1.25rem' }} />
+
+              {/* Corpo del canto renderizzato esattamente come nel sito */}
+              {testoChordpro.trim() ? (
+                <ChordProRenderer
+                  chordproText={testoChordpro}
+                  showChords={showPreviewChords}
+                  fontSizeRem={previewFontSize / 16}
+                />
               ) : (
                 <div
                   style={{
-                    marginTop: '3rem',
-                    color: 'oklch(0.20 0.02 260)',
+                    color: 'var(--color-text-muted)',
                     textAlign: 'center',
-                    fontSize: '0.92rem',
-                    fontWeight: 600,
-                    padding: '2rem 2.5rem',
-                    background: 'white',
-                    borderRadius: 'var(--radius-lg)',
-                    border: '1px solid oklch(0.82 0.01 260)',
-                    boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
-                    maxWidth: '460px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: '0.75rem',
+                    padding: '2.5rem 0',
+                    fontSize: '0.9rem',
                   }}
                 >
-                  <Icon name="print" size={28} />
-                  <span>Inserisci o scrivi il testo del canto a sinistra per visualizzare l'anteprima impaginata A4.</span>
+                  Inserisci o modifica il testo ChordPro a sinistra per visualizzare qui l'anteprima in tempo reale.
                 </div>
-              )
-            )}
+              )}
+            </div>
           </div>
         </div>
       </div>
 
       <style>{`
-        .canto-btn-label-mobile {
-          display: none;
+        .pennata-sym-btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-width: 32px;
+          height: 28px;
+          padding: 0 8px;
+          border-radius: var(--radius-md);
+          border: 1px solid var(--color-border);
+          background-color: var(--color-surface);
+          color: var(--color-ink);
+          font-size: 0.85rem;
+          font-weight: 700;
+          cursor: pointer;
+          transition: all 0.15s ease;
+          box-shadow: var(--shadow-subtle, none);
+          user-select: none;
         }
-        .canto-btn-label-desktop {
-          display: inline;
+        .pennata-sym-btn:hover {
+          background-color: var(--color-surface-hover);
+          border-color: var(--color-interactive);
+          color: var(--color-interactive);
+          transform: translateY(-1px);
+        }
+        .pennata-sym-btn:active {
+          transform: translateY(0);
+          background-color: var(--color-interactive-tenue);
+        }
+        .pennata-preset-btn {
+          display: inline-flex;
+          align-items: center;
+          height: 28px;
+          padding: 0 10px;
+          border-radius: var(--radius-full);
+          border: 1px solid var(--color-border);
+          background-color: var(--color-surface);
+          color: var(--color-ink);
+          font-size: 0.74rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.15s ease;
+          box-shadow: var(--shadow-subtle, none);
+          user-select: none;
+        }
+        .pennata-preset-btn:hover {
+          background-color: var(--color-interactive-tenue);
+          border-color: var(--color-interactive);
+          color: var(--color-interactive);
+          transform: translateY(-1px);
+        }
+        .pennata-preset-btn:active {
+          transform: translateY(0);
         }
 
-        .canto-review-toolbar button,
         .canto-review-toolbar-btn {
-          color: var(--color-text);
-          background: var(--color-surface);
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 4px;
+          min-height: 28px;
+          padding: 0.2rem 0.55rem;
+          border-radius: var(--radius-md);
           border: 1px solid var(--color-border);
-          border-radius: var(--radius-sm);
+          background-color: var(--color-surface);
+          color: var(--color-text);
+          font-size: 0.76rem;
+          font-weight: 600;
           cursor: pointer;
-          transition: background-color 0.15s ease, border-color 0.15s ease;
+          transition: all 0.15s ease;
+          user-select: none;
+          box-shadow: var(--shadow-subtle, none);
+          box-sizing: border-box;
         }
-        .canto-review-toolbar button:hover:not(:disabled),
         .canto-review-toolbar-btn:hover:not(:disabled) {
-          background: var(--color-surface-hover, oklch(0.5 0 0 / 0.15));
+          background-color: var(--color-surface-hover);
           border-color: var(--color-interactive);
+          color: var(--color-interactive);
+          transform: translateY(-1px);
         }
-        .canto-review-toolbar button:disabled {
-          opacity: 0.4;
+        .canto-review-toolbar-btn:active:not(:disabled) {
+          transform: translateY(0);
+          background-color: var(--color-interactive-tenue);
+        }
+        .canto-review-toolbar-btn:disabled {
+          opacity: 0.45;
           cursor: not-allowed;
+          transform: none;
         }
 
         .chord-btn-major {
-          color: var(--color-ink) !important;
-          background: var(--color-surface-card) !important;
-          border-color: var(--color-border) !important;
-          font-weight: 700 !important;
-        }
-
-        .chord-btn-minor {
-          color: var(--color-canti, oklch(0.53 0.18 245)) !important;
-          background: var(--color-canti-tenue, oklch(0.95 0.035 245)) !important;
-          border-color: oklch(0.53 0.18 245 / 0.3) !important;
-          font-weight: 600 !important;
-        }
-
-        .chord-btn-rit {
-          color: var(--color-giochi-badge-text) !important;
-          background: var(--color-giochi-tenue) !important;
-          border-color: oklch(0.80 0.18 78 / 0.35) !important;
-          font-weight: 700 !important;
-        }
-
-        .pennata-sym-btn {
-          padding: 0.2rem 0.5rem;
-          font-size: 0.85rem;
           font-weight: 700;
-          background: var(--color-surface);
-          color: var(--color-text);
-          border: 1px solid var(--color-border);
-          border-radius: var(--radius-sm);
-          cursor: pointer;
-          transition: all 0.15s ease;
+          color: var(--color-ink);
+          background-color: var(--color-surface);
+          border-color: var(--color-border);
         }
-        .pennata-sym-btn:hover {
-          background: var(--color-surface-hover);
-          border-color: var(--color-interactive);
+        .chord-btn-major:hover:not(:disabled) {
+          background-color: var(--color-surface-hover);
+          border-color: var(--color-canti);
+          color: var(--color-canti);
         }
-
-        .pennata-preset-btn {
-          padding: 0.2rem 0.5rem;
-          font-size: 0.72rem;
+        .chord-btn-minor {
           font-weight: 600;
-          background: var(--color-interactive-tenue);
+          color: var(--color-canti);
+          background-color: var(--color-surface);
+          border-color: var(--color-border);
+        }
+        .chord-btn-minor:hover:not(:disabled) {
+          background-color: var(--color-surface-hover);
+          border-color: var(--color-canti);
+        }
+        .chord-btn-rit {
+          font-weight: 700;
           color: var(--color-interactive);
-          border: 1px solid oklch(0.53 0.18 245 / 0.35);
-          border-radius: var(--radius-sm);
-          cursor: pointer;
-        }
-
-        .canto-review-preview-sheet .canzoniere-page,
-        .canto-review-preview-sheet .canzoniere-line-item {
-          color: oklch(0 0 0) !important;
-        }
-        .canto-review-preview-sheet .canzoniere-header-title {
-          color: oklch(0 0 0) !important;
-        }
-        .canto-review-preview-sheet .canzoniere-header-author,
-        .canto-review-preview-sheet .canzoniere-header-params {
-          color: oklch(0.35 0 0) !important;
-        }
-        .canto-review-preview-sheet .song-chord,
-        .canto-review-preview-sheet .canzoniere-chord-badge {
-          color: oklch(0 0 0) !important;
-          font-weight: 700 !important;
+          background-color: var(--color-interactive-tenue);
+          border-color: var(--color-interactive);
         }
 
         @media (max-width: 767px) {

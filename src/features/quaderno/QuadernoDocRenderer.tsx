@@ -28,7 +28,7 @@ const REGEX_INLINE_PATTERNS: PatternRule[] = [
     render: (m, k) => {
       const colorName = m[1] ?? 'yellow';
       const inner = m[2] ?? '';
-      const valid = ['green', 'blue', 'coral', 'yellow'].includes(colorName);
+      const valid = ['green', 'blue', 'coral', 'yellow', 'purple', 'amber', 'cyan', 'gray'].includes(colorName);
       const cls = valid ? `doc-highlight doc-highlight-${colorName}` : 'doc-highlight doc-highlight-yellow';
       return (
         <mark key={k} className={cls}>
@@ -115,12 +115,18 @@ function findBracketPattern(text: string): MatchedBracketPattern | null {
       let colorVar = 'inherit';
       if (color === 'purple') colorVar = 'var(--color-quaderno)';
       else if (color === 'blue') colorVar = 'var(--color-canti)';
+      else if (color === 'cyan') colorVar = 'var(--color-doc-cyan)';
       else if (color === 'green') colorVar = 'var(--color-calendario)';
-      else if (color === 'red') colorVar = 'var(--color-bans)';
+      else if (color === 'lime') colorVar = 'var(--color-doc-lime)';
       else if (color === 'amber') colorVar = 'var(--color-giochi)';
+      else if (color === 'red') colorVar = 'var(--color-bans)';
+      else if (color === 'pink') colorVar = 'var(--color-doc-pink)';
+      else if (color === 'brown') colorVar = 'var(--color-doc-brown)';
+      else if (color === 'navy') colorVar = 'var(--color-doc-navy)';
+      else if (color === 'gray') colorVar = 'var(--color-doc-gray)';
 
       return (
-        <span key={k} style={{ color: colorVar, fontWeight: color !== 'default' ? 600 : 'inherit' }}>
+        <span key={k} className={`doc-color-${color}`} style={{ color: colorVar }}>
           {parseInlineText(innerText)}
         </span>
       );

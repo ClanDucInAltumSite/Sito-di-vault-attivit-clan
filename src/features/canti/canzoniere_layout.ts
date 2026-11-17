@@ -14,6 +14,7 @@
 import { CANZONIERE_CONFIG, CanzoniereConfig } from './canzoniere_config';
 import { Canto } from '../../lib/db';
 import { joinContinuationLines } from './canzoniere_cleaner';
+import { parseLineToScreenWords } from './CantoLineRenderer';
 
 export interface ChordPlacement {
   chord: string;
@@ -167,10 +168,89 @@ export function splitSongIntoPages(chordproText: string): string[] {
  * Parsea una riga ChordPro estraendo il testo nudo e gli accordi con i loro offset.
  * Calcola se la riga sfora la larghezza disponibile per colonna e se genera parole orfane a capo.
  */
+/**
+ * Stima con precisione pixel-perfect i ritorni a capo (flex-wrap) di una riga in Chromium.
+ * Simula il layout a parole (.canto-word) e sillabe/accordi (.canto-unit),
+ * tenendo conto delle dimensioni reali di colonna e margine per ritornelli/strofe.
+ */
+export function estimateLineVisualWraps(
+  line: SongLine | string,
+  fontSizePt: number,
+  colWidthMm: number = 89.5,
+  isChorus: boolean = false,
+  mode: 'suona' | 'canta' = 'suona'
+): number {
+  const ptToMm = 0.352778;
+  // Larghezza utile interna: sottrae il padding della colonna (3.5mm)
+  // e per i ritornelli (.is-chorus) anche padding 3.5mm + border 2.5pt (~0.88mm)
+  const colContentWidthMm = isChorus ? (colWidthMm - 7.0 - 0.88) : (colWidthMm - 3.5);
+  const availableWidthPt = (colContentWidthMm / ptToMm) * 0.98;
+
+  const charLyricWidthPt = fontSizePt * 0.50; // Roboto regular: media larghezza caratteri
+  const chordScale = 0.94; // Accordi ingranditi a 0.94em per ottima leggibilità
+  const charChordWidthPt = fontSizePt * chordScale * 0.54; // Roboto bold accordi
+  const wordGapPt = fontSizePt * 0.28; // margin-right tra parole (.canto-word)
+
+  const lyrics = typeof line === 'string' ? line : line.lyrics;
+  const chords = typeof line === 'string' ? [] : (line.chords || []);
+  const hasChords = chords.length > 0;
+
+  if (mode === 'canta' || !hasChords) {
+    const words = lyrics.trim().split(/\s+/).filter(Boolean);
+    if (words.length <= 1) return 1;
+
+    let currentLineWidthPt = 0;
+    let linesCount = 1;
+
+    for (let i = 0; i < words.length; i++) {
+      const word = words[i]!;
+      const wordWidthPt = word.length * charLyricWidthPt;
+      if (currentLineWidthPt === 0) {
+        currentLineWidthPt = wordWidthPt;
+      } else if (currentLineWidthPt + wordGapPt + wordWidthPt <= availableWidthPt) {
+        currentLineWidthPt += wordGapPt + wordWidthPt;
+      } else {
+        linesCount++;
+        currentLineWidthPt = wordWidthPt;
+      }
+    }
+    return linesCount;
+  }
+
+  // mode === 'suona' con accordi: rispecchia fedelmente CantoLineRenderer ad Unità Atomiche
+  const words = parseLineToScreenWords(lyrics, chords);
+  if (words.length <= 1) return 1;
+
+  let currentLineWidthPt = 0;
+  let linesCount = 1;
+
+  for (let wIdx = 0; wIdx < words.length; wIdx++) {
+    const w = words[wIdx]!;
+    let wordWidthPt = 0;
+    for (const u of w.units) {
+      const lyricW = (u.lyric === '\u00A0' ? 0.28 * fontSizePt : u.lyric.length * charLyricWidthPt);
+      const chordW = u.chord ? (u.chord.length * charChordWidthPt + 0.16 * fontSizePt) : 0;
+      wordWidthPt += Math.max(lyricW, chordW);
+    }
+
+    if (currentLineWidthPt === 0) {
+      currentLineWidthPt = wordWidthPt;
+    } else if (currentLineWidthPt + wordGapPt + wordWidthPt <= availableWidthPt) {
+      currentLineWidthPt += wordGapPt + wordWidthPt;
+    } else {
+      linesCount++;
+      currentLineWidthPt = wordWidthPt;
+    }
+  }
+
+  return linesCount;
+}
+
 export function parseChordProLine(
   line: string,
   fontSizePt: number,
-  colWidthMm: number = 89.5
+  colWidthMm: number = 89.5,
+  isChorus: boolean = false
 ): SongLine {
   const trimmed = line.trim();
 
@@ -212,49 +292,17 @@ export function parseChordProLine(
   }
 
   const isChordOnly = chords.length > 0 && !lyrics.trim();
+  const hasChords = chords.length > 0;
 
-  // 1 pt = 0.352778 mm
-  const ptToMm = 0.352778;
-  const colWidthPt = colWidthMm / ptToMm;
-  const effectiveColWidthPt = colWidthPt * 0.98; // 2% margine di sicurezza per subpixel del browser
+  const visualWraps = estimateLineVisualWraps(
+    { raw: line, isRitLabel: false, isChordOnly, lyrics, chords, hasChords },
+    fontSizePt,
+    colWidthMm,
+    isChorus,
+    hasChords ? 'suona' : 'canta'
+  );
 
-  // Tipografia Roboto: larghezza media lettere ~ 0.46 * fontSizePt
-  const charWidthPt = fontSizePt * 0.46;
-  const charChordWidthPt = fontSizePt * 0.82 * 0.50;
-
-  const words = lyrics.trim().split(/\s+/).filter(Boolean);
-  const wordsCount = words.length;
-  const nonSpaceChars = words.join('').length;
-
-  let estimatedLineWidthPt = nonSpaceChars * charWidthPt;
-
-  // In CantoLineRenderer, ogni parola (.canto-word) ha margin-right: 0.28em
-  if (wordsCount > 1) {
-    estimatedLineWidthPt += (wordsCount - 1) * (0.28 * fontSizePt);
-  }
-
-  // Se ci sono accordi, la sillaba (.canto-unit) si espande al massimo tra accordo e testo
-  if (chords.length > 0) {
-    for (let cIdx = 0; cIdx < chords.length; cIdx++) {
-      const ch = chords[cIdx]!;
-      const chordWidthPt = ch.chord.length * charChordWidthPt + 0.16 * fontSizePt;
-      let sylLen = 0;
-      let p = ch.charIndex;
-      while (p < lyrics.length && lyrics[p] !== ' ') {
-        if (cIdx + 1 < chords.length && chords[cIdx + 1]!.charIndex === p && p > ch.charIndex) {
-          break;
-        }
-        sylLen++;
-        p++;
-      }
-      const sylLyricWidthPt = sylLen * charWidthPt;
-      if (chordWidthPt > sylLyricWidthPt) {
-        estimatedLineWidthPt += chordWidthPt - sylLyricWidthPt;
-      }
-    }
-  }
-
-  const isTooLong = estimatedLineWidthPt > effectiveColWidthPt;
+  const isTooLong = visualWraps > 1;
 
   // Rileva se va a capo lasciando una sola parola a fine riga (parola orfana: <= 4 caratteri)
   let hasSingleWordWrap = false;
@@ -264,12 +312,14 @@ export function parseChordProLine(
       const lastWord = words[words.length - 1]!;
       const cleanLast = lastWord.replace(/[.,:;!?…\-()]/g, '');
       const prefixWithoutLast = words.slice(0, -1).join(' ');
-      const prefixWidthPt = prefixWithoutLast.length * charWidthPt;
-      if (
-        prefixWidthPt <= effectiveColWidthPt &&
-        estimatedLineWidthPt > effectiveColWidthPt &&
-        (cleanLast.length <= 4 || prefixWithoutLast.length === 0)
-      ) {
+      const prefixWraps = estimateLineVisualWraps(
+        prefixWithoutLast,
+        fontSizePt,
+        colWidthMm,
+        isChorus,
+        'canta'
+      );
+      if (prefixWraps === 1 && (cleanLast.length <= 4 || prefixWithoutLast.length === 0)) {
         hasSingleWordWrap = true;
       }
     }
@@ -298,55 +348,19 @@ export function calculateBlockHeightMm(
   config: CanzoniereConfig = CANZONIERE_CONFIG,
   mode: 'suona' | 'canta' = 'suona',
   colWidthMm: number = 89.5,
-  packing: 'standard' | 'css_calibrated' = 'standard'
+  packing: 'standard' | 'css_calibrated' = 'standard',
+  isChorus: boolean = false
 ): number {
   const ptToMm = 0.352778;
-  const colWidthPt = colWidthMm / ptToMm;
-  const effectiveColWidthPt = colWidthPt * 0.98;
-
-  const charLyricWidthPt = fontSizePt * 0.46;
-  const charChordWidthPt = fontSizePt * 0.82 * 0.50;
 
   if (packing === 'standard') {
-    const lineHeight = config.typography.lineHeight || 1.5;
+    const lineHeight = config.typography?.lineHeight || 1.5;
     const lineStepMm = fontSizePt * lineHeight * ptToMm;
     const blockGapMm = lineStepMm;
 
     let totalMm = 0;
     for (const line of lines) {
-      const words = line.lyrics.trim().split(/\s+/).filter(Boolean);
-      const wordsCount = words.length;
-      const nonSpaceChars = words.join('').length;
-
-      let estWidthPt = nonSpaceChars * charLyricWidthPt;
-      if (wordsCount > 1) {
-        estWidthPt += (wordsCount - 1) * (0.28 * fontSizePt);
-      }
-
-      if (mode === 'suona' && line.chords && line.chords.length > 0) {
-        for (let cIdx = 0; cIdx < line.chords.length; cIdx++) {
-          const ch = line.chords[cIdx]!;
-          const chordWidthPt = ch.chord.length * charChordWidthPt + 0.16 * fontSizePt;
-          let sylLen = 0;
-          let p = ch.charIndex;
-          while (p < line.lyrics.length && line.lyrics[p] !== ' ') {
-            if (cIdx + 1 < line.chords.length && line.chords[cIdx + 1]!.charIndex === p && p > ch.charIndex) {
-              break;
-            }
-            sylLen++;
-            p++;
-          }
-          const sylLyricWidthPt = sylLen * charLyricWidthPt;
-          if (chordWidthPt > sylLyricWidthPt) {
-            estWidthPt += chordWidthPt - sylLyricWidthPt;
-          }
-        }
-      }
-
-      const visualWraps =
-        estWidthPt > effectiveColWidthPt
-          ? Math.max(1, Math.ceil(estWidthPt / effectiveColWidthPt))
-          : 1;
+      const visualWraps = estimateLineVisualWraps(line, fontSizePt, colWidthMm, isChorus, mode);
 
       if (mode === 'canta') {
         totalMm += visualWraps * lineStepMm;
@@ -369,52 +383,25 @@ export function calculateBlockHeightMm(
   // (.canto-screen-line + .canto-unit + margine interblocco 8pt da print.css)
   let totalPt = 0;
   for (const line of lines) {
-    const words = line.lyrics.trim().split(/\s+/).filter(Boolean);
-    const wordsCount = words.length;
-    const nonSpaceChars = words.join('').length;
-
-    let estWidthPt = nonSpaceChars * charLyricWidthPt;
-    if (wordsCount > 1) {
-      estWidthPt += (wordsCount - 1) * (0.28 * fontSizePt);
-    }
-
-    if (mode === 'suona' && line.chords && line.chords.length > 0) {
-      for (let cIdx = 0; cIdx < line.chords.length; cIdx++) {
-        const ch = line.chords[cIdx]!;
-        const chordWidthPt = ch.chord.length * charChordWidthPt + 0.16 * fontSizePt;
-        let sylLen = 0;
-        let p = ch.charIndex;
-        while (p < line.lyrics.length && line.lyrics[p] !== ' ') {
-          if (cIdx + 1 < line.chords.length && line.chords[cIdx + 1]!.charIndex === p && p > ch.charIndex) {
-            break;
-          }
-          sylLen++;
-          p++;
-        }
-        const sylLyricWidthPt = sylLen * charLyricWidthPt;
-        if (chordWidthPt > sylLyricWidthPt) {
-          estWidthPt += chordWidthPt - sylLyricWidthPt;
-        }
-      }
-    }
-
-    const visualWraps =
-      estWidthPt > effectiveColWidthPt
-        ? Math.max(1, Math.ceil(estWidthPt / effectiveColWidthPt))
-        : 1;
+    const visualWraps = estimateLineVisualWraps(line, fontSizePt, colWidthMm, isChorus, mode);
 
     if (mode === 'canta') {
-      totalPt += visualWraps * (fontSizePt * 1.25);
+      // Testo puro: line-height 1.25 + margin-bottom 1.5pt tra righe
+      totalPt += visualWraps * (fontSizePt * 1.25) + 1.5;
     } else {
       if (line.isRitLabel || !line.hasChords || line.isChordOnly) {
-        totalPt += visualWraps * (fontSizePt * 1.25);
+        totalPt += visualWraps * (fontSizePt * 1.25) + 1.5;
       } else {
-        totalPt += visualWraps * (fontSizePt * 2.15);
+        // Linea con accordi e testo:
+        // Accordi a 0.94em (line-height 1.05) + testo a 1.0em (line-height 1.15) ~ 2.14 * fontSizePt
+        // + margin-bottom 1.5pt tra righe
+        totalPt += visualWraps * (fontSizePt * 2.14) + 1.5;
       }
     }
   }
 
-  totalPt += 8; // margin-bottom: 8pt
+  // Margine inferiore netto del blocco (8pt totali, di cui 1.5pt già nell'ultima riga -> + 6.5pt)
+  totalPt += 6.5;
   return totalPt * ptToMm;
 }
 
@@ -525,7 +512,7 @@ export function groupIntoBlocks(
   const flushBlock = () => {
     if (currentLines.length > 0) {
       const isBlockChorus = inChorus || inSocDirective || currentLines.some((l) => l.isRitLabel);
-      const heightMm = calculateBlockHeightMm(currentLines, fontSizePt, config, mode, colWidthMm, packing);
+      const heightMm = calculateBlockHeightMm(currentLines, fontSizePt, config, mode, colWidthMm, packing, isBlockChorus);
       blocks.push({
         id: `blk_${blockId++}`,
         isChorus: isBlockChorus,
@@ -684,7 +671,7 @@ export function groupIntoBlocks(
       }
     }
 
-    currentLines.push(parseChordProLine(l, fontSizePt, colWidthMm));
+    currentLines.push(parseChordProLine(l, fontSizePt, colWidthMm, inChorus || inSocDirective));
   }
 
   flushBlock();
@@ -1240,7 +1227,8 @@ function attemptLayout(
  */
 function balanceIntoTwoColumns(
   blocks: SongBlock[],
-  maxColHeightMm: number
+  maxColHeightMm: number,
+  toleranceMm: number = 2.5
 ): {
   fits: boolean;
   leftCol: ColumnContent;
@@ -1256,7 +1244,7 @@ function balanceIntoTwoColumns(
     const b = blocks[0]!;
     const leftCol: ColumnContent = { blocks: [b], totalHeightMm: b.heightMm, linesCount: b.lines.length };
     const rightCol: ColumnContent = { blocks: [], totalHeightMm: 0, linesCount: 0 };
-    return { fits: b.heightMm <= maxColHeightMm, leftCol, rightCol, diffMm: b.heightMm };
+    return { fits: b.heightMm <= maxColHeightMm + toleranceMm, leftCol, rightCol, diffMm: b.heightMm };
   }
 
   let bestSplitIdx = 1;
@@ -1295,7 +1283,7 @@ function balanceIntoTwoColumns(
     linesCount: rightBlocks.reduce((acc, b) => acc + b.lines.length, 0),
   };
 
-  const fits = leftCol.totalHeightMm <= maxColHeightMm && rightCol.totalHeightMm <= maxColHeightMm;
+  const fits = leftCol.totalHeightMm <= maxColHeightMm + toleranceMm && rightCol.totalHeightMm <= maxColHeightMm + toleranceMm;
 
   return { fits, leftCol, rightCol, diffMm: bestDiff };
 }
@@ -1330,7 +1318,7 @@ export function splitLargeBlock(
     };
   }
 
-  const fullH = calculateBlockHeightMm(lines, fontSizePt, config, mode, colWidthMm, packing);
+  const fullH = calculateBlockHeightMm(lines, fontSizePt, config, mode, colWidthMm, packing, block.isChorus);
 
   // 1. Se l'intero blocco entra con una leggera tolleranza (+8.5mm canta / +9.5mm suona), assorbi tutto
   if (fullH <= maxColHeightMm + toleranceMm) {
@@ -1352,7 +1340,7 @@ export function splitLargeBlock(
   let splitIdx = 0;
   for (let i = 1; i < lines.length; i++) {
     const candidateLines = lines.slice(0, i);
-    const h = calculateBlockHeightMm(candidateLines, fontSizePt, config, mode, colWidthMm, packing);
+    const h = calculateBlockHeightMm(candidateLines, fontSizePt, config, mode, colWidthMm, packing, block.isChorus);
     if (h <= maxColHeightMm + toleranceMm) {
       splitIdx = i;
     } else {
@@ -1410,7 +1398,7 @@ export function splitLargeBlock(
       isChorus: block.isChorus,
       cantoId: block.cantoId,
       lines: part1,
-      heightMm: calculateBlockHeightMm(part1, fontSizePt, config, mode, colWidthMm, packing),
+      heightMm: calculateBlockHeightMm(part1, fontSizePt, config, mode, colWidthMm, packing, block.isChorus),
       fontSizePt: block.fontSizePt,
     },
     secondPart: {
@@ -1419,7 +1407,7 @@ export function splitLargeBlock(
       isChorus: block.isChorus,
       cantoId: block.cantoId,
       lines: part2,
-      heightMm: calculateBlockHeightMm(part2, fontSizePt, config, mode, colWidthMm, packing),
+      heightMm: calculateBlockHeightMm(part2, fontSizePt, config, mode, colWidthMm, packing, block.isChorus),
       fontSizePt: block.fontSizePt,
     },
   };
@@ -1475,8 +1463,8 @@ export function layoutCanzoniereSong(
   // Altezze utili A4 (margini 12mm -> altezza totale foglio 297mm - 24mm = 273mm)
   // Con l'intestazione compatta ultra-salva-spazio (~12-14mm) e il footer (~8-10mm),
   // l'altezza colonna utile su Pagina 1 e Pagina 2+ è calibrata a 246–248mm
-  const page1MaxColHeightMm = 246;
-  const page2PlusMaxColHeightMm = 248;
+  const page1MaxColHeightMm = 249;
+  const page2PlusMaxColHeightMm = 250;
 
   // Determina targetPages (minimo numero di pagine con font leggibile >= 10.0 pt)
   const pageChunks = splitSongIntoPages(workingCanto.testo_chordpro);
@@ -1757,8 +1745,8 @@ export function layoutCanzoniereFlow(
   const config = options?.config || CANZONIERE_CONFIG;
   const mode = options?.mode || 'suona';
   const baseFontSizePt = options?.baseFontSizePt || (mode === 'canta' ? 11.5 : 11.0);
-  const maxColHeightMm = mode === 'suona' ? 250 : 252;
-  const toleranceMm = 3.0;
+  const maxColHeightMm = mode === 'suona' ? 248 : 252;
+  const toleranceMm = mode === 'suona' ? 2.0 : 3.0;
 
   const warnings: string[] = [];
   const songPageMap = new Map<string, number>();
@@ -1856,7 +1844,7 @@ export function layoutCanzoniereFlow(
     // 2. Verifica prerequisiti di ammissibilità per iniziare il canto nello spazio residuo della colonna
     let col = getCol();
     let availableInCol = maxColHeightMm - col.totalHeightMm;
-    const toleranceMm = mode === 'suona' ? 3.5 : 3.0;
+    const toleranceMm = mode === 'suona' ? 2.0 : 3.0;
     const minHeightForNewSong = mode === 'suona' ? 50 : 38;
 
     if (col.totalHeightMm > 0) {
@@ -2047,7 +2035,7 @@ export function layoutCanzoniereFlow(
       const b = stanzaBlocks[sIdx]!;
       col = getCol();
       availableInCol = maxColHeightMm - col.totalHeightMm;
-      const toleranceMm = mode === 'suona' ? 3.5 : 3.0;
+      const toleranceMm = mode === 'suona' ? 2.0 : 3.0;
 
       // Invariante Difensiva Assoluta: se col contiene l'header a fondo colonna e la prima strofa non entra né può essere spezzata
       // con almeno 4 righe sotto il titolo, arretra e sposta header alla colonna successiva
@@ -2130,7 +2118,7 @@ export function layoutCanzoniereFlow(
           const minPart1Lines = isImmediatelyAfterHeader ? 4 : 2;
           const part1Ok = split.firstPart.lines.length >= minPart1Lines;
           const part2Ok = split.secondPart.lines.length === 0 || split.secondPart.lines.length >= 2;
-          const heightOk = split.firstPart.heightMm <= availableInCol + toleranceMm + 1.5;
+          const heightOk = split.firstPart.heightMm <= availableInCol + toleranceMm;
           if (part1Ok && part2Ok && heightOk) {
             split.firstPart.cantoId = song.id;
             split.firstPart.fontSizePt = songFontSize;
@@ -2200,8 +2188,8 @@ export function layoutCanzoniereFlow(
 
           // Se la coda rimanente è composta da poche righe (<= 4 righe o <= 25 mm):
           if (remainingLines <= 4 || remainingH <= 25) {
-            // Se eccede di poco (fino a toleranceMm + 2mm), assorbilo per completare la canzone qui
-            if (remainingH <= availableInCol + (toleranceMm + 2)) {
+            // Se eccede di poco (entro toleranceMm), assorbilo per completare la canzone qui
+            if (remainingH <= availableInCol + toleranceMm) {
               for (const rem of remainingBlocks) {
                 rem.cantoId = song.id;
                 rem.fontSizePt = songFontSize;

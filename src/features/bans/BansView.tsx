@@ -14,15 +14,18 @@ import { useAdmin } from '../../lib/auth';
 import { matchesQuery, HighlightText } from '../../lib/search';
 import { softDeleteRecord } from '../../lib/admin_actions';
 import { subscribeSyncState } from '../../lib/sync';
+import { getPropostePerVisualizzazione, approvaPropostaAdmin, ritiraPropostaLocale, subscribeProposte, PropostaItem } from '../../lib/proposte';
 import { BanDetailSheet } from './BanDetailSheet';
 import { BanFormSheet } from './BanFormSheet';
 import { DeleteConfirmModal } from '../../ui/DeleteConfirmModal';
+import { RifiutaPropostaModal } from '../admin/RifiutaPropostaModal';
 
 type SortOption = 'az' | 'za' | 'recenti' | 'vecchi';
 
 export function BansView() {
   const { isAdmin } = useAdmin();
   const [bans, setBans] = useState<Ban[]>([]);
+  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
 
   // Ripristino stato da sessionStorage
   const [search, setSearch] = useState(() => {
@@ -53,19 +56,47 @@ export function BansView() {
 
   const debounceTimerRef = useRef<any>(null);
 
-  // Caricamento dati da IndexedDB
+  const [pendingProposteMap, setPendingProposteMap] = useState<Map<string, PropostaItem>>(new Map());
+  const [rejectingProposta, setRejectingProposta] = useState<PropostaItem | null>(null);
+
+  // Caricamento dati da IndexedDB e Supabase (ufficiali + proposte in attesa)
   const loadData = async () => {
     const list = await getBans(false);
-    setBans(list);
+    const proposte = await getPropostePerVisualizzazione('bans', isAdmin);
+
+    const map = new Map<string, PropostaItem>();
+    const pendingBans: Ban[] = proposte.map((p) => {
+      map.set(p.id, p);
+      return {
+        id: p.id,
+        nome: p.dati.nome || p.titolo,
+        testo: p.dati.testo || '',
+        note_gesti: p.dati.note_gesti || '',
+        link: p.dati.link || null,
+        created_at: p.created_at,
+        updated_at: p.created_at,
+        deleted_at: null,
+      };
+    });
+
+    setPendingProposteMap(map);
+    setPendingIds(new Set(proposte.map((p) => p.id)));
+    setBans([...pendingBans, ...list]);
   };
 
   useEffect(() => {
     loadData();
-    const unsubscribe = subscribeSyncState(() => {
+    const unsubSync = subscribeSyncState(() => {
       loadData();
     });
-    return () => unsubscribe();
-  }, []);
+    const unsubProp = subscribeProposte(() => {
+      loadData();
+    });
+    return () => {
+      unsubSync();
+      unsubProp();
+    };
+  }, [isAdmin]);
 
   // Gestione ricerca con debounce ~200 ms e persistenza in sessionStorage
   const handleSearchChange = (val: string) => {
@@ -157,28 +188,26 @@ export function BansView() {
       />
 
       <div className="container" style={{ paddingTop: 'var(--space-4)' }}>
-        {/* Barra azione Admin (visibile SOLO con sessione admin valida) */}
-        {isAdmin ? (
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'flex-end',
-              marginBottom: 'var(--space-3)',
+        {/* Barra azione (Admin o Proposta Utente Non-Admin) */}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'flex-end',
+            marginBottom: 'var(--space-3)',
+          }}
+        >
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => {
+              setEditingBan(null);
+              setIsFormOpen(true);
             }}
           >
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => {
-                setEditingBan(null);
-                setIsFormOpen(true);
-              }}
-            >
-              <Icon name="plus" size={16} />
-              <span>{I18N.bans.nuovoBan}</span>
-            </Button>
-          </div>
-        ) : null}
+            <Icon name="plus" size={16} />
+            <span>{isAdmin ? I18N.bans.nuovoBan : 'Proponi un Ban'}</span>
+          </Button>
+        </div>
 
         {/* 2. RICERCA RAPIDA E ORDINAMENTO */}
         <div
@@ -277,7 +306,8 @@ export function BansView() {
             footer="Tocca un ban per aprire il testo e la modalità lettura all'aperto."
           >
             {filteredList.map((ban) => {
-              const isNew = ban.id === latestBanId;
+              const isPending = pendingIds.has(ban.id);
+              const isNew = !isPending && ban.id === latestBanId;
 
               const subtitleText = ban.note_gesti
                 ? ban.note_gesti
@@ -286,49 +316,65 @@ export function BansView() {
                 : 'Animazione e gesti';
 
               return (
-                <GroupedRow
-                  key={ban.id}
-                  leading={<SectionIcon section="bans" size="sm" />}
-                  title={
-                    <HighlightText
-                      text={ban.nome}
-                      query={debouncedSearch}
-                    />
-                  }
-                  subtitle={
-                    <HighlightText
-                      text={subtitleText}
-                      query={debouncedSearch}
-                    />
-                  }
-                  trailing={
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                      {ban.link ? (
-                        <span
-                          title="Link esterno disponibile"
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            color: 'var(--color-bans)',
-                          }}
-                          aria-label="Link esterno disponibile"
-                        >
-                          <Icon name="link" size={14} />
-                        </span>
-                      ) : null}
-                      {isNew ? (
-                        <Badge variant="nuovo" size="sm">
-                          Nuovo
-                        </Badge>
-                      ) : null}
-                    </div>
-                  }
-                  chevron
-                  onClick={() => {
-                    setSelectedBan(ban);
-                    setIsDetailOpen(true);
-                  }}
-                />
+                <div key={ban.id} className={isPending ? 'proposta-pending-card' : undefined} style={isPending ? { borderRadius: 'var(--radius-md)', margin: '2px 0' } : undefined}>
+                  <GroupedRow
+                    leading={<SectionIcon section="bans" size="sm" />}
+                    title={
+                      <HighlightText
+                        text={ban.nome}
+                        query={debouncedSearch}
+                      />
+                    }
+                    subtitle={
+                      <div>
+                        <HighlightText
+                          text={subtitleText}
+                          query={debouncedSearch}
+                        />
+                        {isPending ? (
+                          <span className="proposta-pending-caption">
+                            {isAdmin && pendingProposteMap.get(ban.id)?.proponente_nome
+                              ? `Proposto da: ${pendingProposteMap.get(ban.id)?.proponente_nome} • In attesa di approvazione`
+                              : isAdmin
+                              ? 'In attesa di approvazione dell\'Admin'
+                              : 'Visibile solo su questo dispositivo fino all\'approvazione dell\'Admin'}
+                          </span>
+                        ) : null}
+                      </div>
+                    }
+                    trailing={
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                        {ban.link ? (
+                          <span
+                            title="Link esterno disponibile"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              color: 'var(--color-bans)',
+                            }}
+                            aria-label="Link esterno disponibile"
+                          >
+                            <Icon name="link" size={14} />
+                          </span>
+                        ) : null}
+                        {isPending ? (
+                          <Badge variant="giallo" size="sm">
+                            In attesa
+                          </Badge>
+                        ) : isNew ? (
+                          <Badge variant="nuovo" size="sm">
+                            Nuovo
+                          </Badge>
+                        ) : null}
+                      </div>
+                    }
+                    chevron
+                    onClick={() => {
+                      setSelectedBan(ban);
+                      setIsDetailOpen(true);
+                    }}
+                  />
+                </div>
               );
             })}
           </GroupedList>
@@ -340,7 +386,31 @@ export function BansView() {
         ban={selectedBan}
         isOpen={isDetailOpen}
         isNew={selectedBan ? selectedBan.id === latestBanId : false}
+        isPending={selectedBan ? pendingIds.has(selectedBan.id) : false}
+        proponenteNome={selectedBan ? pendingProposteMap.get(selectedBan.id)?.proponente_nome || null : null}
         onClose={() => setIsDetailOpen(false)}
+        onWithdraw={async (b) => {
+          await ritiraPropostaLocale(b.id);
+          setIsDetailOpen(false);
+          setSelectedBan(null);
+          await loadData();
+        }}
+        onApproveProposta={async (b) => {
+          const prop = pendingProposteMap.get(b.id);
+          if (prop) {
+            await approvaPropostaAdmin(prop);
+            setIsDetailOpen(false);
+            setSelectedBan(null);
+            await loadData();
+          }
+        }}
+        onRejectProposta={(b) => {
+          const prop = pendingProposteMap.get(b.id);
+          if (prop) {
+            setIsDetailOpen(false);
+            setRejectingProposta(prop);
+          }
+        }}
         onEdit={(b) => {
           setIsDetailOpen(false);
           setEditingBan(b);
@@ -374,6 +444,17 @@ export function BansView() {
         onConfirm={handleDeleteConfirm}
         itemName={deletingBan?.nome || ''}
         isLoading={isDeleting}
+      />
+
+      {/* Modal In-App Rifiuta Proposta e Blocco Utente (Admin) */}
+      <RifiutaPropostaModal
+        proposta={rejectingProposta}
+        isOpen={Boolean(rejectingProposta)}
+        onClose={() => setRejectingProposta(null)}
+        onSuccess={async () => {
+          setSelectedBan(null);
+          await loadData();
+        }}
       />
     </div>
   );

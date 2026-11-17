@@ -22,8 +22,11 @@ import { getStorageUsageInfo, findOrphanStorageFiles, purgeOrphanStorageFiles, O
 import { downloadAllAttachmentsForOffline, getOfflineAttachmentStats } from '../../lib/storage-cache';
 import { supabase } from '../../lib/supabase';
 import { DEFAULT_PARSED_SONGS } from '../../data/parsed_songs';
+import { getProposteAdmin, getBlockedIps } from '../../lib/proposte';
 import { AdminLoginModal } from './AdminLoginModal';
 import { TrashSheet } from './TrashSheet';
+import { ProposteReviewSheet } from './ProposteReviewSheet';
+import { BlockedIpsSheet } from './BlockedIpsSheet';
 
 export function AdminView() {
   const { isAdmin, userEmail } = useAdmin();
@@ -53,6 +56,12 @@ export function AdminView() {
   const [isScanningOrphans, setIsScanningOrphans] = useState(false);
   const [isPurgingOrphans, setIsPurgingOrphans] = useState(false);
 
+  // Stato Moderazione Proposte e Anti-Flood
+  const [isProposteOpen, setIsProposteOpen] = useState(false);
+  const [proposteCount, setProposteCount] = useState<number>(0);
+  const [isBlockedIpsOpen, setIsBlockedIpsOpen] = useState(false);
+  const [blockedIpsCount, setBlockedIpsCount] = useState<number>(0);
+
   // Stato Download Offline Allegati
   const [offlineStats, setOfflineStats] = useState<{ cached: number; total: number }>({ cached: 0, total: 0 });
   const [isDownloadingOffline, setIsDownloadingOffline] = useState(false);
@@ -73,6 +82,13 @@ export function AdminView() {
 
         const counts = await getDetailedCounts();
         setDetailedCounts(counts);
+
+        const [pList, bList] = await Promise.all([
+          getProposteAdmin(),
+          getBlockedIps(),
+        ]);
+        setProposteCount(pList.length);
+        setBlockedIpsCount(bList.length);
       } catch (_err) {
         // Fallback silenzioso
       }
@@ -320,6 +336,45 @@ export function AdminView() {
               title={I18N.auth.loggedInAsAdmin}
               subtitle={userEmail || 'Staff Capi (Admin)'}
               trailing={<Badge variant="azzurro" size="sm">Attiva</Badge>}
+            />
+          </GroupedList>
+
+          {/* Moderazione Proposte e Anti-Flood */}
+          <GroupedList
+            header="MODERAZIONE E SICUREZZA"
+            footer="I membri del clan possono proporre canti, giochi, bans e canovacci senza essere admin. Gli Admin convalidano e pubblicano le proposte nel Vault."
+          >
+            <GroupedRow
+              leading={<Icon name="check" size={20} />}
+              title="Proposte da Revisionare"
+              subtitle={
+                proposteCount === 0
+                  ? 'Nessuna proposta in attesa di approvazione'
+                  : `${proposteCount} ${proposteCount === 1 ? 'proposta in attesa di approvazione' : 'proposte in attesa di approvazione'}`
+              }
+              trailing={
+                <Badge variant={proposteCount > 0 ? 'giallo' : 'neutral'} size="sm">
+                  {proposteCount} {proposteCount === 1 ? 'proposta' : 'proposte'}
+                </Badge>
+              }
+              chevron
+              onClick={() => setIsProposteOpen(true)}
+            />
+            <GroupedRow
+              leading={<Icon name="admin" size={20} />}
+              title="Sicurezza & IP Bloccati (Anti-Flood)"
+              subtitle={
+                blockedIpsCount === 0
+                  ? 'Protezione attiva (soglia 20 req/2s) • Nessun IP bloccato'
+                  : `${blockedIpsCount} indirizzi bloccati per superamento soglia flood`
+              }
+              trailing={
+                <Badge variant={blockedIpsCount > 0 ? 'rosso' : 'azzurro'} size="sm">
+                  {blockedIpsCount > 0 ? `${blockedIpsCount} bloccati` : 'Attivo'}
+                </Badge>
+              }
+              chevron
+              onClick={() => setIsBlockedIpsOpen(true)}
             />
           </GroupedList>
 
@@ -614,6 +669,20 @@ export function AdminView() {
       <TrashSheet
         isOpen={isTrashOpen}
         onClose={() => setIsTrashOpen(false)}
+        onItemsChanged={loadData}
+      />
+
+      {/* Sheet Revisione Proposte Clan */}
+      <ProposteReviewSheet
+        isOpen={isProposteOpen}
+        onClose={() => setIsProposteOpen(false)}
+        onItemsChanged={loadData}
+      />
+
+      {/* Sheet Sicurezza & IP Bloccati (Anti-Flood) */}
+      <BlockedIpsSheet
+        isOpen={isBlockedIpsOpen}
+        onClose={() => setIsBlockedIpsOpen(false)}
         onItemsChanged={loadData}
       />
 

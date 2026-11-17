@@ -5,6 +5,8 @@ import { I18N } from '../../lib/i18n';
 import { Gioco } from '../../lib/db';
 import { saveGioco } from '../../lib/admin_actions';
 import { findSimilarName } from '../../lib/search';
+import { useAdmin } from '../../lib/auth';
+import { inviaProposta } from '../../lib/proposte';
 
 export interface GiocoFormSheetProps {
   isOpen: boolean;
@@ -21,9 +23,11 @@ export function GiocoFormSheet({
   initialGioco,
   existingNames,
 }: GiocoFormSheetProps) {
+  const { isAdmin } = useAdmin();
   const [nome, setNome] = useState('');
   const [regole, setRegole] = useState('');
   const [materiali, setMateriali] = useState('');
+  const [proponenteNome, setProponenteNome] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -32,6 +36,7 @@ export function GiocoFormSheet({
       setNome(initialGioco?.nome || '');
       setRegole(initialGioco?.regole || '');
       setMateriali(initialGioco?.materiali || '');
+      setProponenteNome('');
       setErrorMessage(null);
     }
   }, [isOpen, initialGioco]);
@@ -51,27 +56,55 @@ export function GiocoFormSheet({
     setErrorMessage(null);
 
     try {
-      const saved = await saveGioco({
-        id: initialGioco?.id,
-        nome,
-        regole,
-        materiali,
-      });
-      setIsSaving(false);
-      onSaved(saved);
-      onClose();
+      if (isAdmin) {
+        const saved = await saveGioco({
+          id: initialGioco?.id,
+          nome,
+          regole,
+          materiali,
+        });
+        setIsSaving(false);
+        onSaved(saved);
+        onClose();
+      } else {
+        const prop = await inviaProposta(
+          'giochi',
+          nome,
+          { nome, regole, materiali },
+          proponenteNome
+        );
+        setIsSaving(false);
+        onSaved({
+          id: prop.id,
+          nome: prop.titolo,
+          regole,
+          materiali,
+          created_at: prop.created_at,
+          updated_at: prop.created_at,
+          deleted_at: null,
+        });
+        onClose();
+      }
     } catch (err: any) {
       setIsSaving(false);
       setErrorMessage(err.message || I18N.dialogs.erroreSalvataggio);
     }
   };
 
+  const titleText = isAdmin
+    ? initialGioco ? 'Modifica Gioco' : I18N.giochi.nuovoGioco
+    : initialGioco ? 'Modifica Gioco' : 'Proponi un Gioco al Clan';
+
+  const subtitleText = isAdmin
+    ? 'I campi contrassegnati da * sono obbligatori.'
+    : 'La proposta sarà inviata all\'Admin e sarà visibile subito su questo dispositivo.';
+
   return (
     <BottomSheet
       isOpen={isOpen}
       onClose={onClose}
-      title={initialGioco ? 'Modifica Gioco' : I18N.giochi.nuovoGioco}
-      subtitle="I campi contrassegnati da * sono obbligatori."
+      title={titleText}
+      subtitle={subtitleText}
       footer={
         <div style={{ display: 'flex', gap: '8px', width: '100%', justifyContent: 'flex-end' }}>
           <Button variant="ghost" onClick={onClose} disabled={isSaving}>
@@ -83,7 +116,7 @@ export function GiocoFormSheet({
             isLoading={isSaving}
             disabled={!isValid || isSaving}
           >
-            {I18N.dialogs.salva}
+            {isAdmin ? I18N.dialogs.salva : 'Invia proposta all\'Admin'}
           </Button>
         </div>
       }
@@ -174,6 +207,23 @@ export function GiocoFormSheet({
             disabled={isSaving}
           />
         </div>
+
+        {!isAdmin ? (
+          <div className="ios-form-group">
+            <label className="ios-form-label" htmlFor="gioco-proponente">
+              Il tuo nome o Pattuglia (opzionale)
+            </label>
+            <input
+              id="gioco-proponente"
+              type="text"
+              className="ios-form-input"
+              placeholder="es. Pattuglia Volpi o Marco R."
+              value={proponenteNome}
+              onInput={(e) => setProponenteNome((e.target as HTMLInputElement).value)}
+              disabled={isSaving}
+            />
+          </div>
+        ) : null}
       </form>
     </BottomSheet>
   );

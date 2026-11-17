@@ -207,6 +207,8 @@ export function parseLineToScreenWords(
  *   Gli accordi risiedono nel flusso naturale sopra le sillabe e non collidono MAI col testo quando la riga va a capo.
  * - Stampa A4: modello con ancore a larghezza zero per garantire larghezze millimetriche fisse nelle 2 colonne.
  */
+
+
 export function CantoLineRenderer({
   line,
   showChords = true,
@@ -301,9 +303,9 @@ export function CantoLineRenderer({
     );
   }
 
-  // 5. Riga con accordi: Modello ad Unità Atomiche (.canto-word e .canto-unit)
-  // Utilizzato universalmente per schermo e stampa per impedire qualsiasi collisione tra accordi e parole.
+  // 5. Riga con accordi (sempre visualizzati chiaramente sopra il testo)
   const words = parseLineToScreenWords(lyrics, chords, transposeDelta);
+
   return (
     <div
       ref={lineRef}
@@ -312,26 +314,36 @@ export function CantoLineRenderer({
     >
       {words.map((w, wIdx) => (
         <span key={wIdx} className="canto-word">
-          {w.units.map((u, uIdx) => (
-            <span key={uIdx} className="canto-unit">
-              {u.chord && (
-                <span
-                  className="canzoniere-chord-anchor"
-                  aria-hidden="true"
-                  style={{ width: 0, height: 0, display: 'inline-block', overflow: 'hidden' }}
-                />
-              )}
+          {w.units.map((u, uIdx) => {
+            const hasChord = Boolean(u.chord);
+            const isChordOnlyUnit = hasChord && (!u.lyric || !u.lyric.trim());
+
+            return (
               <span
-                className={`canto-unit-chord song-chord ${u.chord ? 'canzoniere-chord-badge' : ''}`.trim()}
-                aria-hidden={!u.chord}
+                key={uIdx}
+                className={`canto-unit ${hasChord ? 'has-chord' : ''} ${isChordOnlyUnit ? 'is-chord-only' : ''}`.trim()}
+                style={{
+                  minWidth: isChordOnlyUnit ? `${Math.max(1.4, (u.chord?.length || 2) * 0.65)}em` : undefined,
+                }}
               >
-                {u.chord || '\u00A0'}
+                {hasChord ? (
+                  <span
+                    className="canto-unit-chord song-chord"
+                    aria-label={`Accordo ${u.chord}`}
+                  >
+                    {u.chord}
+                  </span>
+                ) : (
+                  <span className="canto-unit-chord-placeholder" aria-hidden="true">
+                    &nbsp;
+                  </span>
+                )}
+                <span className="canto-unit-lyric">
+                  {u.lyric || '\u00A0'}
+                </span>
               </span>
-              <span className="canto-unit-lyric">
-                {u.lyric || '\u00A0'}
-              </span>
-            </span>
-          ))}
+            );
+          })}
         </span>
       ))}
     </div>

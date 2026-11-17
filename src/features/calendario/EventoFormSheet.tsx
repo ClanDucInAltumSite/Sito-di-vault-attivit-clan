@@ -375,6 +375,7 @@ export function EventoFormSheet({
             fontSize: 'var(--font-size-xs)',
             lineHeight: 1.4,
             color: 'var(--color-text-secondary)',
+            wordBreak: 'break-word',
           }}
         >
           {I18N.calendario.avvisoPrivacy}
@@ -921,8 +922,8 @@ export function EventoFormSheet({
                   )}
                 </div>
               ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
-                  <div>
+                <div className="evento-form-date-grid">
+                  <div style={{ minWidth: 0 }}>
                     <label
                       htmlFor="evento-data-inizio"
                       style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 600, marginBottom: 'var(--space-1)' }}
@@ -940,7 +941,7 @@ export function EventoFormSheet({
                     />
                   </div>
 
-                  <div>
+                  <div style={{ minWidth: 0 }}>
                     <label
                       htmlFor="evento-data-fine"
                       style={{ display: 'block', fontSize: 'var(--font-size-xs)', fontWeight: 600, marginBottom: 'var(--space-1)' }}

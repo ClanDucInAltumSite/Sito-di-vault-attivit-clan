@@ -10,15 +10,168 @@ import { I18N } from '../../lib/i18n';
 import { Icon } from '../../ui/Icon';
 import { compressImageForDocument } from './quaderno_image';
 import { renderMarkdownToContainer, domToMarkdown } from './quaderno_dom';
+import { getCategoryPillColors } from './quaderno_colors';
 
 export interface QuadernoDocEditorProps {
   pagina: QuadernoPagina;
   isOpen: boolean;
-  onClose: (updatedPagina: QuadernoPagina) => void;
+  onClose: (updatedPagina: QuadernoPagina, wasPoppedByBrowser?: boolean) => void;
 }
 
 type SaveStatus = 'saved' | 'saving' | 'dirty' | 'error';
 type HeadingLevel = 0 | 1 | 2 | 3 | 4 | 'sub';
+// Helper per recuperare la variabile CSS del colore
+function getColorVar(color: string): string {
+  switch (color) {
+    case 'purple': return 'var(--color-quaderno)';
+    case 'blue': return 'var(--color-canti)';
+    case 'cyan': return 'var(--color-doc-cyan)';
+    case 'green': return 'var(--color-calendario)';
+    case 'lime': return 'var(--color-doc-lime)';
+    case 'amber': return 'var(--color-giochi)';
+    case 'red': return 'var(--color-bans)';
+    case 'pink': return 'var(--color-doc-pink)';
+    case 'brown': return 'var(--color-doc-brown)';
+    case 'navy': return 'var(--color-doc-navy)';
+    case 'gray': return 'var(--color-doc-gray)';
+    default: return 'inherit';
+  }
+}
+
+// Helper per recuperare la variabile CSS dell'evidenziatore
+function getHighlightVar(color: string): string {
+  switch (color) {
+    case 'green': return 'var(--color-highlight-green)';
+    case 'blue': return 'var(--color-highlight-blue)';
+    case 'coral': return 'var(--color-highlight-coral)';
+    case 'purple': return 'var(--color-highlight-purple)';
+    case 'amber': return 'var(--color-highlight-amber)';
+    case 'cyan': return 'var(--color-highlight-cyan)';
+    case 'gray': return 'var(--color-highlight-gray)';
+    default: return 'var(--color-highlight-yellow)';
+  }
+}
+
+// Ripristina la posizione del cursore in base all'offset dei caratteri
+function setCaretAtCharOffset(container: Node, targetOffset: number): Range {
+  const range = document.createRange();
+  range.selectNodeContents(container);
+  range.collapse(true);
+
+  let currentOffset = 0;
+  const nodeIterator = document.createNodeIterator(container, NodeFilter.SHOW_TEXT);
+  let textNode: Text | null = null;
+  let lastTextNode: Text | null = null;
+
+  while ((textNode = nodeIterator.nextNode() as Text | null)) {
+    lastTextNode = textNode;
+    const len = textNode.nodeValue ? textNode.nodeValue.length : 0;
+    if (currentOffset + len >= targetOffset) {
+      range.setStart(textNode, Math.max(0, targetOffset - currentOffset));
+      range.collapse(true);
+      return range;
+    }
+    currentOffset += len;
+  }
+
+  if (lastTextNode) {
+    range.setStart(lastTextNode, lastTextNode.nodeValue ? lastTextNode.nodeValue.length : 0);
+    range.collapse(true);
+  }
+  return range;
+}
+
+// Trova l'antenato più vicino corrispondente a un predicato
+function findAncestor(
+  node: Node | null,
+  stopAt: HTMLElement,
+  matcher: (el: HTMLElement) => boolean
+): HTMLElement | null {
+  let curr: Node | null = node;
+  while (curr && curr !== stopAt) {
+    if (curr.nodeType === Node.ELEMENT_NODE && matcher(curr as HTMLElement)) {
+      return curr as HTMLElement;
+    }
+    curr = curr.parentNode;
+  }
+  return null;
+}
+
+// Divide un elemento antenato in due parti a un determinato punto limite (boundaryNode, boundaryOffset)
+function splitElementAt(
+  ancestor: HTMLElement,
+  boundaryNode: Node,
+  boundaryOffset: number
+): { left: HTMLElement | null; right: HTMLElement | null } {
+  try {
+    if (!ancestor.contains(boundaryNode)) {
+      return { left: ancestor, right: null };
+    }
+
+    const preRange = document.createRange();
+    preRange.setStart(ancestor, 0);
+    preRange.setEnd(boundaryNode, boundaryOffset);
+    if (preRange.toString().length === 0) {
+      return { left: null, right: ancestor };
+    }
+
+    const postRange = document.createRange();
+    postRange.setStart(boundaryNode, boundaryOffset);
+    postRange.setEnd(ancestor, ancestor.childNodes.length);
+    if (postRange.toString().length === 0) {
+      return { left: ancestor, right: null };
+    }
+
+    const splitRange = document.createRange();
+    splitRange.setStart(boundaryNode, boundaryOffset);
+    splitRange.setEnd(ancestor, ancestor.childNodes.length);
+    const rightFrag = splitRange.extractContents();
+
+    const rightEl = ancestor.cloneNode(false) as HTMLElement;
+    rightEl.appendChild(rightFrag);
+    ancestor.after(rightEl);
+
+    return { left: ancestor, right: rightEl };
+  } catch (err) {
+    console.warn('Errore splitElementAt:', err);
+    return { left: ancestor, right: null };
+  }
+}
+
+// Espande un cursore collassato ai confini della parola se il cursore è adiacente o interno ad essa
+function tryExpandToWord(range: Range): Range | null {
+  if (!range.collapsed) return null;
+  const node = range.startContainer;
+  if (node.nodeType !== Node.TEXT_NODE) return null;
+  const text = node.textContent || '';
+  const offset = range.startOffset;
+
+  const isCharBeforeWord = offset > 0 && /\S/.test(text[offset - 1] ?? '');
+  const isCharAfterWord = offset < text.length && /\S/.test(text[offset] ?? '');
+
+  if (!isCharBeforeWord && !isCharAfterWord) {
+    return null;
+  }
+
+  let start = offset;
+  while (start > 0 && /\S/.test(text[start - 1] ?? '')) {
+    start--;
+  }
+
+  let end = offset;
+  while (end < text.length && /\S/.test(text[end] ?? '')) {
+    end++;
+  }
+
+  if (start < end) {
+    const wordRange = document.createRange();
+    wordRange.setStart(node, start);
+    wordRange.setEnd(node, end);
+    return wordRange;
+  }
+
+  return null;
+}
 
 export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditorProps) {
   const [titolo, setTitolo] = useState(pagina.titolo || '');
@@ -58,6 +211,8 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
   const isHistoryNavigatingRef = useRef<boolean>(false);
   const typingTimerRef = useRef<any>(null);
   const isClosingRef = useRef<boolean>(false);
+  const isPoppedByBrowserRef = useRef<boolean>(false);
+  const inFlightPromiseRef = useRef<Promise<QuadernoPagina> | null>(null);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
 
@@ -102,8 +257,13 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
       setIsStrike(document.queryCommandState('strikeThrough'));
       setIsListUnordered(document.queryCommandState('insertUnorderedList'));
       setIsListOrdered(document.queryCommandState('insertOrderedList'));
+      const nativeUndo = document.queryCommandEnabled('undo');
+      const nativeRedo = document.queryCommandEnabled('redo');
+      setCanUndo(nativeUndo || undoStackRef.current.length > 1);
+      setCanRedo(nativeRedo || redoStackRef.current.length > 0);
     } catch {
-      // Ignora errori su contesti non editabili
+      setCanUndo(undoStackRef.current.length > 1);
+      setCanRedo(redoStackRef.current.length > 0);
     }
 
     const sel = window.getSelection();
@@ -139,17 +299,18 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
 
         if (el.dataset.color) {
           foundColor = el.dataset.color;
+        } else if (el.className) {
+          const m = el.className.match(/doc-color-([a-z]+)/);
+          if (m && m[1]) foundColor = m[1];
         }
 
         if (el.dataset.highlight) {
           foundHighlight = el.dataset.highlight;
-        } else if (el.classList.contains('doc-highlight-green')) {
-          foundHighlight = 'green';
-        } else if (el.classList.contains('doc-highlight-blue')) {
-          foundHighlight = 'blue';
-        } else if (el.classList.contains('doc-highlight-coral')) {
-          foundHighlight = 'coral';
-        } else if (el.classList.contains('doc-highlight-yellow') || tag === 'MARK') {
+        } else if (el.className) {
+          const m = el.className.match(/doc-highlight-([a-z]+)/);
+          if (m && m[1]) foundHighlight = m[1];
+          else if (tag === 'MARK') foundHighlight = 'yellow';
+        } else if (tag === 'MARK') {
           foundHighlight = 'yellow';
         }
       }
@@ -214,29 +375,44 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
     };
   }, [isOpen, updateActiveToolbarState]);
 
-  // Salvataggio effettivo
+  // Salvataggio effettivo con lock anti-concorrenza
   const doSave = useCallback(
-    async (titleToSave: string, catToSave: QuadernoCategoria, dateToSave: string, markdownContent: string) => {
+    async (titleToSave: string, catToSave: QuadernoCategoria, dateToSave: string, markdownContent: string): Promise<QuadernoPagina | null> => {
       const cleanTitle = titleToSave.trim();
-      if (!cleanTitle || !dateToSave) return;
+      if (!cleanTitle || !dateToSave) return null;
+
+      if (inFlightPromiseRef.current) {
+        try {
+          await inFlightPromiseRef.current;
+        } catch {}
+      }
 
       setSaveStatus('saving');
+      const savePromise = saveQuadernoPagina({
+        id: pagina.id,
+        titolo: cleanTitle,
+        categoria: catToSave,
+        data: dateToSave,
+        contenuto: markdownContent,
+        evento_id: pagina.evento_id,
+      });
+      inFlightPromiseRef.current = savePromise;
+
       try {
-        const saved = await saveQuadernoPagina({
-          id: pagina.id,
-          titolo: cleanTitle,
-          categoria: catToSave,
-          data: dateToSave,
-          contenuto: markdownContent,
-          evento_id: pagina.evento_id,
-        });
+        const saved = await savePromise;
         lastSavedPaginaRef.current = saved;
         setSaveStatus('saved');
         setErrorMessage(null);
+        return saved;
       } catch (err: any) {
         console.warn('Errore autosave quaderno:', err);
         setSaveStatus('error');
         setErrorMessage(err.message || 'Impossibile salvare la bozza.');
+        return null;
+      } finally {
+        if (inFlightPromiseRef.current === savePromise) {
+          inFlightPromiseRef.current = null;
+        }
       }
     },
     [pagina.id, pagina.evento_id]
@@ -271,7 +447,11 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
           stack.shift();
         }
         redoStackRef.current = [];
-        setCanUndo(stack.length > 1);
+        let nativeUndo = false;
+        try {
+          nativeUndo = document.queryCommandEnabled('undo');
+        } catch {}
+        setCanUndo(nativeUndo || stack.length > 1);
         setCanRedo(false);
       }
     };
@@ -288,7 +468,15 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
   // Notifica modifica contenuto dal foglio
   const handleContentChanged = useCallback(() => {
     if (!editorRef.current) return;
-    const isDocEmpty = !editorRef.current.textContent?.trim();
+    if (!editorRef.current.childNodes.length || (editorRef.current.childNodes.length === 1 && editorRef.current.firstChild?.nodeName === 'BR')) {
+      const p = document.createElement('p');
+      p.className = 'doc-p';
+      p.appendChild(document.createElement('br'));
+      editorRef.current.replaceChildren(p);
+    }
+    const hasMediaOrDivider = !!editorRef.current.querySelector('img, hr, figure, table');
+    const hasText = !!editorRef.current.textContent?.trim();
+    const isDocEmpty = !hasText && !hasMediaOrDivider;
     if (isDocEmpty) {
       editorRef.current.setAttribute('data-empty', 'true');
     } else {
@@ -300,19 +488,34 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
     updateActiveToolbarState();
   }, [titolo, categoria, data, scheduleAutoSave, pushHistorySnapshot, updateActiveToolbarState]);
 
-  // Ripristina l'ultimo stato (Undo - Ctrl+Z)
+  // Ripristina l'ultimo stato (Undo - pulsante toolbar o fallback)
   const handleUndo = useCallback(() => {
     const editor = editorRef.current;
     if (!editor) return;
-    if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+    if (typingTimerRef.current) {
+      clearTimeout(typingTimerRef.current);
+      typingTimerRef.current = null;
+    }
 
     const currentMd = domToMarkdown(editor);
     const stack = undoStackRef.current;
-    if (currentMd !== stack[stack.length - 1]) {
+    if (stack.length === 0 || (stack.length > 0 && currentMd !== stack[stack.length - 1])) {
       stack.push(currentMd);
     }
 
     if (stack.length <= 1) return;
+
+    let activeBlockIndex = 0;
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0 && editor.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+      let b: Node | null = sel.getRangeAt(0).startContainer;
+      while (b && b.parentNode !== editor) {
+        b = b.parentNode;
+      }
+      if (b && b.parentNode === editor) {
+        activeBlockIndex = Array.from(editor.children).indexOf(b as HTMLElement);
+      }
+    }
 
     isHistoryNavigatingRef.current = true;
     try {
@@ -325,8 +528,23 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
       } else {
         editor.removeAttribute('data-empty');
       }
+      try {
+        const validIndex = Math.max(0, Math.min(activeBlockIndex, editor.children.length - 1));
+        const targetBlock = (editor.children[validIndex] as HTMLElement) || editor;
+        editor.focus();
+        const newRange = document.createRange();
+        newRange.selectNodeContents(targetBlock);
+        newRange.collapse(false);
+        const s = window.getSelection();
+        if (s) {
+          s.removeAllRanges();
+          s.addRange(newRange);
+          savedRangeRef.current = newRange.cloneRange();
+        }
+      } catch {}
+
       setCanUndo(stack.length > 1);
-      setCanRedo(true);
+      setCanRedo(redoStackRef.current.length > 0);
       scheduleAutoSave(titolo, categoria, data, targetMd);
       updateActiveToolbarState();
     } finally {
@@ -334,11 +552,28 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
     }
   }, [titolo, categoria, data, scheduleAutoSave, updateActiveToolbarState]);
 
-  // Ripete lo stato annullato (Redo - Ctrl+Y / Ctrl+Shift+Z)
+  // Ripete lo stato annullato (Redo - pulsante toolbar o fallback)
   const handleRedo = useCallback(() => {
     const editor = editorRef.current;
-    if (!editor || redoStackRef.current.length === 0) return;
-    if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+    if (!editor) return;
+    if (typingTimerRef.current) {
+      clearTimeout(typingTimerRef.current);
+      typingTimerRef.current = null;
+    }
+
+    if (redoStackRef.current.length === 0) return;
+
+    let activeBlockIndex = 0;
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0 && editor.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+      let b: Node | null = sel.getRangeAt(0).startContainer;
+      while (b && b.parentNode !== editor) {
+        b = b.parentNode;
+      }
+      if (b && b.parentNode === editor) {
+        activeBlockIndex = Array.from(editor.children).indexOf(b as HTMLElement);
+      }
+    }
 
     isHistoryNavigatingRef.current = true;
     try {
@@ -350,7 +585,22 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
       } else {
         editor.removeAttribute('data-empty');
       }
-      setCanUndo(true);
+      try {
+        const validIndex = Math.max(0, Math.min(activeBlockIndex, editor.children.length - 1));
+        const targetBlock = (editor.children[validIndex] as HTMLElement) || editor;
+        editor.focus();
+        const newRange = document.createRange();
+        newRange.selectNodeContents(targetBlock);
+        newRange.collapse(false);
+        const s = window.getSelection();
+        if (s) {
+          s.removeAllRanges();
+          s.addRange(newRange);
+          savedRangeRef.current = newRange.cloneRange();
+        }
+      } catch {}
+
+      setCanUndo(undoStackRef.current.length > 1);
       setCanRedo(redoStackRef.current.length > 0);
       scheduleAutoSave(titolo, categoria, data, nextMd);
       updateActiveToolbarState();
@@ -363,20 +613,26 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
   useEffect(() => {
     if (!isOpen) return;
     isClosingRef.current = false;
+    isPoppedByBrowserRef.current = false;
 
-    window.history.pushState({ quadernoEditorOpen: true, paginaId: pagina.id }, '');
+    if (window.history.state?.quadernoReadingOpen) {
+      window.history.replaceState({ quadernoEditorOpen: true, paginaId: pagina.id }, '');
+    } else if (!window.history.state?.quadernoEditorOpen) {
+      window.history.pushState({ quadernoEditorOpen: true, paginaId: pagina.id }, '');
+    }
 
     const handlePopState = () => {
       if (isClosingRef.current) return;
       isClosingRef.current = true;
-      handleDone();
+      isPoppedByBrowserRef.current = true;
+      handleDone(true);
     };
 
     window.addEventListener('popstate', handlePopState);
 
     return () => {
       window.removeEventListener('popstate', handlePopState);
-      if (window.history.state?.quadernoEditorOpen) {
+      if (!isPoppedByBrowserRef.current && window.history.state?.quadernoEditorOpen) {
         window.history.replaceState(null, '');
       }
     };
@@ -384,45 +640,175 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
 
 
 
-  // Helper sicuro per rimuovere involucri di formattazione dal range specificato
-  const unwrapRangeElements = useCallback(
-    (range: Range, isTarget: (el: HTMLElement) => boolean) => {
+  // Helper atomico e senza annidamento per applicare o rimuovere stili inline (colori, evidenziatori, dimensioni)
+  const applyInlineStyleToRange = useCallback(
+    (
+      matcher: (el: HTMLElement) => boolean,
+      createWrapper: ((val: string) => HTMLElement) | null,
+      value: string | null
+    ) => {
       const editor = editorRef.current;
       if (!editor) return;
 
-      // 1. Controlla se gli antenati fino ad editor soddisfano isTarget
-      let curr: Node | null = range.commonAncestorContainer;
-      while (curr && curr !== editor) {
-        if (curr.nodeType === Node.ELEMENT_NODE && isTarget(curr as HTMLElement)) {
-          const el = curr as HTMLElement;
-          const parent = el.parentNode;
-          if (parent) {
-            while (el.firstChild) {
-              parent.insertBefore(el.firstChild, el);
-            }
-            parent.removeChild(el);
-          }
-          break;
+      let range = savedRangeRef.current;
+      const sel = window.getSelection();
+      if ((!range || !editor.contains(range.commonAncestorContainer)) && sel && sel.rangeCount > 0) {
+        if (editor.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+          range = sel.getRangeAt(0);
         }
-        curr = curr.parentNode;
+      }
+      if (!range) {
+        editor.focus();
+        return;
       }
 
-      // 2. Controlla se dentro il range ci sono nodi che soddisfano isTarget
-      const frag = range.cloneContents();
-      const allEls = Array.from(frag.querySelectorAll('*'));
-      const hasMatch = allEls.some((el) => isTarget(el as HTMLElement));
-
-      if (hasMatch) {
-        const extracted = range.extractContents();
-        extracted.querySelectorAll('*').forEach((el) => {
-          if (isTarget(el as HTMLElement)) {
-            el.replaceWith(...Array.from(el.childNodes));
+      // Se il cursore è collassato (nessun testo selezionato)
+      if (range.collapsed) {
+        const expandedRange = tryExpandToWord(range);
+        if (expandedRange) {
+          range = expandedRange;
+        } else {
+          // Cursore su spazio bianco o riga vuota
+          if (!createWrapper || value === 'default' || value === 'clear') {
+            const enclosing = findAncestor(range.startContainer, editor, matcher);
+            if (enclosing) {
+              const newRange = document.createRange();
+              newRange.setStartAfter(enclosing);
+              newRange.collapse(true);
+              editor.focus();
+              if (sel) {
+                sel.removeAllRanges();
+                sel.addRange(newRange);
+              }
+              savedRangeRef.current = newRange.cloneRange();
+            }
+            return;
           }
-        });
-        range.insertNode(extracted);
+
+          const enclosing = findAncestor(range.startContainer, editor, matcher);
+          if (enclosing) {
+            splitElementAt(enclosing, range.startContainer, range.startOffset);
+          }
+
+          const wrapper = createWrapper(value!);
+          const textNode = document.createTextNode('\u200B');
+          wrapper.appendChild(textNode);
+          range.insertNode(wrapper);
+
+          const newRange = document.createRange();
+          newRange.setStart(textNode, 1);
+          newRange.collapse(true);
+          editor.focus();
+          if (sel) {
+            sel.removeAllRanges();
+            sel.addRange(newRange);
+          }
+          savedRangeRef.current = newRange.cloneRange();
+
+          handleContentChanged();
+          pushHistorySnapshot(true);
+          return;
+        }
       }
+
+      // Range NON collassato (testo selezionato)
+      const startAncestor = findAncestor(range.startContainer, editor, matcher);
+      const endAncestor = findAncestor(range.endContainer, editor, matcher);
+
+      let effectiveStartNode: Node = range.startContainer;
+      let effectiveStartOffset: number = range.startOffset;
+      let effectiveEndNode: Node = range.endContainer;
+      let effectiveEndOffset: number = range.endOffset;
+
+      if (startAncestor && endAncestor && startAncestor === endAncestor) {
+        // Entrambi i confini sono all'interno dello stesso elemento antenato
+        const { left } = splitElementAt(startAncestor, range.endContainer, range.endOffset);
+        if (left) {
+          const { right: rightStart } = splitElementAt(left, range.startContainer, range.startOffset);
+          if (rightStart) {
+            effectiveStartNode = rightStart;
+            effectiveStartOffset = 0;
+            effectiveEndNode = rightStart;
+            effectiveEndOffset = rightStart.childNodes.length;
+          } else {
+            effectiveStartNode = left;
+            effectiveStartOffset = 0;
+            effectiveEndNode = left;
+            effectiveEndOffset = left.childNodes.length;
+          }
+        }
+      } else {
+        if (endAncestor) {
+          const { left: leftEnd } = splitElementAt(endAncestor, range.endContainer, range.endOffset);
+          if (leftEnd) {
+            effectiveEndNode = leftEnd;
+            effectiveEndOffset = leftEnd.childNodes.length;
+          }
+        }
+        if (startAncestor) {
+          const { right: rightStart } = splitElementAt(startAncestor, range.startContainer, range.startOffset);
+          if (rightStart) {
+            effectiveStartNode = rightStart;
+            effectiveStartOffset = 0;
+          }
+        }
+      }
+
+      const effectiveRange = document.createRange();
+      try {
+        effectiveRange.setStart(effectiveStartNode, effectiveStartOffset);
+        effectiveRange.setEnd(effectiveEndNode, effectiveEndOffset);
+      } catch {
+        effectiveRange.setStart(range.startContainer, range.startOffset);
+        effectiveRange.setEnd(range.endContainer, range.endOffset);
+      }
+
+      const frag = effectiveRange.extractContents();
+
+      // Rimuovi TUTTI gli involucri preesistenti che corrispondono a matcher dentro il frammento
+      const allMatching = Array.from(frag.querySelectorAll('*')).filter((el) => matcher(el as HTMLElement));
+      allMatching.forEach((el) => {
+        el.replaceWith(...Array.from(el.childNodes));
+      });
+
+      if (createWrapper && value && value !== 'default' && value !== 'clear') {
+        const wrapper = createWrapper(value);
+        wrapper.appendChild(frag);
+        effectiveRange.insertNode(wrapper);
+
+        const newRange = document.createRange();
+        newRange.selectNodeContents(wrapper);
+        editor.focus();
+        if (sel) {
+          sel.removeAllRanges();
+          sel.addRange(newRange);
+        }
+        savedRangeRef.current = newRange.cloneRange();
+      } else {
+        const firstChild = frag.firstChild;
+        const lastChild = frag.lastChild;
+        effectiveRange.insertNode(frag);
+
+        const newRange = document.createRange();
+        if (firstChild && lastChild) {
+          newRange.setStartBefore(firstChild);
+          newRange.setEndAfter(lastChild);
+        } else {
+          newRange.setStart(effectiveRange.startContainer, effectiveRange.startOffset);
+          newRange.collapse(true);
+        }
+        editor.focus();
+        if (sel) {
+          sel.removeAllRanges();
+          sel.addRange(newRange);
+        }
+        savedRangeRef.current = newRange.cloneRange();
+      }
+
+      handleContentChanged();
+      pushHistorySnapshot(true);
     },
-    []
+    [handleContentChanged, pushHistorySnapshot]
   );
 
   // Comando nativo execCommand per comandi standard (grassetto, corsivo, elenchi)
@@ -497,7 +883,7 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
         const rect = colorBtnRef.current.getBoundingClientRect();
         setMenuPos({
           top: rect.bottom + 4,
-          left: Math.max(8, Math.min(rect.left - 20, window.innerWidth - 200)),
+          left: Math.max(8, Math.min(rect.left - 20, window.innerWidth - 245)),
         });
       }
       isMenuOpenRef.current = true;
@@ -533,7 +919,7 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
         if (curr.nodeType === Node.ELEMENT_NODE) {
           const el = curr as HTMLElement;
           const tag = el.tagName.toUpperCase();
-          if (['P', 'H1', 'H2', 'H3', 'H4', 'DIV', 'BLOCKQUOTE'].includes(tag)) {
+          if (['P', 'H1', 'H2', 'H3', 'H4', 'DIV', 'BLOCKQUOTE', 'LI'].includes(tag)) {
             affectedBlocks.push(el);
             break;
           }
@@ -564,31 +950,78 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
 
     if (affectedBlocks.length > 0) {
       let lastReplaced: HTMLElement | null = null;
+      let lastCharOffset = 0;
+
       for (const block of affectedBlocks) {
+        // Calcola l'offset relativo del cursore prima della sostituzione
+        try {
+          const preRange = document.createRange();
+          preRange.setStart(block, 0);
+          const maxEndOffset = range.startContainer.nodeType === Node.TEXT_NODE
+            ? Math.min(range.startOffset, range.startContainer.nodeValue?.length ?? 0)
+            : Math.min(range.startOffset, range.startContainer.childNodes.length);
+          preRange.setEnd(range.startContainer, maxEndOffset);
+          lastCharOffset = preRange.toString().length;
+        } catch {
+          lastCharOffset = 0;
+        }
+
         const newEl = document.createElement(targetTag);
         newEl.className = targetClass;
         if (isSub) {
           newEl.dataset.role = 'subtitle';
         }
+
         while (block.firstChild) {
           newEl.appendChild(block.firstChild);
         }
         if (!newEl.childNodes.length || (newEl.childNodes.length === 1 && newEl.firstChild?.nodeName === 'BR')) {
           newEl.replaceChildren(document.createElement('br'));
         }
-        block.replaceWith(newEl);
+
+        // Se il blocco era un elemento di una lista (LI), estrailo pulitamente dividendo la lista
+        if (block.tagName.toUpperCase() === 'LI') {
+          const parentList = block.parentElement; // UL o OL
+          if (parentList && parentList.parentNode) {
+            const subsequentLis: Element[] = [];
+            let next = block.nextElementSibling;
+            while (next) {
+              subsequentLis.push(next);
+              next = next.nextElementSibling;
+            }
+
+            if (subsequentLis.length > 0) {
+              const nextList = parentList.cloneNode(false) as HTMLElement;
+              for (const sli of subsequentLis) {
+                nextList.appendChild(sli);
+              }
+              parentList.after(nextList);
+            }
+
+            parentList.after(newEl);
+            block.remove();
+
+            if (!parentList.children.length) {
+              parentList.remove();
+            }
+          } else {
+            block.replaceWith(newEl);
+          }
+        } else {
+          block.replaceWith(newEl);
+        }
+
         lastReplaced = newEl;
       }
 
       if (lastReplaced) {
-        const newRange = document.createRange();
-        newRange.selectNodeContents(lastReplaced);
-        newRange.collapse(false);
+        editor.focus();
+        const restoredRange = setCaretAtCharOffset(lastReplaced, lastCharOffset);
         if (sel) {
           sel.removeAllRanges();
-          sel.addRange(newRange);
+          sel.addRange(restoredRange);
         }
-        savedRangeRef.current = newRange.cloneRange();
+        savedRangeRef.current = restoredRange.cloneRange();
       }
     } else {
       const newEl = document.createElement(targetTag);
@@ -597,6 +1030,7 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
       newEl.appendChild(document.createElement('br'));
       editor.appendChild(newEl);
 
+      editor.focus();
       const newRange = document.createRange();
       newRange.selectNodeContents(newEl);
       newRange.collapse(false);
@@ -609,246 +1043,77 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
 
     setActiveHeading(level);
     handleContentChanged();
-    editor.focus();
+    pushHistorySnapshot(true);
   };
 
   // 3. Stepper Dimensione Testo
   const changeFontSize = (delta: number) => {
-    const editor = editorRef.current;
-    if (!editor) return;
-
-    let range = savedRangeRef.current;
-    const sel = window.getSelection();
-    if ((!range || !editor.contains(range.commonAncestorContainer)) && sel && sel.rangeCount > 0) {
-      if (editor.contains(sel.getRangeAt(0).commonAncestorContainer)) {
-        range = sel.getRangeAt(0);
-      }
-    }
-    if (!range) {
-      editor.focus();
-      return;
-    }
-
     const newSize = Math.max(12, Math.min(36, activeFontSize + delta));
     setActiveFontSize(newSize);
 
-    if (range.collapsed) {
+    const isSizeMatcher = (el: HTMLElement) =>
+      el.classList.contains('doc-size-span') || !!el.dataset.size || !!el.style.fontSize;
+
+    const createSizeWrapper = (sz: string) => {
       const span = document.createElement('span');
       span.className = 'doc-size-span';
-      span.dataset.size = String(newSize);
-      span.style.fontSize = `${newSize}px`;
-      const textNode = document.createTextNode('\u200B');
-      span.appendChild(textNode);
-      range.insertNode(span);
-      const newRange = document.createRange();
-      newRange.setStart(textNode, 1);
-      newRange.collapse(true);
-      if (sel) {
-        sel.removeAllRanges();
-        sel.addRange(newRange);
-      }
-      savedRangeRef.current = newRange.cloneRange();
-      handleContentChanged();
-      editor.focus();
-      return;
-    }
+      span.dataset.size = sz;
+      span.style.fontSize = `${sz}px`;
+      return span;
+    };
 
-    // Pulisce size preesistenti nel frammento estratto
-    const frag = range.extractContents();
-    frag.querySelectorAll('.doc-size-span, [data-size]').forEach((el) => {
-      const h = el as HTMLElement;
-      delete h.dataset.size;
-      h.style.fontSize = '';
-      h.classList.remove('doc-size-span');
-      if (!h.getAttribute('style') && !h.getAttribute('class') && Object.keys(h.dataset).length === 0) {
-        h.replaceWith(...Array.from(h.childNodes));
-      }
-    });
-
-    const span = document.createElement('span');
-    span.className = 'doc-size-span';
-    span.dataset.size = String(newSize);
-    span.style.fontSize = `${newSize}px`;
-    span.appendChild(frag);
-    range.insertNode(span);
-
-    const newRange = document.createRange();
-    newRange.selectNodeContents(span);
-    if (sel) {
-      sel.removeAllRanges();
-      sel.addRange(newRange);
-    }
-    savedRangeRef.current = newRange.cloneRange();
-
-    handleContentChanged();
-    editor.focus();
+    applyInlineStyleToRange(
+      isSizeMatcher,
+      createSizeWrapper,
+      String(newSize)
+    );
   };
 
   // 4. Evidenziatore Pastello
-  const applyHighlight = (color: 'yellow' | 'green' | 'blue' | 'coral' | 'clear') => {
+  const applyHighlight = (color: 'yellow' | 'green' | 'blue' | 'coral' | 'purple' | 'amber' | 'cyan' | 'gray' | 'clear') => {
     closeAllMenus();
-    const editor = editorRef.current;
-    if (!editor) return;
-
-    let range = savedRangeRef.current;
-    const sel = window.getSelection();
-    if ((!range || !editor.contains(range.commonAncestorContainer)) && sel && sel.rangeCount > 0) {
-      if (editor.contains(sel.getRangeAt(0).commonAncestorContainer)) {
-        range = sel.getRangeAt(0);
-      }
-    }
-    if (!range) {
-      editor.focus();
-      return;
+    if (color !== 'clear') {
+      setActiveHighlight(color);
     }
 
-    if (color === 'clear') {
-      unwrapRangeElements(
-        range,
-        (el) => el.tagName === 'MARK' || el.classList.contains('doc-highlight') || !!el.dataset.highlight
-      );
-      setActiveHighlight('yellow');
-      handleContentChanged();
-      editor.focus();
-      return;
-    }
+    const isHighlightMatcher = (el: HTMLElement) =>
+      el.tagName === 'MARK' || el.classList.contains('doc-highlight') || !!el.dataset.highlight;
 
-    setActiveHighlight(color);
-
-    if (range.collapsed) {
+    const createHighlightWrapper = (c: string) => {
       const mark = document.createElement('mark');
-      mark.className = `doc-highlight doc-highlight-${color}`;
-      mark.dataset.highlight = color;
-      const textNode = document.createTextNode('\u200B');
-      mark.appendChild(textNode);
-      range.insertNode(mark);
-      const newRange = document.createRange();
-      newRange.setStart(textNode, 1);
-      newRange.collapse(true);
-      if (sel) {
-        sel.removeAllRanges();
-        sel.addRange(newRange);
-      }
-      savedRangeRef.current = newRange.cloneRange();
-      handleContentChanged();
-      editor.focus();
-      return;
-    }
+      mark.className = `doc-highlight doc-highlight-${c}`;
+      mark.dataset.highlight = c;
+      return mark;
+    };
 
-    // Pulisce mark preesistenti nel frammento estratto
-    const frag = range.extractContents();
-    frag.querySelectorAll('mark, [data-highlight], [class*="doc-highlight"]').forEach((el) => {
-      const h = el as HTMLElement;
-      h.replaceWith(...Array.from(h.childNodes));
-    });
-
-    const mark = document.createElement('mark');
-    mark.className = `doc-highlight doc-highlight-${color}`;
-    mark.dataset.highlight = color;
-    mark.appendChild(frag);
-    range.insertNode(mark);
-
-    const newRange = document.createRange();
-    newRange.selectNodeContents(mark);
-    if (sel) {
-      sel.removeAllRanges();
-      sel.addRange(newRange);
-    }
-    savedRangeRef.current = newRange.cloneRange();
-
-    handleContentChanged();
-    editor.focus();
+    applyInlineStyleToRange(
+      isHighlightMatcher,
+      color === 'clear' ? null : createHighlightWrapper,
+      color
+    );
   };
 
   // 5. Colore Testo Scout
-  const applyTextColor = (color: 'default' | 'purple' | 'blue' | 'green' | 'red' | 'amber') => {
+  const applyTextColor = (color: 'default' | 'purple' | 'blue' | 'cyan' | 'green' | 'lime' | 'amber' | 'red' | 'pink' | 'brown' | 'navy' | 'gray') => {
     closeAllMenus();
-    const editor = editorRef.current;
-    if (!editor) return;
-
-    let range = savedRangeRef.current;
-    const sel = window.getSelection();
-    if ((!range || !editor.contains(range.commonAncestorContainer)) && sel && sel.rangeCount > 0) {
-      if (editor.contains(sel.getRangeAt(0).commonAncestorContainer)) {
-        range = sel.getRangeAt(0);
-      }
-    }
-    if (!range) {
-      editor.focus();
-      return;
-    }
-
     setActiveColor(color);
 
-    if (color === 'default') {
-      unwrapRangeElements(
-        range,
-        (el) => el.dataset.color !== undefined || el.className.includes('doc-color-')
-      );
-      handleContentChanged();
-      editor.focus();
-      return;
-    }
+    const isColorMatcher = (el: HTMLElement) =>
+      el.dataset.color !== undefined || /doc-color-([a-z]+)/.test(el.className);
 
-    let colorVar = 'inherit';
-    if (color === 'purple') colorVar = 'var(--color-quaderno)';
-    else if (color === 'blue') colorVar = 'var(--color-canti)';
-    else if (color === 'green') colorVar = 'var(--color-calendario)';
-    else if (color === 'red') colorVar = 'var(--color-bans)';
-    else if (color === 'amber') colorVar = 'var(--color-giochi)';
-
-    if (range.collapsed) {
+    const createColorWrapper = (c: string) => {
       const span = document.createElement('span');
-      span.className = `doc-color-${color}`;
-      span.dataset.color = color;
-      span.style.color = colorVar;
-      span.style.fontWeight = '600';
-      const textNode = document.createTextNode('\u200B');
-      span.appendChild(textNode);
-      range.insertNode(span);
-      const newRange = document.createRange();
-      newRange.setStart(textNode, 1);
-      newRange.collapse(true);
-      if (sel) {
-        sel.removeAllRanges();
-        sel.addRange(newRange);
-      }
-      savedRangeRef.current = newRange.cloneRange();
-      handleContentChanged();
-      editor.focus();
-      return;
-    }
+      span.className = `doc-color-${c}`;
+      span.dataset.color = c;
+      span.style.color = getColorVar(c);
+      return span;
+    };
 
-    // Pulisce color span preesistenti nel frammento estratto
-    const frag = range.extractContents();
-    frag.querySelectorAll('[data-color], [class*="doc-color-"]').forEach((el) => {
-      const h = el as HTMLElement;
-      delete h.dataset.color;
-      h.style.color = '';
-      h.className = h.className.split(' ').filter((c) => !c.startsWith('doc-color-')).join(' ');
-      if (!h.getAttribute('style') && !h.getAttribute('class') && Object.keys(h.dataset).length === 0) {
-        h.replaceWith(...Array.from(h.childNodes));
-      }
-    });
-
-    const span = document.createElement('span');
-    span.className = `doc-color-${color}`;
-    span.dataset.color = color;
-    span.style.color = colorVar;
-    span.style.fontWeight = '600';
-    span.appendChild(frag);
-    range.insertNode(span);
-
-    const newRange = document.createRange();
-    newRange.selectNodeContents(span);
-    if (sel) {
-      sel.removeAllRanges();
-      sel.addRange(newRange);
-    }
-    savedRangeRef.current = newRange.cloneRange();
-
-    handleContentChanged();
-    editor.focus();
+    applyInlineStyleToRange(
+      isColorMatcher,
+      color === 'default' ? null : createColorWrapper,
+      color
+    );
   };
 
   // 6. Separatore Orizzontale a livello di blocco pulito
@@ -906,6 +1171,24 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
       savedRangeRef.current = newRange.cloneRange();
     }
     handleContentChanged();
+    pushHistorySnapshot(true);
+  };
+
+  // 6b. Blocco citazione con focus preservato
+  const toggleBlockquote = () => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    restoreSelection();
+    editor.focus();
+    const tag = isBlockquote ? 'p' : 'blockquote';
+    try {
+      document.execCommand('formatBlock', false, `<${tag}>`);
+    } catch {
+      document.execCommand('formatBlock', false, tag);
+    }
+    setIsBlockquote(!isBlockquote);
+    handleContentChanged();
+    pushHistorySnapshot(true);
   };
 
   // Helper comune per inserimento immagini (da file o da incolla) a livello blocco
@@ -960,6 +1243,7 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
       savedRangeRef.current = newRange.cloneRange();
     }
     handleContentChanged();
+    pushHistorySnapshot(true);
   };
 
   // 7. Inserisci Immagine da file
@@ -1023,8 +1307,192 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
     }
   };
 
-  // 9. Scorciatoie da tastiera e formattazione istantanea (Ctrl+Z, Ctrl+Y, Ctrl+B, Ctrl+I, Ctrl+U)
+  // 9. Scorciatoie da tastiera e formattazione istantanea (Ctrl+Z, Ctrl+Y, Ctrl+B, Ctrl+I, Ctrl+U, Invio nei titoli)
   const handleKeyDown = (e: KeyboardEvent) => {
+    // Gestione Invio (Enter) all'interno dei titoli per evitare che la riga successiva resti un titolo
+    if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0 && editorRef.current) {
+        const range = sel.getRangeAt(0);
+        if (editorRef.current.contains(range.commonAncestorContainer)) {
+          let headingBlock: HTMLElement | null = null;
+          let curr: Node | null = range.commonAncestorContainer;
+          while (curr && curr !== editorRef.current) {
+            if (curr.nodeType === Node.ELEMENT_NODE) {
+              const el = curr as HTMLElement;
+              const tag = el.tagName.toUpperCase();
+              if (['H1', 'H2', 'H3', 'H4'].includes(tag) || el.classList.contains('doc-subtitle') || el.dataset.role === 'subtitle') {
+                headingBlock = el;
+                break;
+              }
+            }
+            curr = curr.parentNode;
+          }
+
+          if (headingBlock) {
+            // Se il titolo è completamente vuoto, convertilo in un paragrafo normale
+            if (!headingBlock.textContent?.trim()) {
+              e.preventDefault();
+              const p = document.createElement('p');
+              p.className = 'doc-p';
+              p.appendChild(document.createElement('br'));
+              headingBlock.replaceWith(p);
+              const newRange = document.createRange();
+              newRange.setStart(p, 0);
+              newRange.collapse(true);
+              sel.removeAllRanges();
+              sel.addRange(newRange);
+              savedRangeRef.current = newRange.cloneRange();
+              setActiveHeading(0);
+              handleContentChanged();
+              pushHistorySnapshot(true);
+              return;
+            }
+
+            // Se il cursore è all'inizio (offset 0), inserisci un paragrafo normale prima del titolo
+            const rangeToStart = document.createRange();
+            rangeToStart.setStart(headingBlock, 0);
+            rangeToStart.setEnd(range.startContainer, range.startOffset);
+            if (!rangeToStart.toString()) {
+              e.preventDefault();
+              const p = document.createElement('p');
+              p.className = 'doc-p';
+              p.appendChild(document.createElement('br'));
+              headingBlock.before(p);
+              handleContentChanged();
+              pushHistorySnapshot(true);
+              return;
+            }
+
+            // Cursore alla fine o nel mezzo: estrai la parte successiva e inseriscila in un paragrafo normale
+            e.preventDefault();
+            const splitRange = document.createRange();
+            splitRange.setStart(range.startContainer, range.startOffset);
+            splitRange.setEnd(headingBlock, headingBlock.childNodes.length);
+            const frag = splitRange.extractContents();
+
+            if (!headingBlock.childNodes.length) {
+              headingBlock.appendChild(document.createElement('br'));
+            }
+
+            const p = document.createElement('p');
+            p.className = 'doc-p';
+            if (frag.childNodes.length > 0 && frag.textContent?.trim()) {
+              p.appendChild(frag);
+            } else {
+              p.appendChild(document.createElement('br'));
+            }
+            headingBlock.after(p);
+
+            const newRange = document.createRange();
+            newRange.setStart(p, 0);
+            newRange.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(newRange);
+            savedRangeRef.current = newRange.cloneRange();
+            setActiveHeading(0);
+            handleContentChanged();
+            pushHistorySnapshot(true);
+            return;
+          }
+        }
+      }
+    }
+
+    // Gestione Backspace all'inizio di un titolo per convertirlo in paragrafo normale
+    if (e.key === 'Backspace' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0 && editorRef.current) {
+        const range = sel.getRangeAt(0);
+        if (range.collapsed && editorRef.current.contains(range.commonAncestorContainer)) {
+          let headingBlock: HTMLElement | null = null;
+          let curr: Node | null = range.commonAncestorContainer;
+          while (curr && curr !== editorRef.current) {
+            if (curr.nodeType === Node.ELEMENT_NODE) {
+              const el = curr as HTMLElement;
+              const tag = el.tagName.toUpperCase();
+              if (['H1', 'H2', 'H3', 'H4'].includes(tag) || el.classList.contains('doc-subtitle') || el.dataset.role === 'subtitle') {
+                headingBlock = el;
+                break;
+              }
+            }
+            curr = curr.parentNode;
+          }
+
+          if (headingBlock) {
+            const rangeToStart = document.createRange();
+            rangeToStart.setStart(headingBlock, 0);
+            rangeToStart.setEnd(range.startContainer, range.startOffset);
+            if (!rangeToStart.toString()) {
+              e.preventDefault();
+              const p = document.createElement('p');
+              p.className = 'doc-p';
+              while (headingBlock.firstChild) {
+                p.appendChild(headingBlock.firstChild);
+              }
+              if (!p.childNodes.length || (p.childNodes.length === 1 && p.firstChild?.nodeName === 'BR')) {
+                p.replaceChildren(document.createElement('br'));
+              }
+              headingBlock.replaceWith(p);
+              const newRange = document.createRange();
+              newRange.setStart(p, 0);
+              newRange.collapse(true);
+              sel.removeAllRanges();
+              sel.addRange(newRange);
+              savedRangeRef.current = newRange.cloneRange();
+              setActiveHeading(0);
+              handleContentChanged();
+              pushHistorySnapshot(true);
+              return;
+            }
+          }
+        }
+      }
+    }
+
+    // Gestione Invio in una citazione vuota per uscire dal blocco
+    if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0 && editorRef.current) {
+        const range = sel.getRangeAt(0);
+        let blockquote: HTMLElement | null = null;
+        let curr: Node | null = range.commonAncestorContainer;
+        while (curr && curr !== editorRef.current) {
+          if (curr.nodeType === Node.ELEMENT_NODE && (curr as HTMLElement).tagName.toUpperCase() === 'BLOCKQUOTE') {
+            blockquote = curr as HTMLElement;
+            break;
+          }
+          curr = curr.parentNode;
+        }
+
+        if (blockquote && (!blockquote.textContent?.trim())) {
+          e.preventDefault();
+          const p = document.createElement('p');
+          p.className = 'doc-p';
+          p.appendChild(document.createElement('br'));
+          blockquote.replaceWith(p);
+          const newRange = document.createRange();
+          newRange.setStart(p, 0);
+          newRange.collapse(true);
+          sel.removeAllRanges();
+          sel.addRange(newRange);
+          savedRangeRef.current = newRange.cloneRange();
+          setIsBlockquote(false);
+          handleContentChanged();
+          pushHistorySnapshot(true);
+          return;
+        }
+      }
+    }
+
+    // Tasto Tab per indentare senza perdere il focus del foglio
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      document.execCommand('insertText', false, '    ');
+      handleContentChanged();
+      return;
+    }
+
     if (e.ctrlKey || e.metaKey) {
       if (e.key === 'z' || e.key === 'Z') {
         e.preventDefault();
@@ -1033,9 +1501,11 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
         } else {
           handleUndo();
         }
+        return;
       } else if (e.key === 'y' || e.key === 'Y') {
         e.preventDefault();
         handleRedo();
+        return;
       } else if (e.key === 'b' || e.key === 'B') {
         e.preventDefault();
         execCmd('bold');
@@ -1050,12 +1520,19 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
   };
 
   // 10. Chiusura e salvataggio immediato
-  const handleDone = async () => {
+  const handleDone = async (wasPoppedByBrowser = false) => {
     if (saveTimerRef.current) {
       clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
     }
     const cleanTitle = titolo.trim() || pagina.titolo;
     const currentMarkdown = editorRef.current ? domToMarkdown(editorRef.current) : (pagina.contenuto || '');
+
+    if (inFlightPromiseRef.current) {
+      try {
+        await inFlightPromiseRef.current;
+      } catch {}
+    }
 
     setSaveStatus('saving');
     try {
@@ -1071,10 +1548,10 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
       setSaveStatus('saved');
       setErrorMessage(null);
       isClosingRef.current = true;
-      if (window.history.state?.quadernoEditorOpen) {
+      if (!wasPoppedByBrowser && window.history.state?.quadernoEditorOpen) {
         window.history.back();
       }
-      onClose(saved);
+      onClose(saved, wasPoppedByBrowser);
     } catch (err: any) {
       console.warn('Errore salvataggio finale:', err);
       setSaveStatus('error');
@@ -1112,6 +1589,10 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
         <div
           className="doc-menu-backdrop"
           onMouseDown={(e) => {
+            e.preventDefault();
+            closeAllMenus();
+          }}
+          onTouchStart={(e) => {
             e.preventDefault();
             closeAllMenus();
           }}
@@ -1168,21 +1649,49 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
               className="doc-chip doc-chip-green"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => applyHighlight('green')}
-              title="Verde menta"
+              title="Verde menta pastello"
             />
             <button
               type="button"
               className="doc-chip doc-chip-blue"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => applyHighlight('blue')}
-              title="Azzurro cielo"
+              title="Azzurro pastello"
             />
             <button
               type="button"
               className="doc-chip doc-chip-coral"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => applyHighlight('coral')}
-              title="Rosa corallo"
+              title="Rosa corallo pastello"
+            />
+            <button
+              type="button"
+              className="doc-chip doc-chip-purple-hl"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => applyHighlight('purple')}
+              title="Lavanda pastello"
+            />
+            <button
+              type="button"
+              className="doc-chip doc-chip-amber-hl"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => applyHighlight('amber')}
+              title="Pesca pastello"
+            />
+            <button
+              type="button"
+              className="doc-chip doc-chip-cyan-hl"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => applyHighlight('cyan')}
+              title="Turchese pastello"
+            />
+            <button
+              type="button"
+              className="doc-chip doc-chip-gray-hl"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => applyHighlight('gray')}
+              title="Grigio perla pastello"
             />
           </div>
           <button
@@ -1205,7 +1714,7 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
           onClick={(e) => e.stopPropagation()}
         >
           <div className="doc-palette-title">Colore Testo</div>
-          <div className="doc-palette-grid">
+          <div className="doc-palette-grid-6">
             <button
               type="button"
               className="doc-chip doc-chip-ink"
@@ -1225,7 +1734,14 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
               className="doc-chip doc-chip-canti"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => applyTextColor('blue')}
-              title="Azzurro Canti"
+              title="Blu Canti"
+            />
+            <button
+              type="button"
+              className="doc-chip doc-chip-cyan"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => applyTextColor('cyan')}
+              title="Ciano Turchese"
             />
             <button
               type="button"
@@ -1236,10 +1752,10 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
             />
             <button
               type="button"
-              className="doc-chip doc-chip-bans"
+              className="doc-chip doc-chip-lime"
               onMouseDown={(e) => e.preventDefault()}
-              onClick={() => applyTextColor('red')}
-              title="Rosso Bans"
+              onClick={() => applyTextColor('lime')}
+              title="Verde Lime"
             />
             <button
               type="button"
@@ -1247,6 +1763,41 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => applyTextColor('amber')}
               title="Ambra Giochi"
+            />
+            <button
+              type="button"
+              className="doc-chip doc-chip-bans"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => applyTextColor('red')}
+              title="Rosso Bans"
+            />
+            <button
+              type="button"
+              className="doc-chip doc-chip-pink"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => applyTextColor('pink')}
+              title="Rosa Fucsia"
+            />
+            <button
+              type="button"
+              className="doc-chip doc-chip-brown"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => applyTextColor('brown')}
+              title="Marrone Terra"
+            />
+            <button
+              type="button"
+              className="doc-chip doc-chip-navy"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => applyTextColor('navy')}
+              title="Blu Notte"
+            />
+            <button
+              type="button"
+              className="doc-chip doc-chip-gray"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => applyTextColor('gray')}
+              title="Grigio Cenere"
             />
           </div>
         </div>
@@ -1258,7 +1809,7 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
           <button
             type="button"
             className="doc-icon-btn"
-            onClick={handleDone}
+            onClick={() => handleDone(false)}
             title={I18N.quaderno.editor.chiudi}
             aria-label={I18N.quaderno.editor.chiudi}
           >
@@ -1292,7 +1843,7 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
           <button
             type="button"
             className="ios-btn ios-btn-primary ios-btn-sm doc-btn-done"
-            onClick={handleDone}
+            onClick={() => handleDone(false)}
           >
             <Icon name="check" size={16} />
             <span>{I18N.quaderno.editor.fine}</span>
@@ -1431,14 +1982,7 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
               <span
                 className="doc-color-bar"
                 style={{
-                  backgroundColor:
-                    activeHighlight === 'green'
-                      ? 'var(--color-highlight-green)'
-                      : activeHighlight === 'blue'
-                      ? 'var(--color-highlight-blue)'
-                      : activeHighlight === 'coral'
-                      ? 'var(--color-highlight-coral)'
-                      : 'var(--color-highlight-yellow)',
+                  backgroundColor: getHighlightVar(activeHighlight),
                 }}
               />
             </button>
@@ -1459,18 +2003,7 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
                 style={{
                   fontWeight: 800,
                   fontSize: '15px',
-                  color:
-                    activeColor === 'purple'
-                      ? 'var(--color-quaderno)'
-                      : activeColor === 'blue'
-                      ? 'var(--color-canti)'
-                      : activeColor === 'green'
-                      ? 'var(--color-calendario)'
-                      : activeColor === 'red'
-                      ? 'var(--color-bans)'
-                      : activeColor === 'amber'
-                      ? 'var(--color-giochi)'
-                      : 'var(--color-text)',
+                  color: getColorVar(activeColor) === 'inherit' ? 'var(--color-text)' : getColorVar(activeColor),
                 }}
               >
                 A
@@ -1478,18 +2011,7 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
               <span
                 className="doc-color-bar"
                 style={{
-                  backgroundColor:
-                    activeColor === 'purple'
-                      ? 'var(--color-quaderno)'
-                      : activeColor === 'blue'
-                      ? 'var(--color-canti)'
-                      : activeColor === 'green'
-                      ? 'var(--color-calendario)'
-                      : activeColor === 'red'
-                      ? 'var(--color-bans)'
-                      : activeColor === 'amber'
-                      ? 'var(--color-giochi)'
-                      : 'var(--color-text)',
+                  backgroundColor: getColorVar(activeColor) === 'inherit' ? 'var(--color-text)' : getColorVar(activeColor),
                 }}
               />
             </button>
@@ -1559,15 +2081,7 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
             type="button"
             className={`doc-toolbar-btn ${isBlockquote ? 'doc-toolbar-btn-active' : ''}`}
             onMouseDown={(e) => e.preventDefault()}
-            onClick={() => {
-              const tag = isBlockquote ? 'p' : 'blockquote';
-              try {
-                document.execCommand('formatBlock', false, `<${tag}>`);
-              } catch {
-                document.execCommand('formatBlock', false, tag);
-              }
-              handleContentChanged();
-            }}
+            onClick={toggleBlockquote}
             title={I18N.quaderno.editor.citazione}
             aria-label={I18N.quaderno.editor.citazione}
           >
@@ -1595,6 +2109,22 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
               className="doc-sheet-title-input"
               value={titolo}
               placeholder="Titolo del documento..."
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === 'ArrowDown') {
+                  e.preventDefault();
+                  if (editorRef.current) {
+                    editorRef.current.focus();
+                    const sel = window.getSelection();
+                    if (sel && editorRef.current.firstChild) {
+                      const range = document.createRange();
+                      range.setStart(editorRef.current.firstChild, 0);
+                      range.collapse(true);
+                      sel.removeAllRanges();
+                      sel.addRange(range);
+                    }
+                  }
+                }
+              }}
               onInput={(e) => {
                 const val = (e.target as HTMLInputElement).value;
                 setTitolo(val);
@@ -1603,25 +2133,53 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
               }}
             />
 
-            <div className="doc-sheet-meta-row">
-              <div className="doc-sheet-cat-picker">
-                <label className="doc-sheet-meta-label">Categoria:</label>
-                <select
-                  className="doc-sheet-select"
-                  value={categoria}
-                  onChange={(e) => {
-                    const val = (e.target as HTMLSelectElement).value as QuadernoCategoria;
-                    setCategoria(val);
-                    const currentMarkdown = editorRef.current ? domToMarkdown(editorRef.current) : (pagina.contenuto || '');
-                    scheduleAutoSave(titolo, val, data, currentMarkdown);
-                  }}
-                >
-                  {categories.map((c) => (
-                    <option key={c.key} value={c.key}>
-                      {c.label}
-                    </option>
-                  ))}
-                </select>
+            <div className="doc-sheet-meta-row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 'var(--space-3)' }}>
+              <div className="doc-sheet-cat-picker" style={{ width: '100%' }}>
+                <label className="doc-sheet-meta-label" style={{ marginBottom: '6px', display: 'block' }}>Categoria:</label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                  {categories.map((c) => {
+                    const isSelected = categoria === c.key;
+                    const style = getCategoryPillColors(c.key, isSelected);
+                    return (
+                      <button
+                        key={c.key}
+                        type="button"
+                        onClick={() => {
+                          setCategoria(c.key);
+                          const currentMarkdown = editorRef.current ? domToMarkdown(editorRef.current) : (pagina.contenuto || '');
+                          scheduleAutoSave(titolo, c.key, data, currentMarkdown);
+                        }}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          padding: '6px 12px',
+                          borderRadius: 'var(--radius-full, 9999px)',
+                          fontSize: 'var(--font-size-xs)',
+                          fontWeight: isSelected ? 700 : 500,
+                          border: '1px solid',
+                          borderColor: style.border,
+                          backgroundColor: style.bg,
+                          color: style.color,
+                          cursor: 'pointer',
+                          transition: 'all var(--duration-fast) var(--ease-ios)',
+                        }}
+                      >
+                        <span
+                          style={{
+                            width: '7px',
+                            height: '7px',
+                            borderRadius: '50%',
+                            backgroundColor: style.dotColor,
+                            flexShrink: 0,
+                          }}
+                          aria-hidden="true"
+                        />
+                        <span>{c.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               <div className="doc-sheet-date-picker">

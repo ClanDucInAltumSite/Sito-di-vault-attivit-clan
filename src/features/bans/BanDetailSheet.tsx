@@ -17,6 +17,11 @@ export interface BanDetailSheetProps {
   onDelete?: (ban: Ban) => void;
   onUpdated?: () => void;
   isNew?: boolean;
+  isPending?: boolean;
+  proponenteNome?: string | null;
+  onWithdraw?: (ban: Ban) => void;
+  onApproveProposta?: (ban: Ban) => void;
+  onRejectProposta?: (ban: Ban) => void;
 }
 
 export function BanDetailSheet({
@@ -27,6 +32,11 @@ export function BanDetailSheet({
   onDelete,
   onUpdated,
   isNew = false,
+  isPending = false,
+  proponenteNome,
+  onWithdraw,
+  onApproveProposta,
+  onRejectProposta,
 }: BanDetailSheetProps) {
   const { isAdmin } = useAdmin();
   const [attachmentKey, setAttachmentKey] = useState(0);
@@ -49,7 +59,28 @@ export function BanDetailSheet({
             gap: 'var(--space-2)',
           }}
         >
-          {isAdmin ? (
+          {isAdmin && isPending ? (
+            <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={() => onRejectProposta?.(ban)}
+                aria-label="Rifiuta proposta"
+              >
+                <Icon name="close" size={16} />
+                <span>Rifiuta</span>
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => onApproveProposta?.(ban)}
+                aria-label="Approva ban"
+              >
+                <Icon name="check" size={16} />
+                <span>Approva</span>
+              </Button>
+            </div>
+          ) : isAdmin ? (
             <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
               <Button
                 variant="danger"
@@ -70,6 +101,16 @@ export function BanDetailSheet({
                 <span>{I18N.dialogs.modifica}</span>
               </Button>
             </div>
+          ) : isPending && onWithdraw ? (
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={() => onWithdraw(ban)}
+              aria-label="Ritira proposta"
+            >
+              <Icon name="trash" size={16} />
+              <span>Ritira proposta</span>
+            </Button>
           ) : (
             <div />
           )}
@@ -81,7 +122,35 @@ export function BanDetailSheet({
       }
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-        {isNew && (
+        {isPending ? (
+          <div
+            style={{
+              padding: 'var(--space-3) var(--space-4)',
+              backgroundColor: 'var(--color-giallo-subtle)',
+              border: '1.5px dashed var(--color-interactive)',
+              borderRadius: 'var(--radius-md)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 'var(--space-1)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
+              <Badge variant="giallo" size="sm">In attesa di approvazione</Badge>
+              {proponenteNome && (
+                <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-interactive)', fontWeight: 600 }}>
+                  Proposto da: {proponenteNome}
+                </span>
+              )}
+            </div>
+            <p style={{ margin: 0, fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
+              {isAdmin
+                ? 'Questa proposta è in attesa di essere validata. Puoi approvarla o rifiutarla subito con i pulsanti in basso.'
+                : 'Proposta inviata all\'Admin. Visibile solo su questo dispositivo fino all\'approvazione finale.'}
+            </p>
+          </div>
+        ) : null}
+
+        {isNew && !isPending && (
           <div>
             <Badge variant="nuovo" size="sm">Nuovo</Badge>
           </div>

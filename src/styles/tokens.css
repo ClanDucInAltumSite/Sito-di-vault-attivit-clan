@@ -148,6 +148,22 @@
   --color-highlight-blue-text: oklch(0.20 0.08 235);
   --color-highlight-coral: oklch(0.93 0.10 25);
   --color-highlight-coral-text: oklch(0.25 0.10 25);
+  --color-highlight-purple: oklch(0.93 0.10 310);
+  --color-highlight-purple-text: oklch(0.25 0.12 310);
+  --color-highlight-amber: oklch(0.94 0.11 65);
+  --color-highlight-amber-text: oklch(0.24 0.09 65);
+  --color-highlight-cyan: oklch(0.93 0.09 195);
+  --color-highlight-cyan-text: oklch(0.20 0.08 195);
+  --color-highlight-gray: oklch(0.92 0.01 260);
+  --color-highlight-gray-text: oklch(0.25 0.02 260);
+
+  /* Colori Testo Documenti Quaderno */
+  --color-doc-cyan: oklch(0.48 0.15 200);
+  --color-doc-lime: oklch(0.48 0.16 135);
+  --color-doc-pink: oklch(0.52 0.20 350);
+  --color-doc-brown: oklch(0.46 0.12 55);
+  --color-doc-navy: oklch(0.40 0.17 260);
+  --color-doc-gray: oklch(0.50 0.02 260);
 
   /* Targa Bianca del Logo (fondamentale per logo sempre su fondo chiaro) */
   --color-targa-bg: oklch(1 0 0);
@@ -310,6 +326,22 @@
     --color-highlight-blue-text: oklch(0.95 0.05 235);
     --color-highlight-coral: oklch(0.34 0.09 25);
     --color-highlight-coral-text: oklch(0.96 0.05 25);
+    --color-highlight-purple: oklch(0.34 0.10 310);
+    --color-highlight-purple-text: oklch(0.96 0.05 310);
+    --color-highlight-amber: oklch(0.35 0.09 65);
+    --color-highlight-amber-text: oklch(0.96 0.05 65);
+    --color-highlight-cyan: oklch(0.32 0.08 195);
+    --color-highlight-cyan-text: oklch(0.95 0.05 195);
+    --color-highlight-gray: oklch(0.35 0.01 260);
+    --color-highlight-gray-text: oklch(0.96 0.01 260);
+
+    /* Colori Testo Documenti Quaderno (Dark Mode) */
+    --color-doc-cyan: oklch(0.72 0.14 200);
+    --color-doc-lime: oklch(0.74 0.15 135);
+    --color-doc-pink: oklch(0.75 0.18 350);
+    --color-doc-brown: oklch(0.72 0.11 55);
+    --color-doc-navy: oklch(0.70 0.15 260);
+    --color-doc-gray: oklch(0.75 0.02 260);
 
     /* Targa Bianca del Logo: resta BIANCA OPACA anche in tema scuro */
     --color-targa-bg: oklch(1 0 0);
@@ -411,6 +443,22 @@
   --color-highlight-blue-text: oklch(0.95 0.05 235);
   --color-highlight-coral: oklch(0.34 0.09 25);
   --color-highlight-coral-text: oklch(0.96 0.05 25);
+  --color-highlight-purple: oklch(0.34 0.10 310);
+  --color-highlight-purple-text: oklch(0.96 0.05 310);
+  --color-highlight-amber: oklch(0.35 0.09 65);
+  --color-highlight-amber-text: oklch(0.96 0.05 65);
+  --color-highlight-cyan: oklch(0.32 0.08 195);
+  --color-highlight-cyan-text: oklch(0.95 0.05 195);
+  --color-highlight-gray: oklch(0.35 0.01 260);
+  --color-highlight-gray-text: oklch(0.96 0.01 260);
+
+  /* Colori Testo Documenti Quaderno (Dark Mode) */
+  --color-doc-cyan: oklch(0.72 0.14 200);
+  --color-doc-lime: oklch(0.74 0.15 135);
+  --color-doc-pink: oklch(0.75 0.18 350);
+  --color-doc-brown: oklch(0.72 0.11 55);
+  --color-doc-navy: oklch(0.70 0.15 260);
+  --color-doc-gray: oklch(0.75 0.02 260);
 
   --color-targa-bg: oklch(1 0 0);
   --color-targa-border: oklch(0.90 0.005 80);

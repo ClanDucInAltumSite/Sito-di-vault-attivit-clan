@@ -7,7 +7,7 @@ import { SearchField } from '../../ui/SearchField';
 import { HeaderBanner } from '../../ui/HeaderBanner';
 import { Button } from '../../ui/Button';
 import { Icon } from '../../ui/Icon';
-import { QuadernoPagina, QuadernoCategoria, getQuadernoPagine } from '../../lib/db';
+import { QuadernoPagina, getQuadernoPagine } from '../../lib/db';
 import { deleteQuadernoPagina } from '../../lib/admin_actions';
 import { useAdmin } from '../../lib/auth';
 import { subscribeSyncState } from '../../lib/sync';
@@ -16,8 +16,7 @@ import { QuadernoFormSheet } from './QuadernoFormSheet';
 import { QuadernoDocEditor } from './QuadernoDocEditor';
 import { stripQuadernoSnippet } from './quaderno_dom';
 import { DeleteConfirmModal } from '../../ui/DeleteConfirmModal';
-
-type CategoryFilter = 'tutte' | QuadernoCategoria;
+import { CategoryFilter, getCategoryPillColors } from './quaderno_colors';
 
 export function QuadernoView() {
   const { isAdmin } = useAdmin();
@@ -174,18 +173,16 @@ export function QuadernoView() {
         <div
           style={{
             display: 'flex',
+            flexWrap: 'wrap',
             gap: 'var(--space-2)',
-            overflowX: 'auto',
-            paddingBottom: 'var(--space-2)',
             marginBottom: 'var(--space-4)',
-            scrollbarWidth: 'none',
-            WebkitOverflowScrolling: 'touch',
           }}
           role="tablist"
           aria-label="Filtro categorie quaderno"
         >
           {categoryFilters.map((cf) => {
             const isActive = filterCategory === cf.key;
+            const style = getCategoryPillColors(cf.key, isActive);
             return (
               <button
                 key={cf.key}
@@ -194,20 +191,34 @@ export function QuadernoView() {
                 aria-selected={isActive}
                 onClick={() => setFilterCategory(cf.key)}
                 style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
                   padding: '6px 14px',
                   borderRadius: 'var(--radius-full, 9999px)',
                   fontSize: 'var(--font-size-xs)',
                   fontWeight: isActive ? 700 : 500,
                   whiteSpace: 'nowrap',
                   border: '1px solid',
-                  borderColor: isActive ? 'var(--color-quaderno)' : 'var(--color-border)',
-                  backgroundColor: isActive ? 'var(--color-quaderno)' : 'var(--color-surface)',
-                  color: isActive ? 'oklch(1 0 0)' : 'var(--color-text)',
+                  borderColor: style.border,
+                  backgroundColor: style.bg,
+                  color: style.color,
                   cursor: 'pointer',
                   transition: 'all var(--duration-fast) var(--ease-ios)',
                 }}
               >
-                {cf.label}
+                <span
+                  style={{
+                    width: '7px',
+                    height: '7px',
+                    borderRadius: '50%',
+                    backgroundColor: style.dotColor,
+                    flexShrink: 0,
+                    transition: 'background-color var(--duration-fast) var(--ease-ios)',
+                  }}
+                  aria-hidden="true"
+                />
+                <span>{cf.label}</span>
               </button>
             );
           })}
@@ -445,11 +456,13 @@ export function QuadernoView() {
         <QuadernoDocEditor
           pagina={editingPagina}
           isOpen={isEditorOpen}
-          onClose={(updated) => {
+          onClose={(updated, wasPoppedByBrowser) => {
             setIsEditorOpen(false);
             loadData();
             setSelectedPagina(updated);
-            setIsReadingModeOpen(true);
+            if (!wasPoppedByBrowser) {
+              setIsReadingModeOpen(true);
+            }
           }}
         />
       )}

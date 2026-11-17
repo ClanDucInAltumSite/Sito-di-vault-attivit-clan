@@ -15,7 +15,8 @@ html {
   text-size-adjust: 100%;
   background-color: var(--color-bg);
   color: var(--color-text);
-  overflow-x: hidden;
+  overflow-x: clip;
+  overflow-y: auto;
   color-scheme: light dark;
 }
 
@@ -31,7 +32,8 @@ body {
   flex-direction: column;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  overflow-x: hidden;
+  overflow-x: clip;
+  overflow-y: visible;
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 

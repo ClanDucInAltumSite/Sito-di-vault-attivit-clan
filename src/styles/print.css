@@ -768,8 +768,9 @@
     margin-bottom: 0 !important;
   }
 
-  .canzoniere-line-item.has-chords {
-    margin-top: 1.5em !important;
+  .canzoniere-line-item.has-chords,
+  .canto-screen-line.has-chords {
+    margin-top: 0 !important;
   }
 
   /* Modello ad Unità Atomiche per la Stampa */
@@ -787,7 +788,7 @@
     white-space: nowrap !important;
     vertical-align: bottom !important;
     margin-right: 0.28em !important;
-    margin-bottom: 0.08em !important;
+    margin-bottom: 0 !important;
   }
 
   .canto-unit {
@@ -800,11 +801,11 @@
 
   .canto-unit-chord {
     font-family: 'Roboto', sans-serif !important;
-    font-weight: 700 !important;
-    font-size: 0.82em !important;
-    line-height: 1.1 !important;
+    font-weight: 800 !important;
+    font-size: 0.94em !important;
+    line-height: 1.05 !important;
     color: oklch(0 0 0) !important;
-    min-height: 1.1em !important;
+    min-height: 1.05em !important;
     white-space: nowrap !important;
     padding-right: 0.08em !important;
   }
@@ -812,7 +813,7 @@
   .canto-unit-lyric {
     font-family: inherit !important;
     font-size: 1em !important;
-    line-height: 1.25 !important;
+    line-height: 1.15 !important;
     color: oklch(0 0 0) !important;
     white-space: pre !important;
   }
@@ -823,7 +824,9 @@
 
   .canzoniere-chord-badge {
     font-family: 'Roboto', sans-serif !important;
-    font-weight: 700 !important;
+    font-weight: 800 !important;
+    font-size: 0.94em !important;
+    line-height: 1.15 !important;
     color: oklch(0 0 0) !important;
     white-space: pre !important;
     display: inline-block !important;
@@ -1779,8 +1782,10 @@ body:has(.stampa-view) .topo-contour-wrapper,
 }
 
 .canzoniere-page .canzoniere-line-item.has-chords,
-.stampa-measure-host .canzoniere-line-item.has-chords {
-  margin-top: 1.5em;
+.stampa-measure-host .canzoniere-line-item.has-chords,
+.canzoniere-page .canto-screen-line.has-chords,
+.stampa-measure-host .canto-screen-line.has-chords {
+  margin-top: 0;
   line-height: normal;
 }
 
@@ -1790,7 +1795,7 @@ body:has(.stampa-view) .topo-contour-wrapper,
   flex-wrap: wrap;
   align-items: flex-end;
   margin-top: 0;
-  margin-bottom: 1.5pt;
+  margin-bottom: 2pt;
   line-height: 1;
 }
 
@@ -1815,11 +1820,11 @@ body:has(.stampa-view) .topo-contour-wrapper,
 .canzoniere-page .canto-unit-chord,
 .stampa-measure-host .canto-unit-chord {
   font-family: 'Roboto', sans-serif;
-  font-weight: 700;
-  font-size: 0.82em;
-  line-height: 1.1;
+  font-weight: 800;
+  font-size: 0.94em;
+  line-height: 1.15;
   color: oklch(0 0 0);
-  min-height: 1.1em;
+  min-height: 1.15em;
   white-space: nowrap;
   padding-right: 0.08em;
 }
@@ -1841,9 +1846,10 @@ body:has(.stampa-view) .topo-contour-wrapper,
 .canzoniere-page .canzoniere-chord-badge,
 .stampa-measure-host .canzoniere-chord-badge {
   font-family: 'Roboto', sans-serif;
-  font-weight: 700;
+  font-weight: 800;
+  font-size: 0.94em;
   color: oklch(0 0 0);
-  line-height: 1.1;
+  line-height: 1.15;
 }
 
 .canzoniere-page .canzoniere-chord-only-item,

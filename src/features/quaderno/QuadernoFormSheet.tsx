@@ -9,6 +9,7 @@ import { Icon } from '../../ui/Icon';
 import { I18N } from '../../lib/i18n';
 import { QuadernoPagina, QuadernoCategoria } from '../../lib/db';
 import { saveQuadernoPagina } from '../../lib/admin_actions';
+import { getCategoryPillColors } from './quaderno_colors';
 
 export interface QuadernoFormSheetProps {
   isOpen: boolean;
@@ -170,62 +171,115 @@ export function QuadernoFormSheet({
           />
         </div>
 
-        {/* 2. SOTTO: CATEGORIA E DATA AFFIANCATE IN GRIGLIA COMPATTA */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 'var(--space-3)' }}>
-          <div>
-            <label
-              htmlFor="quaderno-form-categoria"
-              style={{
-                display: 'block',
-                fontSize: 'var(--font-size-xs)',
-                fontWeight: 600,
-                color: 'var(--color-text-secondary)',
-                marginBottom: '4px',
-                textTransform: 'uppercase',
-                letterSpacing: '0.04em',
-              }}
-            >
-              {I18N.quaderno.categoria}
-            </label>
-            <select
-              id="quaderno-form-categoria"
-              className="ios-form-input"
-              value={categoria}
-              onChange={(e) => setCategoria((e.target as HTMLSelectElement).value as QuadernoCategoria)}
-              style={{ height: '44px' }}
-            >
-              {categories.map((c) => (
-                <option key={c.key} value={c.key}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
+        {/* 2. TIPOLOGIA DOCUMENTO (CATEGORIA) */}
+        <div>
+          <label
+            htmlFor="quaderno-form-categoria"
+            style={{
+              display: 'block',
+              fontSize: 'var(--font-size-xs)',
+              fontWeight: 600,
+              color: 'var(--color-text-secondary)',
+              marginBottom: '8px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
+            }}
+          >
+            {I18N.quaderno.categoria}
+          </label>
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 'var(--space-2)',
+            }}
+            role="radiogroup"
+            aria-label={I18N.quaderno.categoria}
+          >
+            {categories.map((c) => {
+              const isSelected = categoria === c.key;
+              const style = getCategoryPillColors(c.key, isSelected);
+              return (
+                <button
+                  key={c.key}
+                  type="button"
+                  role="radio"
+                  aria-checked={isSelected}
+                  onClick={() => setCategoria(c.key)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '8px 14px',
+                    borderRadius: 'var(--radius-full, 9999px)',
+                    fontSize: 'var(--font-size-xs)',
+                    fontWeight: isSelected ? 700 : 500,
+                    whiteSpace: 'nowrap',
+                    border: '1px solid',
+                    borderColor: style.border,
+                    backgroundColor: style.bg,
+                    color: style.color,
+                    cursor: 'pointer',
+                    transition: 'all var(--duration-fast) var(--ease-ios)',
+                  }}
+                >
+                  <span
+                    style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      backgroundColor: style.dotColor,
+                      flexShrink: 0,
+                      transition: 'background-color var(--duration-fast) var(--ease-ios)',
+                    }}
+                    aria-hidden="true"
+                  />
+                  <span>{c.label}</span>
+                </button>
+              );
+            })}
           </div>
+          {/* Select sincronizzato nascosto per fallback accessibilità e form handling */}
+          <select
+            id="quaderno-form-categoria"
+            value={categoria}
+            onChange={(e) => setCategoria((e.target as HTMLSelectElement).value as QuadernoCategoria)}
+            style={{ display: 'none' }}
+            tabIndex={-1}
+            aria-hidden="true"
+          >
+            {categories.map((c) => (
+              <option key={c.key} value={c.key}>
+                {c.label}
+              </option>
+            ))}
+          </select>
+        </div>
 
-          <div>
-            <label
-              htmlFor="quaderno-form-data"
-              style={{
-                display: 'block',
-                fontSize: 'var(--font-size-xs)',
-                fontWeight: 600,
-                color: 'var(--color-text-secondary)',
-                marginBottom: '4px',
-                textTransform: 'uppercase',
-                letterSpacing: '0.04em',
-              }}
-            >
-              {I18N.quaderno.data}
-            </label>
-            <input
-              id="quaderno-form-data"
-              type="date"
-              className="ios-form-input"
-              value={data}
-              onInput={(e) => setData((e.target as HTMLInputElement).value)}
-              style={{ height: '44px' }}
-            />
-          </div>
+        {/* 3. DATA DELLA PAGINA */}
+        <div>
+          <label
+            htmlFor="quaderno-form-data"
+            style={{
+              display: 'block',
+              fontSize: 'var(--font-size-xs)',
+              fontWeight: 600,
+              color: 'var(--color-text-secondary)',
+              marginBottom: '4px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
+            }}
+          >
+            {I18N.quaderno.data}
+          </label>
+          <input
+            id="quaderno-form-data"
+            type="date"
+            className="ios-form-input"
+            value={data}
+            onInput={(e) => setData((e.target as HTMLInputElement).value)}
+            style={{ height: '44px', maxWidth: '280px' }}
+          />
         </div>
 
         <div

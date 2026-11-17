@@ -19,6 +19,11 @@ export interface CantoDetailSheetProps {
   onDelete?: (canto: Canto) => void;
   onUpdated?: () => void;
   isNew?: boolean;
+  isPending?: boolean;
+  proponenteNome?: string | null;
+  onWithdraw?: (canto: Canto) => void;
+  onApproveProposta?: (canto: Canto) => void;
+  onRejectProposta?: (canto: Canto) => void;
 }
 
 export function CantoDetailSheet({
@@ -30,6 +35,11 @@ export function CantoDetailSheet({
   onDelete,
   onUpdated,
   isNew = false,
+  isPending = false,
+  proponenteNome,
+  onWithdraw,
+  onApproveProposta,
+  onRejectProposta,
 }: CantoDetailSheetProps) {
   const { isAdmin } = useAdmin();
   const [attachmentKey, setAttachmentKey] = useState(0);
@@ -54,7 +64,28 @@ export function CantoDetailSheet({
             gap: 'var(--space-2)',
           }}
         >
-          {isAdmin ? (
+          {isAdmin && isPending ? (
+            <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={() => onRejectProposta?.(canto)}
+                aria-label="Rifiuta proposta"
+              >
+                <Icon name="close" size={16} />
+                <span>Rifiuta</span>
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => onApproveProposta?.(canto)}
+                aria-label="Approva canto"
+              >
+                <Icon name="check" size={16} />
+                <span>Approva</span>
+              </Button>
+            </div>
+          ) : isAdmin ? (
             <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
               <Button
                 variant="danger"
@@ -75,6 +106,16 @@ export function CantoDetailSheet({
                 <span>{I18N.dialogs.modifica}</span>
               </Button>
             </div>
+          ) : isPending && onWithdraw ? (
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={() => onWithdraw(canto)}
+              aria-label="Ritira proposta"
+            >
+              <Icon name="trash" size={16} />
+              <span>Ritira proposta</span>
+            </Button>
           ) : (
             <div />
           )}
@@ -86,8 +127,39 @@ export function CantoDetailSheet({
       }
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+        {isPending ? (
+          <div
+            style={{
+              padding: 'var(--space-3) var(--space-4)',
+              backgroundColor: 'var(--color-giallo-subtle)',
+              border: '1.5px dashed var(--color-interactive)',
+              borderRadius: 'var(--radius-md)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 'var(--space-1)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
+              <Badge variant="giallo" size="sm">In attesa di approvazione</Badge>
+              {proponenteNome && (
+                <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-interactive)', fontWeight: 600 }}>
+                  Proposto da: {proponenteNome}
+                </span>
+              )}
+            </div>
+            <p style={{ margin: 0, fontSize: 'var(--font-size-sm)', color: 'var(--color-ink)' }}>
+              {isAdmin
+                ? 'Questa proposta è in attesa di una tua decisione. Puoi approvarla per renderla pubblica a tutti, oppure rifiutarla.'
+                : 'La tua proposta è stata inviata e sarà visibile a tutti dopo l\'approvazione dell\'Admin.'}
+            </p>
+          </div>
+        ) : null}
+
         {/* Chips informativa metadati musicali */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
+          {isPending ? (
+            <Badge variant="giallo" size="sm">In attesa</Badge>
+          ) : null}
           {isNew ? (
             <Badge variant="nuovo" size="sm">Nuovo</Badge>
           ) : null}
@@ -180,26 +252,30 @@ export function CantoDetailSheet({
           />
         </div>
 
-        {/* Galleria Allegati (Fase 5) */}
-        <AttachmentGallery
-          key={attachmentKey}
-          parentType="canto"
-          parentId={canto.id}
-          isAdmin={isAdmin}
-          onChanged={() => {
-            setAttachmentKey((k) => k + 1);
-            onUpdated?.();
-          }}
-        />
+        {/* Galleria Allegati (Fase 5) - solo canti approvati */}
+        {!isPending && (
+          <>
+            <AttachmentGallery
+              key={attachmentKey}
+              parentType="canto"
+              parentId={canto.id}
+              isAdmin={isAdmin}
+              onChanged={() => {
+                setAttachmentKey((k) => k + 1);
+                onUpdated?.();
+              }}
+            />
 
-        {isAdmin && (
-          <AttachmentUploadManager
-            parent={{ type: 'canto', id: canto.id }}
-            onUploaded={() => {
-              setAttachmentKey((k) => k + 1);
-              onUpdated?.();
-            }}
-          />
+            {isAdmin && (
+              <AttachmentUploadManager
+                parent={{ type: 'canto', id: canto.id }}
+                onUploaded={() => {
+                  setAttachmentKey((k) => k + 1);
+                  onUpdated?.();
+                }}
+              />
+            )}
+          </>
         )}
       </div>
     </BottomSheet>

@@ -129,7 +129,9 @@ export function CantoReadingMode({
       }
     });
 
-    const originalOverflow = document.body.style.overflow;
+    const origHtmlOverflow = document.documentElement.style.overflow;
+    const origBodyOverflow = document.body.style.overflow;
+    document.documentElement.style.overflow = 'hidden';
     document.body.style.overflow = 'hidden';
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -141,7 +143,8 @@ export function CantoReadingMode({
 
     return () => {
       active = false;
-      document.body.style.overflow = originalOverflow;
+      document.documentElement.style.overflow = origHtmlOverflow;
+      document.body.style.overflow = origBodyOverflow;
       window.removeEventListener('keydown', handleKeyDown);
       releaseWakeLock();
     };
@@ -451,12 +454,12 @@ export function CantoReadingMode({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: 'var(--space-2) var(--space-4)',
+            padding: 'var(--space-2) var(--space-3)',
             gap: 'var(--space-2)',
-            minHeight: '52px',
+            minHeight: '48px',
           }}
         >
-          {/* Tasto INDIETRO con indicazione chiara e freccia */}
+          {/* Tasto INDIETRO */}
           <button
             type="button"
             onClick={handleClose}
@@ -464,8 +467,8 @@ export function CantoReadingMode({
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '6px',
-              minHeight: '38px',
+              gap: '4px',
+              minHeight: '36px',
               padding: '0 var(--space-3)',
               color: 'var(--color-interactive)',
               fontWeight: 700,
@@ -479,36 +482,47 @@ export function CantoReadingMode({
             <span>Indietro</span>
           </button>
 
-          {/* Titolo del Canto */}
+          {/* Titolo del Canto (fluido, centrato, non schiacciato) */}
           <div
             style={{
               fontWeight: 700,
-              fontSize: 'var(--font-size-base)',
+              fontSize: '1rem',
               color: 'var(--color-ink)',
               textAlign: 'center',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
-              flex: 1,
-              padding: '0 var(--space-2)',
+              flex: '1 1 auto',
+              minWidth: 0,
+              padding: '0 6px',
             }}
+            title={canto.titolo}
           >
             {canto.titolo}
           </div>
 
           {/* Azioni destra: Badge Schermo sempre attivo + Tasti Admin */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
             {isWakeLockSupported() && wakeLockActive ? (
-              <Badge variant="azzurro" size="sm">
-                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <Icon name="sun" size={14} />
-                  <span>Schermo attivo</span>
-                </span>
-              </Badge>
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  background: 'var(--color-interactive-tenue)',
+                  color: 'var(--color-interactive)',
+                }}
+                title="Schermo sempre attivo"
+              >
+                <Icon name="sun" size={15} />
+              </span>
             ) : null}
 
             {isAdmin && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <button
                   type="button"
                   onClick={() => onEdit?.(canto)}
@@ -517,15 +531,15 @@ export function CantoReadingMode({
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '4px',
-                    minHeight: '34px',
-                    padding: '0 var(--space-3)',
+                    minHeight: '32px',
+                    padding: '0 10px',
                     fontSize: 'var(--font-size-xs)',
                     fontWeight: 600,
                     borderRadius: 'var(--radius-full)',
                   }}
                   aria-label="Modifica canto"
                 >
-                  <Icon name="edit" size={14} />
+                  <Icon name="edit" size={13} />
                   <span>Modifica</span>
                 </button>
                 <button
@@ -535,17 +549,16 @@ export function CantoReadingMode({
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '4px',
-                    minHeight: '34px',
-                    padding: '0 var(--space-3)',
-                    fontSize: 'var(--font-size-xs)',
-                    fontWeight: 600,
+                    justifyContent: 'center',
+                    minWidth: '32px',
+                    minHeight: '32px',
+                    padding: 0,
                     borderRadius: 'var(--radius-full)',
                   }}
                   aria-label="Elimina canto"
+                  title="Elimina canto"
                 >
                   <Icon name="trash" size={14} />
-                  <span>Elimina</span>
                 </button>
               </div>
             )}
@@ -553,271 +566,275 @@ export function CantoReadingMode({
         </div>
 
         {/* Seconda riga: Toolbar controlli per accordi, trasposizione, zoom e metronomo */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: 'var(--space-2) var(--space-4)',
-            borderTop: '1px solid var(--color-border-subtle)',
-            backgroundColor: 'var(--color-surface-hover)',
-            overflowX: 'auto',
-            gap: 'var(--space-3)',
-            WebkitOverflowScrolling: 'touch',
-          }}
-        >
-          {/* Toggle Accordi On/Off */}
-          <button
-            type="button"
-            onClick={() => setShowChords(!showChords)}
-            className={`ios-btn ${showChords ? 'ios-btn-secondary' : 'ios-btn-ghost'}`}
-            style={{
-              minHeight: '34px',
-              padding: '0 var(--space-3)',
-              fontSize: 'var(--font-size-xs)',
-              fontWeight: 600,
-              borderRadius: 'var(--radius-full)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            <Icon name="canti" size={16} />
-            <span>{showChords ? I18N.canti.mostraAccordi : I18N.canti.nascondiAccordi}</span>
-          </button>
-
-          {/* Toggle Auto-Scroll a tempo (BPM) */}
-          <button
-            type="button"
-            onClick={toggleAutoScroll}
-            className={`ios-btn ${isAutoScrolling ? 'ios-btn-primary' : 'ios-btn-ghost'}`}
-            style={{
-              minHeight: '34px',
-              padding: '0 var(--space-3)',
-              fontSize: 'var(--font-size-xs)',
-              fontWeight: 600,
-              borderRadius: 'var(--radius-full)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              whiteSpace: 'nowrap',
-              backgroundColor: isAutoScrolling ? 'var(--color-interactive)' : undefined,
-              color: isAutoScrolling ? '#ffffff' : undefined,
-            }}
-            aria-label={isAutoScrolling ? 'Ferma scorrimento automatico' : 'Avvia scorrimento automatico al beat'}
-            title="Scorrimento automatico al Beat (BPM)"
-          >
-            <Icon name={isAutoScrolling ? 'pause' : 'play'} size={14} />
-            <span>{isAutoScrolling ? 'Auto-scroll On' : 'Auto-scroll'}</span>
-          </button>
-
-          {/* Controlli Trasposizione Semitonale */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              backgroundColor: 'var(--color-surface)',
-              borderRadius: 'var(--radius-full)',
-              border: '1px solid var(--color-border)',
-              padding: '2px',
-            }}
-          >
+        <div className="canto-reading-controls-bar">
+          {/* Gruppo 1: Accordi, Tonalità, Auto-scroll */}
+          <div className="canto-reading-controls-group">
+            {/* Toggle Accordi On/Off + Modalità */}
+            {/* Toggle Accordi On/Off */}
             <button
               type="button"
-              onClick={() => handleTranspose(-1)}
-              className="ios-btn ios-btn-ghost"
+              onClick={() => setShowChords(!showChords)}
+              className={`ios-btn ${showChords ? 'ios-btn-secondary' : 'ios-btn-ghost'}`}
               style={{
-                minWidth: '32px',
-                minHeight: '30px',
-                padding: '0 6px',
-                fontSize: 'var(--font-size-xs)',
-                fontWeight: 700,
-                borderRadius: 'var(--radius-full)',
-              }}
-              aria-label="Abbassa di un semitono (-1)"
-              title="Abbassa di un semitono"
-            >
-              -1
-            </button>
-            <button
-              type="button"
-              onClick={() => setTransposeDelta(0)}
-              className="ios-btn ios-btn-ghost"
-              style={{
-                minHeight: '30px',
-                padding: '0 8px',
+                minHeight: '32px',
+                padding: '0 10px',
                 fontSize: 'var(--font-size-xs)',
                 fontWeight: 600,
-                color: transposeDelta === 0 ? 'var(--color-text-secondary)' : 'var(--color-interactive)',
-              }}
-              title="Reimposta tonalità originale"
-            >
-              {transposeDelta === 0 ? 'Orig' : `${transposeDelta > 0 ? `+${transposeDelta}` : transposeDelta}`}
-            </button>
-            <button
-              type="button"
-              onClick={() => handleTranspose(1)}
-              className="ios-btn ios-btn-ghost"
-              style={{
-                minWidth: '32px',
-                minHeight: '30px',
-                padding: '0 6px',
-                fontSize: 'var(--font-size-xs)',
-                fontWeight: 700,
-                borderRadius: 'var(--radius-full)',
-              }}
-              aria-label="Alza di un semitono (+1)"
-              title="Alza di un semitono"
-            >
-              +1
-            </button>
-          </div>
-
-          {/* METRONOMO AUDIO-VISIVO ("quel coso che si usa per prendere il tempo") */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '2px',
-              backgroundColor: 'var(--color-surface)',
-              borderRadius: 'var(--radius-full)',
-              border: isMetronomePlaying ? '1.5px solid var(--color-interactive)' : '1px solid var(--color-border)',
-              padding: '2px 4px',
-            }}
-          >
-            <button
-              type="button"
-              onClick={toggleMetronome}
-              className={`ios-btn ${isMetronomePlaying ? 'ios-btn-primary' : 'ios-btn-ghost'}`}
-              style={{
-                minHeight: '30px',
-                padding: '0 8px',
-                fontSize: 'var(--font-size-xs)',
-                fontWeight: 700,
                 borderRadius: 'var(--radius-full)',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '6px',
+                gap: '5px',
+                whiteSpace: 'nowrap',
+                backgroundColor: showChords ? 'var(--color-surface)' : 'transparent',
+                border: '1px solid var(--color-border)',
+                color: showChords ? 'var(--color-chord, var(--color-interactive))' : 'var(--color-text-secondary)',
               }}
-              aria-label={isMetronomePlaying ? 'Ferma ritmo metronomo' : 'Avvia ritmo metronomo'}
-              title={isMetronomePlaying ? 'Ferma metronomo' : 'Avvia metronomo a tempo'}
+              title={showChords ? 'Nascondi accordi' : 'Mostra accordi'}
             >
-              <span
-                style={{
-                  width: '8px',
-                  height: '8px',
-                  borderRadius: '50%',
-                  backgroundColor: pulse ? 'var(--color-bans)' : isMetronomePlaying ? 'var(--color-canti)' : 'var(--color-text-secondary)',
-                  display: 'inline-block',
-                  transition: 'transform 80ms ease',
-                  transform: pulse ? 'scale(1.6)' : 'scale(1)',
-                }}
-                className={pulse ? 'metronome-pulse' : ''}
-              />
-              <span>{isMetronomePlaying ? 'Stop' : 'Ritmo'}</span>
+              <Icon name="canti" size={14} />
+              <span>{showChords ? 'Accordi' : 'No accordi'}</span>
             </button>
 
+            {/* Controlli Trasposizione Semitonale */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                backgroundColor: 'var(--color-surface)',
+                borderRadius: 'var(--radius-full)',
+                border: '1px solid var(--color-border)',
+                padding: '2px',
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => handleTranspose(-1)}
+                className="ios-btn ios-btn-ghost"
+                style={{
+                  minWidth: '28px',
+                  minHeight: '30px',
+                  padding: '0 4px',
+                  fontSize: 'var(--font-size-xs)',
+                  fontWeight: 700,
+                  borderRadius: 'var(--radius-full)',
+                }}
+                aria-label="Abbassa di un semitono (-1)"
+                title="Abbassa di un semitono"
+              >
+                -1
+              </button>
+              <button
+                type="button"
+                onClick={() => setTransposeDelta(0)}
+                className="ios-btn ios-btn-ghost"
+                style={{
+                  minHeight: '30px',
+                  padding: '0 6px',
+                  fontSize: 'var(--font-size-xs)',
+                  fontWeight: 600,
+                  color: transposeDelta === 0 ? 'var(--color-text-secondary)' : 'var(--color-interactive)',
+                  whiteSpace: 'nowrap',
+                }}
+                title="Reimposta tonalità originale"
+              >
+                {canto.tonalita ? (transposeDelta === 0 ? canto.tonalita : `${transposeChord(canto.tonalita, transposeDelta)}`) : (transposeDelta === 0 ? 'Orig' : `${transposeDelta > 0 ? `+${transposeDelta}` : transposeDelta}`)}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleTranspose(1)}
+                className="ios-btn ios-btn-ghost"
+                style={{
+                  minWidth: '28px',
+                  minHeight: '30px',
+                  padding: '0 4px',
+                  fontSize: 'var(--font-size-xs)',
+                  fontWeight: 700,
+                  borderRadius: 'var(--radius-full)',
+                }}
+                aria-label="Alza di un semitono (+1)"
+                title="Alza di un semitono"
+              >
+                +1
+              </button>
+            </div>
+
+            {/* Toggle Auto-Scroll a tempo */}
             <button
               type="button"
-              onClick={() => setBpm((b) => Math.max(40, b - 5))}
-              className="ios-btn ios-btn-ghost"
+              onClick={toggleAutoScroll}
+              className={`ios-btn ${isAutoScrolling ? 'ios-btn-primary' : 'ios-btn-ghost'}`}
               style={{
-                minWidth: '24px',
                 minHeight: '30px',
-                padding: '0 4px',
+                padding: '0 8px',
                 fontSize: 'var(--font-size-xs)',
-                fontWeight: 700,
+                fontWeight: 600,
+                borderRadius: 'var(--radius-full)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                whiteSpace: 'nowrap',
+                backgroundColor: isAutoScrolling ? 'var(--color-interactive)' : undefined,
+                color: isAutoScrolling ? '#ffffff' : undefined,
               }}
-              title="-5 BPM"
-              aria-label="Rallenta ritmo di 5 BPM"
+              aria-label={isAutoScrolling ? 'Ferma scorrimento automatico' : 'Avvia scorrimento automatico'}
+              title="Scorrimento automatico al Beat"
             >
-              -
-            </button>
-            <span
-              style={{
-                fontSize: 'var(--font-size-xs)',
-                fontWeight: 700,
-                minWidth: '56px',
-                textAlign: 'center',
-                color: isMetronomePlaying ? 'var(--color-interactive)' : 'var(--color-text)',
-              }}
-            >
-              {bpm} BPM
-            </span>
-            <button
-              type="button"
-              onClick={() => setBpm((b) => Math.min(240, b + 5))}
-              className="ios-btn ios-btn-ghost"
-              style={{
-                minWidth: '24px',
-                minHeight: '30px',
-                padding: '0 4px',
-                fontSize: 'var(--font-size-xs)',
-                fontWeight: 700,
-              }}
-              title="+5 BPM"
-              aria-label="Accelera ritmo di 5 BPM"
-            >
-              +
+              <Icon name={isAutoScrolling ? 'pause' : 'play'} size={13} />
+              <span>{isAutoScrolling ? 'Auto-scroll ON' : 'Auto-scroll'}</span>
             </button>
           </div>
 
-          {/* Regolazione Dimensione Carattere */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              backgroundColor: 'var(--color-surface)',
-              borderRadius: 'var(--radius-full)',
-              border: '1px solid var(--color-border)',
-              padding: '2px',
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => changeFontSize(-2)}
-              disabled={fontSize <= 14}
-              className="ios-btn ios-btn-ghost"
+          {/* Gruppo 2: Ritmo/Metronomo & Dimensione Font */}
+          <div className="canto-reading-controls-group">
+            {/* Metronomo & BPM */}
+            <div
               style={{
-                minWidth: '32px',
-                minHeight: '30px',
-                padding: '0 6px',
-                fontSize: 'var(--font-size-xs)',
-                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '2px',
+                backgroundColor: 'var(--color-surface)',
                 borderRadius: 'var(--radius-full)',
-              }}
-              aria-label="Riduci dimensione carattere"
-            >
-              A-
-            </button>
-            <span
-              style={{
-                fontSize: 'var(--font-size-xs)',
-                fontWeight: 600,
-                padding: '0 4px',
-                color: 'var(--color-text-secondary)',
+                border: isMetronomePlaying ? '1.5px solid var(--color-interactive)' : '1px solid var(--color-border)',
+                padding: '2px 4px',
               }}
             >
-              {fontSize}px
-            </span>
-            <button
-              type="button"
-              onClick={() => changeFontSize(2)}
-              disabled={fontSize >= 32}
-              className="ios-btn ios-btn-ghost"
+              <button
+                type="button"
+                onClick={toggleMetronome}
+                className={`ios-btn ${isMetronomePlaying ? 'ios-btn-primary' : 'ios-btn-ghost'}`}
+                style={{
+                  minHeight: '28px',
+                  padding: '0 7px',
+                  fontSize: 'var(--font-size-xs)',
+                  fontWeight: 700,
+                  borderRadius: 'var(--radius-full)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                }}
+                aria-label={isMetronomePlaying ? 'Ferma metronomo' : 'Avvia metronomo'}
+                title={isMetronomePlaying ? 'Ferma metronomo' : 'Avvia metronomo a tempo'}
+              >
+                <span
+                  style={{
+                    width: '8px',
+                    height: '8px',
+                    borderRadius: '50%',
+                    backgroundColor: pulse ? 'var(--color-bans)' : isMetronomePlaying ? 'var(--color-canti)' : 'var(--color-text-secondary)',
+                    display: 'inline-block',
+                    transition: 'transform 80ms ease',
+                    transform: pulse ? 'scale(1.6)' : 'scale(1)',
+                  }}
+                  className={pulse ? 'metronome-pulse' : ''}
+                />
+                <span>{isMetronomePlaying ? 'Stop' : 'Ritmo'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setBpm((b) => Math.max(40, b - 5))}
+                className="ios-btn ios-btn-ghost"
+                style={{
+                  minWidth: '22px',
+                  minHeight: '28px',
+                  padding: '0 4px',
+                  fontSize: 'var(--font-size-xs)',
+                  fontWeight: 700,
+                }}
+                title="-5 BPM"
+                aria-label="-5 BPM"
+              >
+                -
+              </button>
+              <span
+                style={{
+                  fontSize: 'var(--font-size-xs)',
+                  fontWeight: 700,
+                  minWidth: '48px',
+                  textAlign: 'center',
+                  color: isMetronomePlaying ? 'var(--color-interactive)' : 'var(--color-text)',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {bpm} BPM
+              </span>
+              <button
+                type="button"
+                onClick={() => setBpm((b) => Math.min(240, b + 5))}
+                className="ios-btn ios-btn-ghost"
+                style={{
+                  minWidth: '22px',
+                  minHeight: '28px',
+                  padding: '0 4px',
+                  fontSize: 'var(--font-size-xs)',
+                  fontWeight: 700,
+                }}
+                title="+5 BPM"
+                aria-label="+5 BPM"
+              >
+                +
+              </button>
+            </div>
+
+            {/* Regolazione Dimensione Carattere */}
+            <div
               style={{
-                minWidth: '32px',
-                minHeight: '30px',
-                padding: '0 6px',
-                fontSize: 'var(--font-size-sm)',
-                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                backgroundColor: 'var(--color-surface)',
                 borderRadius: 'var(--radius-full)',
+                border: '1px solid var(--color-border)',
+                padding: '2px',
               }}
-              aria-label="Aumenta dimensione carattere"
             >
-              A+
-            </button>
+              <button
+                type="button"
+                onClick={() => changeFontSize(-2)}
+                disabled={fontSize <= 14}
+                className="ios-btn ios-btn-ghost"
+                style={{
+                  minWidth: '28px',
+                  minHeight: '28px',
+                  padding: '0 4px',
+                  fontSize: 'var(--font-size-xs)',
+                  fontWeight: 700,
+                  borderRadius: 'var(--radius-full)',
+                }}
+                aria-label="Riduci dimensione carattere"
+                title="Riduci font"
+              >
+                A-
+              </button>
+              <span
+                style={{
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  padding: '0 3px',
+                  color: 'var(--color-text-secondary)',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {fontSize}px
+              </span>
+              <button
+                type="button"
+                onClick={() => changeFontSize(2)}
+                disabled={fontSize >= 32}
+                className="ios-btn ios-btn-ghost"
+                style={{
+                  minWidth: '28px',
+                  minHeight: '28px',
+                  padding: '0 4px',
+                  fontSize: 'var(--font-size-xs)',
+                  fontWeight: 700,
+                  borderRadius: 'var(--radius-full)',
+                }}
+                aria-label="Aumenta dimensione carattere"
+                title="Aumenta font"
+              >
+                A+
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -830,20 +847,26 @@ export function CantoReadingMode({
         style={{
           flex: 1,
           overflowY: 'auto',
-          padding: `var(--space-6) var(--space-4) calc(var(--space-8) + env(safe-area-inset-bottom, 0px) + ${isAutoScrolling ? '80px' : '40px'})`,
-          maxWidth: '850px',
-          margin: '0 auto',
           width: '100%',
           boxSizing: 'border-box',
           WebkitOverflowScrolling: 'touch',
         }}
       >
-        <div style={{ marginBottom: 'var(--space-4)' }}>
-          <h1
-            className="song-title-display"
-            style={{
-              fontSize: `calc(${fontSize}px * 1.4)`,
-              lineHeight: 1.2,
+        <div
+          style={{
+            maxWidth: '850px',
+            margin: '0 auto',
+            width: '100%',
+            padding: `var(--space-6) var(--space-4) calc(var(--space-8) + env(safe-area-inset-bottom, 0px) + ${isAutoScrolling ? '80px' : '40px'})`,
+            boxSizing: 'border-box',
+          }}
+        >
+          <div style={{ marginBottom: 'var(--space-4)' }}>
+            <h1
+              className="song-title-display"
+              style={{
+                fontSize: `calc(${fontSize}px * 1.4)`,
+                lineHeight: 1.2,
               marginTop: 0,
               marginBottom: 'var(--space-2)',
             }}
@@ -947,6 +970,7 @@ export function CantoReadingMode({
               />
             </div>
           )}
+        </div>
         </div>
       </main>
 

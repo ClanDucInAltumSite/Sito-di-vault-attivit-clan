@@ -1291,3 +1291,39 @@ Gli animatori liturgici e capi reparto necessitano talvolta di stampare solo i c
    - Aggiunto test specifico n. 12 in `test/stampa_nuova_logica.test.ts`.
    - 325/325 test Vitest verdi (100%), typecheck a 0 errori e build di produzione verificata.
 
+---
+
+## ADR-0036: Ottimizzazione Spaziature Verticali, Visibilità Accordi e Calibrazione Wrap Anti-Slicing in "Chi suona"
+
+### Data
+2026-11-06
+
+### Contesto
+1. **Taglio del testo a fondo pagina (*slicing*) in "Chi suona":** Righe lunghe di testo o versi con molti accordi che su due colonne andavano a capo su 2 righe visive reali venivano conteggiate dall'algoritmo di stima altezze (`estimateLineVisualWraps`) come una singola riga di testo, sottostimando l'ingombro reale di diversi millimetri a blocco. Inoltre, in `print.css`, una regola obsoleta (`.canzoniere-line-item.has-chords { margin-top: 1.5em !important; }`) derivata dal vecchio posizionamento badge aggiungeva circa 5.8 mm di vuoto verticale per ogni riga con accordi. Questo portava le colonne calcolate a 248 mm a raggiungere altezze fisiche reali di 289–340 mm dentro un contenitore A4 alto 271 mm con `overflow: hidden`, provocando il taglio orizzontale netto delle righe inferiori.
+2. **Spaziature verticali eccessive tra accordo, testo e righe:** Lo spazio verticale tra gli accordi e il testo sottostante, nonché il margine tra righe successive di accordi (`.canto-screen-line`, `.canto-word`), era eccessivamente dilatato, sprecando prezioso spazio verticale a scapito della compattezza.
+3. **Visibilità e dimensione degli accordi:** Gli accordi risultavano visivamente troppo piccoli, sottili e poco evidenti per un musicista che suona lo strumento a leggio o all'aperto, richiedendo un font più grande, marcato ed evidente.
+
+### Decisioni Adottate
+1. **Algoritmo di Wrap Visivo Rigoroso (`canzoniere_layout.ts`):**
+   - Riprogettata la funzione `estimateLineVisualWraps` per calcolare con esattezza millimetrica l'ingombro delle righe con accordi: somma le larghezze dei singoli word flex-item (considerando la larghezza massima tra sillaba e accordo `max(wordWidth, chordWidth)`) e il `margin-right` tra parole (0.28em). Se la riga eccede la larghezza colonna (88 mm per colonna), calcola accuratamente i wrap visivi (2 o più righe).
+   - Calibrata l'altezza riga con accordi in `calculateBlockHeightMm`: `visualWraps * (fontSizePt * 2.14) + 1.5 pt` (coerente con chord `0.94 * 1.05` + lyric `1.15`).
+   - Calibrata l'altezza massima delle colonne a `page1MaxColHeightMm = 249 mm`, `page2PlusMaxColHeightMm = 250 mm` e `maxColHeightMm = 248 mm` con tolleranza prudenziale `toleranceMm = 2.0–2.5 mm`, eliminando sommatorie di overshoot artificiali.
+2. **Compattazione Verticale Pulita ed Eliminazione Regole Obsolete (`print.css` & `components.css`):**
+   - Eliminato definitivamente il `margin-top: 1.5em` parassita da `.canzoniere-line-item.has-chords, .canto-screen-line.has-chords`, impostandolo a `0 !important`.
+   - Ridotto il margine inferiore tra righe `.canto-screen-line` a `1.5pt !important`.
+   - Azzerato il margine inferiore di `.canto-word` a `0 !important` (in precedenza 0.08em).
+   - Impostato `line-height: 1.05` e `min-height: 1.05em` per gli accordi (`.canto-unit-chord`) e `line-height: 1.15` per le sillabe (`.canto-unit-lyric`).
+   - Risultato: layout arioso e pulito, ma compatto, risparmiando oltre 30 mm di spazio sprecato per colonna.
+3. **Potenziamento Visibilità e Leggibilità Accordi:**
+   - Dimensione font accordo aumentata a `font-size: 0.94em !important` (sia in anteprima a schermo che in stampa A4).
+   - Spessore font accordo elevato a `font-weight: 800 !important` (extra bold), garantendo contrasto e leggibilità immediata per i chitarristi/animatori anche a distanza.
+
+### Verifica Globale
+- **TypeScript Typecheck:** `npm run typecheck` completato con 0 errori.
+- **Unit & Integration Test (Vitest):** 335/335 test passati (31 file di test, inclusi i 23 test di adaptive fill ed equilibrio colonne).
+- **Playwright PDF Audit Reale Chromium:**
+  - *Chi canta* (12 pagine): 0 problemi di layout, 0 ritornelli orfani, 100% OK.
+  - *Chi suona* (21 pagine): 0 problemi di layout, 0 orfani, 100% OK.
+  - Verifica millimetrica del margine inferiore su tutte le 21 schede A4: bottom clearance $\ge 0.00$ mm su ogni pagina, zero righe tagliate o nascoste da `overflow: hidden`.
+
+

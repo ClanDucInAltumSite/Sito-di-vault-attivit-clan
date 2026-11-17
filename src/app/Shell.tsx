@@ -32,6 +32,7 @@ export function Shell({
   const { route } = useRoute();
   const { isAdmin } = useAdmin();
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const handleShare = async () => {
@@ -131,71 +132,263 @@ export function Shell({
         </div>
 
         <div className="ios-top-bar-trailing">
-          {/* Indicatore e Pulsante Sincronizzazione con Bussola Scout Animata */}
-          <button
-            type="button"
-            className="ios-btn ios-btn-ghost ios-btn-sm"
-            onClick={onManualSync || (() => navigate('stato-dati'))}
-            aria-label={isSyncing ? 'Sincronizzazione in corso' : 'Sincronizza archivio'}
-            title={
-              isSyncing
-                ? 'Sincronizzazione in corso…'
-                : lastSyncTime
-                ? `Ultimo aggiornamento: ${formattedSyncTime}. Tocca per sincronizzare`
-                : 'Aggiorna ora'
-            }
-            disabled={!isOnline && !isSyncing}
-            style={{ padding: '0 6px', minWidth: '36px' }}
-          >
-            <CompassSync isSyncing={isSyncing} size={20} />
-          </button>
-
-          {/* Condivisione Web App */}
-          <button
-            type="button"
-            className="ios-btn ios-btn-ghost ios-btn-sm"
-            onClick={handleShare}
-            aria-label={I18N.app.shareBtn}
-            title={I18N.app.shareBtn}
-            style={{ padding: '0 8px', minWidth: '38px' }}
-          >
-            <Icon name="share" size={20} />
-          </button>
-
-          {/* Scorciatoia Centro Stampa */}
-          <button
-            type="button"
-            className="ios-btn ios-btn-ghost ios-btn-sm"
-            onClick={() => navigate('stampa')}
-            aria-label={I18N.nav.stampa}
-            title={I18N.nav.stampa}
-            style={{ padding: '0 8px', minWidth: '38px' }}
-          >
-            <Icon name="stampa" size={20} />
-          </button>
-
-          {/* Accesso Admin */}
-          <button
-            type="button"
-            className={`ios-btn ios-btn-sm ${isAdmin ? 'ios-btn-primary' : 'ios-btn-ghost'}`}
-            onClick={() => {
-              if (isAdmin) {
-                navigate('admin');
-              } else {
-                setIsLoginModalOpen(true);
+          {/* Su Desktop (>= 768px): Pulsanti completi orizzontali */}
+          <div className="ios-top-bar-trailing-desktop">
+            {/* Indicatore e Pulsante Sincronizzazione con Bussola Scout Animata */}
+            <button
+              type="button"
+              className="ios-btn ios-btn-ghost ios-btn-sm"
+              onClick={onManualSync || (() => navigate('stato-dati'))}
+              aria-label={isSyncing ? 'Sincronizzazione in corso' : 'Sincronizza archivio'}
+              title={
+                isSyncing
+                  ? 'Sincronizzazione in corso…'
+                  : lastSyncTime
+                  ? `Ultimo aggiornamento: ${formattedSyncTime}. Tocca per sincronizzare`
+                  : 'Aggiorna ora'
               }
-            }}
-            aria-label={I18N.nav.admin}
-            title={isAdmin ? I18N.auth.loggedInAsAdmin : I18N.auth.loginTitle}
-            style={{ padding: '0 10px' }}
-          >
-            <Icon name="admin" size={18} />
-            <span style={{ fontSize: '13px', marginLeft: '4px' }}>
-              {isAdmin ? 'Admin' : 'Accedi'}
-            </span>
-          </button>
+              disabled={!isOnline && !isSyncing}
+              style={{ padding: '0 6px', minWidth: '36px' }}
+            >
+              <CompassSync isSyncing={isSyncing} size={20} />
+            </button>
+
+            {/* Condivisione Web App */}
+            <button
+              type="button"
+              className="ios-btn ios-btn-ghost ios-btn-sm"
+              onClick={handleShare}
+              aria-label={I18N.app.shareBtn}
+              title={I18N.app.shareBtn}
+              style={{ padding: '0 8px', minWidth: '38px' }}
+            >
+              <Icon name="share" size={20} />
+            </button>
+
+            {/* Scorciatoia Centro Stampa */}
+            <button
+              type="button"
+              className="ios-btn ios-btn-ghost ios-btn-sm"
+              onClick={() => navigate('stampa')}
+              aria-label={I18N.nav.stampa}
+              title={I18N.nav.stampa}
+              style={{ padding: '0 8px', minWidth: '38px' }}
+            >
+              <Icon name="stampa" size={20} />
+            </button>
+
+            {/* Accesso Admin */}
+            <button
+              type="button"
+              className={`ios-btn ios-btn-sm ${isAdmin ? 'ios-btn-primary' : 'ios-btn-ghost'}`}
+              onClick={() => {
+                if (isAdmin) {
+                  navigate('admin');
+                } else {
+                  setIsLoginModalOpen(true);
+                }
+              }}
+              aria-label={I18N.nav.admin}
+              title={isAdmin ? I18N.auth.loggedInAsAdmin : I18N.auth.loginTitle}
+              style={{ padding: '0 10px' }}
+            >
+              <Icon name="admin" size={18} />
+              <span style={{ fontSize: '13px', marginLeft: '4px' }}>
+                {isAdmin ? 'Admin' : 'Accedi'}
+              </span>
+            </button>
+          </div>
+
+          {/* Su Mobile (< 768px): Pulsante Hamburger */}
+          <div className="ios-top-bar-trailing-mobile">
+            <button
+              type="button"
+              className={`ios-btn ios-btn-sm ${isMobileMenuOpen ? 'ios-btn-primary' : 'ios-btn-ghost'}`}
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              aria-label={isMobileMenuOpen ? 'Chiudi menu' : 'Menu azioni'}
+              title="Menu azioni"
+              style={{
+                width: '38px',
+                height: '36px',
+                padding: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Icon name={isMobileMenuOpen ? 'x' : 'menu'} size={22} />
+            </button>
+          </div>
         </div>
       </header>
+
+      {/* Drawer Menu Mobile (Visibile al tocco dell'Hamburger su schermi piccoli) */}
+      {isMobileMenuOpen && (
+        <>
+          <div
+            className="ios-mobile-drawer-backdrop"
+            onClick={() => setIsMobileMenuOpen(false)}
+            aria-hidden="true"
+          />
+          <div className="ios-mobile-drawer" role="dialog" aria-modal="true" aria-label="Menu rapido">
+            {/* Header del Drawer */}
+            <div className="ios-mobile-drawer-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <BrandLogo variant="emblema" size={24} />
+                <span style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--color-ink)' }}>
+                  Menu e Azioni
+                </span>
+              </div>
+              <button
+                type="button"
+                className="ios-btn ios-btn-ghost ios-btn-sm"
+                onClick={() => setIsMobileMenuOpen(false)}
+                style={{ padding: '4px 8px' }}
+                aria-label="Chiudi menu"
+              >
+                <Icon name="x" size={18} />
+              </button>
+            </div>
+
+            {/* Card Sincronizzazione Dati */}
+            <div className="ios-mobile-drawer-sync-card">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <CompassSync isSyncing={isSyncing} size={28} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-ink)' }}>
+                    {isSyncing ? 'Sincronizzazione in corso…' : 'Archivio Sincronizzato'}
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
+                    {!isOnline
+                      ? 'Dispositivo non connesso'
+                      : lastSyncTime
+                      ? `Ultimo sync: ${formattedSyncTime}`
+                      : 'Nessun sync effettuato'}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem' }}>
+                <button
+                  type="button"
+                  className="ios-btn ios-btn-sm ios-btn-secondary"
+                  style={{ flex: 1, fontSize: '0.78rem' }}
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    if (onManualSync) {
+                      onManualSync();
+                    } else {
+                      navigate('stato-dati');
+                    }
+                  }}
+                  disabled={!isOnline || isSyncing}
+                >
+                  <Icon name="refresh" size={14} />
+                  <span style={{ marginLeft: '4px' }}>Sincronizza ora</span>
+                </button>
+                <button
+                  type="button"
+                  className="ios-btn ios-btn-sm ios-btn-ghost"
+                  style={{ fontSize: '0.78rem' }}
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    navigate('stato-dati');
+                  }}
+                >
+                  Dettagli
+                </button>
+              </div>
+            </div>
+
+            {/* Voci di Azione Rapida */}
+            <div className="ios-mobile-drawer-items">
+              {/* Condividi */}
+              <button
+                type="button"
+                className="ios-mobile-drawer-item"
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  handleShare();
+                }}
+              >
+                <div className="ios-mobile-drawer-icon" style={{ background: 'var(--color-interactive-tenue)', color: 'var(--color-interactive)' }}>
+                  <Icon name="share" size={20} />
+                </div>
+                <div className="ios-mobile-drawer-text">
+                  <span className="ios-mobile-drawer-title">{I18N.app.shareBtn}</span>
+                  <span className="ios-mobile-drawer-desc">Invia link o copia negli appunti</span>
+                </div>
+              </button>
+
+              {/* Centro Stampa */}
+              <button
+                type="button"
+                className="ios-mobile-drawer-item"
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  navigate('stampa');
+                }}
+              >
+                <div className="ios-mobile-drawer-icon" style={{ background: 'var(--color-surface-hover)', color: 'var(--color-ink)' }}>
+                  <Icon name="stampa" size={20} />
+                </div>
+                <div className="ios-mobile-drawer-text">
+                  <span className="ios-mobile-drawer-title">{I18N.stampa.title}</span>
+                  <span className="ios-mobile-drawer-desc">Stampa libretti e schede A4</span>
+                </div>
+              </button>
+
+              {/* Amministrazione */}
+              <button
+                type="button"
+                className="ios-mobile-drawer-item"
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  if (isAdmin) {
+                    navigate('admin');
+                  } else {
+                    setIsLoginModalOpen(true);
+                  }
+                }}
+              >
+                <div
+                  className="ios-mobile-drawer-icon"
+                  style={{
+                    background: isAdmin ? 'var(--color-giochi-tenue)' : 'var(--color-surface-hover)',
+                    color: isAdmin ? 'var(--color-giochi-badge-text)' : 'var(--color-ink)',
+                  }}
+                >
+                  <Icon name="admin" size={20} />
+                </div>
+                <div className="ios-mobile-drawer-text">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span className="ios-mobile-drawer-title">
+                      {isAdmin ? 'Pannello Amministrazione' : 'Accedi come Responsabile'}
+                    </span>
+                    {isAdmin && (
+                      <span
+                        style={{
+                          fontSize: '0.68rem',
+                          background: 'var(--color-giochi-tenue)',
+                          color: 'var(--color-giochi-badge-text)',
+                          padding: '1px 6px',
+                          borderRadius: '10px',
+                          fontWeight: 700,
+                        }}
+                      >
+                        Attivo
+                      </span>
+                    )}
+                  </div>
+                  <span className="ios-mobile-drawer-desc">
+                    {isAdmin ? 'Gestisci canti, giochi e calendario' : 'Modifica contenuti e database'}
+                  </span>
+                </div>
+              </button>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Sfondo Topografico Ambientale Globale (visibile in tutte le pagine) */}
       <TopographicBackground />

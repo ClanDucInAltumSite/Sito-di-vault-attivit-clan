@@ -184,30 +184,15 @@ export function CalendarioView() {
       />
 
       <div className="container" style={{ paddingTop: 'var(--space-4)' }}>
-        {/* 2. BARRA CONTROLLI SUPERIORE: FILTRI VISTA E PULSANTE NUOVO EVENTO ADMIN */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: 'var(--space-3)',
-            marginBottom: 'var(--space-4)',
-          }}
-        >
-          <div style={{ flex: '1 1 280px', maxWidth: '380px' }}>
-            <SegmentedControl
-              options={[
-                { value: 'mese', label: I18N.calendario.vistaMese },
-                { value: 'prossimi', label: I18N.calendario.prossimiEventi },
-                { value: 'passati', label: 'Passati' },
-              ]}
-              value={viewMode}
-              onChange={handleViewModeChange}
-            />
-          </div>
-
-          {isAdmin && (
+        {/* Barra azione Admin (visibile SOLO con sessione admin autenticata, allineata a destra come in tutte le sezioni) */}
+        {isAdmin ? (
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              marginBottom: 'var(--space-3)',
+            }}
+          >
             <Button
               variant="primary"
               size="sm"
@@ -217,7 +202,20 @@ export function CalendarioView() {
               <Icon name="plus" size={16} />
               <span>{I18N.calendario.nuovoEvento}</span>
             </Button>
-          )}
+          </div>
+        ) : null}
+
+        {/* 2. SELETTORE VISTA (Mese / Prossimi Eventi / Passati) */}
+        <div style={{ marginBottom: 'var(--space-4)' }}>
+          <SegmentedControl
+            options={[
+              { value: 'mese', label: I18N.calendario.vistaMese },
+              { value: 'prossimi', label: I18N.calendario.prossimiEventi },
+              { value: 'passati', label: 'Passati' },
+            ]}
+            value={viewMode}
+            onChange={handleViewModeChange}
+          />
         </div>
 
         {/* 2B. BANNER RIUNIONE CON DATA DA CONCORDARE (ODG IN CORSO) */}

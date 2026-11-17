@@ -14,6 +14,7 @@ import { useAdmin } from '../../lib/auth';
 import { matchesQuery, HighlightText } from '../../lib/search';
 import { softDeleteRecord } from '../../lib/admin_actions';
 import { subscribeSyncState } from '../../lib/sync';
+import { getPropostePerVisualizzazione, approvaPropostaAdmin, ritiraPropostaLocale, subscribeProposte, PropostaItem } from '../../lib/proposte';
 import { stripChords } from '../../lib/chordpro';
 import { splitSongIntoPages } from '../../lib/stampa';
 import { CantoDetailSheet } from './CantoDetailSheet';
@@ -22,6 +23,7 @@ import { ImportCantoModal, ImportedSongData } from './ImportCantoModal';
 import { CantoReviewModal } from './CantoReviewModal';
 import { QuickCategoryAssignModal } from './QuickCategoryAssignModal';
 import { DeleteConfirmModal } from '../../ui/DeleteConfirmModal';
+import { RifiutaPropostaModal } from '../admin/RifiutaPropostaModal';
 import { DANZA_LA_VITA_PARSED, DEFAULT_PARSED_SONGS } from '../../data/parsed_songs';
 
 type SortOption = 'az' | 'za' | 'recenti' | 'vecchi';
@@ -30,6 +32,7 @@ export type CategoryFilter = 'tutti' | 'scout' | 'chiesa' | 'esterni' | 'senza_c
 export function CantiView() {
   const { isAdmin } = useAdmin();
   const [canti, setCanti] = useState<Canto[]>([]);
+  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
 
   // Filtro Categoria (Fase 11F)
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>(() => {
@@ -73,7 +76,10 @@ export function CantiView() {
 
   const debounceTimerRef = useRef<any>(null);
 
-  // Caricamento dati da IndexedDB
+  const [pendingProposteMap, setPendingProposteMap] = useState<Map<string, PropostaItem>>(new Map());
+  const [rejectingProposta, setRejectingProposta] = useState<PropostaItem | null>(null);
+
+  // Caricamento dati da IndexedDB e Supabase (ufficiali + proposte in attesa)
   const loadData = async () => {
     const list = await getCanti(false);
     const enriched = [...list];
@@ -130,9 +136,37 @@ export function CantiView() {
       }
     }
 
-    enriched.sort((a, b) => a.titolo.localeCompare(b.titolo, 'it'));
+    // Unisci proposte in attesa (locali o da Supabase per admin)
+    const proposte = await getPropostePerVisualizzazione('canti', isAdmin);
+    const map = new Map<string, PropostaItem>();
+    const pendingCanti: Canto[] = proposte.map((p) => {
+      map.set(p.id, p);
+      return {
+        id: p.id,
+        titolo: p.dati.titolo || p.titolo,
+        autore: p.dati.autore || null,
+        categoria: p.dati.categoria || 'scout',
+        tonalita: p.dati.tonalita || null,
+        ritmo: p.dati.ritmo || null,
+        tempo_bpm: p.dati.tempo_bpm || null,
+        bpm_testo: p.dati.bpm_testo || null,
+        misura: p.dati.misura || null,
+        capotasto: p.dati.capotasto || null,
+        origine: p.dati.origine || 'manuale',
+        nota_fonte: p.dati.nota_fonte || null,
+        testo_chordpro: p.dati.testo_chordpro || '',
+        created_at: p.created_at,
+        updated_at: p.created_at,
+        deleted_at: null,
+      };
+    });
 
-    setCanti(enriched);
+    setPendingProposteMap(map);
+    setPendingIds(new Set(proposte.map((p) => p.id)));
+    const merged = [...pendingCanti, ...enriched];
+    merged.sort((a, b) => a.titolo.localeCompare(b.titolo, 'it'));
+
+    setCanti(merged);
 
     if (toSeed.length > 0) {
       upsertRecords('canti', toSeed).catch((err) => console.warn('Canti seeding error:', err));
@@ -149,7 +183,10 @@ export function CantiView() {
 
   useEffect(() => {
     loadData();
-    const unsubscribe = subscribeSyncState(() => {
+    const unsubSync = subscribeSyncState(() => {
+      loadData();
+    });
+    const unsubProp = subscribeProposte(() => {
       loadData();
     });
     (window as any).__openCantoDetail = (canto: Canto) => {
@@ -180,11 +217,12 @@ export function CantiView() {
       setIsReviewModalOpen(true);
     };
     return () => {
-      unsubscribe();
+      unsubSync();
+      unsubProp();
       delete (window as any).__openCantoDetail;
       delete (window as any).__openReviewForTesting;
     };
-  }, []);
+  }, [isAdmin]);
 
   // Gestione ricerca con debounce ~200 ms e persistenza in sessionStorage
   const handleSearchChange = (val: string) => {
@@ -290,40 +328,55 @@ export function CantiView() {
       />
 
       <div className="container" style={{ paddingTop: 'var(--space-4)' }}>
-        {/* Barra azione Admin (visibile SOLO con sessione admin autenticata) */}
-        {isAdmin ? (
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'flex-end',
-              alignItems: 'center',
-              gap: 'var(--space-2)',
-              marginBottom: 'var(--space-3)',
-            }}
-          >
+        {/* Barra azione (Admin o Proposta Utente Non-Admin) */}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'flex-end',
+            alignItems: 'center',
+            gap: 'var(--space-2)',
+            marginBottom: 'var(--space-3)',
+          }}
+        >
+          {isAdmin ? (
+            <>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => setIsImportModalOpen(true)}
+              >
+                <Icon name="upload" size={16} />
+                <span>Importa canto</span>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setEditingCanto(null);
+                  setImportedSongData(null);
+                  setIsReviewModalOpen(true);
+                }}
+                style={{ fontSize: '0.85rem' }}
+              >
+                <Icon name="plus" size={14} />
+                <span>Nuovo canto vuoto</span>
+              </Button>
+            </>
+          ) : (
             <Button
               variant="primary"
-              size="sm"
-              onClick={() => setIsImportModalOpen(true)}
-            >
-              <Icon name="upload" size={16} />
-              <span>Importa canto</span>
-            </Button>
-            <Button
-              variant="ghost"
               size="sm"
               onClick={() => {
                 setEditingCanto(null);
                 setImportedSongData(null);
                 setIsReviewModalOpen(true);
               }}
-              style={{ fontSize: '0.85rem' }}
             >
-              <Icon name="plus" size={14} />
-              <span>Nuovo canto vuoto</span>
+              <Icon name="plus" size={16} />
+              <span>Proponi un Canto</span>
             </Button>
-          </div>
-        ) : null}
+          )}
+        </div>
 
         {/* Avviso Admin per canti senza categoria con assegnazione rapida (Fase 11F) */}
         {isAdmin && countUncategorized > 0 ? (
@@ -470,7 +523,8 @@ export function CantiView() {
             footer="Tocca un canto per visualizzare gli accordi, trasporre la tonalità o avviare il metronomo."
           >
             {filteredList.map((canto) => {
-              const isNew = canto.id === latestCantoId;
+              const isPending = pendingIds.has(canto.id);
+              const isNew = !isPending && canto.id === latestCantoId;
 
               const pageCount = splitSongIntoPages(canto.testo_chordpro).length;
               const metaParts = [];
@@ -483,56 +537,80 @@ export function CantiView() {
               const subtitleText = metaParts.join(' • ');
 
               return (
-                <GroupedRow
-                  key={canto.id}
-                  leading={<SectionIcon section="canti" size="sm" />}
-                  title={
-                    <HighlightText
-                      text={canto.titolo}
-                      query={debouncedSearch}
-                    />
-                  }
-                  subtitle={
-                    <HighlightText
-                      text={canto.autore ? `${canto.autore} - ${subtitleText}` : subtitleText}
-                      query={debouncedSearch}
-                    />
-                  }
-                  trailing={
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                      {canto.categoria === 'scout' && (
-                        <Badge variant="azzurro" size="sm">
-                          Scout
-                        </Badge>
-                      )}
-                      {canto.categoria === 'chiesa' && (
-                        <Badge variant="giallo" size="sm">
-                          Chiesa
-                        </Badge>
-                      )}
-                      {canto.categoria === 'esterni' && (
-                        <Badge variant="rosso" size="sm">
-                          Esterni
-                        </Badge>
-                      )}
-                      {!canto.categoria && isAdmin && (
-                        <Badge variant="rosso" size="sm">
-                          Senza cat.
-                        </Badge>
-                      )}
-                      {isNew ? (
-                        <Badge variant="nuovo" size="sm">
-                          Nuovo
-                        </Badge>
-                      ) : null}
-                    </div>
-                  }
-                  chevron
-                  onClick={() => {
-                    setSelectedCanto(canto);
-                    setIsReadingModeOpen(true);
-                  }}
-                />
+                <div key={canto.id} className={isPending ? 'proposta-pending-card' : undefined} style={isPending ? { borderRadius: 'var(--radius-md)', margin: '2px 0' } : undefined}>
+                  <GroupedRow
+                    leading={<SectionIcon section="canti" size="sm" />}
+                    title={
+                      <HighlightText
+                        text={canto.titolo}
+                        query={debouncedSearch}
+                      />
+                    }
+                    subtitle={
+                      <div>
+                        <HighlightText
+                          text={canto.autore ? `${canto.autore} - ${subtitleText}` : subtitleText}
+                          query={debouncedSearch}
+                        />
+                        {isPending ? (
+                          <span className="proposta-pending-caption">
+                            {isAdmin && pendingProposteMap.get(canto.id)?.proponente_nome
+                              ? `Proposto da: ${pendingProposteMap.get(canto.id)?.proponente_nome} • In attesa di approvazione`
+                              : isAdmin
+                              ? 'In attesa di approvazione dell\'Admin'
+                              : 'Visibile solo su questo dispositivo fino all\'approvazione dell\'Admin'}
+                          </span>
+                        ) : null}
+                      </div>
+                    }
+                    trailing={
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                        {isPending ? (
+                          <Badge variant="giallo" size="sm">
+                            In attesa
+                          </Badge>
+                        ) : (
+                          <>
+                            {canto.categoria === 'scout' && (
+                              <Badge variant="azzurro" size="sm">
+                                Scout
+                              </Badge>
+                            )}
+                            {canto.categoria === 'chiesa' && (
+                              <Badge variant="giallo" size="sm">
+                                Chiesa
+                              </Badge>
+                            )}
+                            {canto.categoria === 'esterni' && (
+                              <Badge variant="rosso" size="sm">
+                                Esterni
+                              </Badge>
+                            )}
+                            {!canto.categoria && isAdmin && (
+                              <Badge variant="rosso" size="sm">
+                                Senza cat.
+                              </Badge>
+                            )}
+                            {isNew ? (
+                              <Badge variant="nuovo" size="sm">
+                                Nuovo
+                              </Badge>
+                            ) : null}
+                          </>
+                        )}
+                      </div>
+                    }
+                    chevron
+                    onClick={() => {
+                      setSelectedCanto(canto);
+                      if (isPending) {
+                        setIsDetailOpen(true);
+                      } else {
+                        setIsReadingModeOpen(true);
+                      }
+                    }}
+                  />
+                </div>
               );
             })}
           </GroupedList>
@@ -544,6 +622,8 @@ export function CantiView() {
         canto={selectedCanto}
         isOpen={isDetailOpen}
         isNew={selectedCanto ? selectedCanto.id === latestCantoId : false}
+        isPending={selectedCanto ? pendingIds.has(selectedCanto.id) : false}
+        proponenteNome={selectedCanto ? pendingProposteMap.get(selectedCanto.id)?.proponente_nome || null : null}
         onClose={() => {
           setIsDetailOpen(false);
           setSelectedCanto(null);
@@ -552,6 +632,28 @@ export function CantiView() {
           setIsDetailOpen(false);
           setSelectedCanto(c);
           setIsReadingModeOpen(true);
+        }}
+        onApproveProposta={async (c) => {
+          const prop = pendingProposteMap.get(c.id);
+          if (prop) {
+            await approvaPropostaAdmin(prop);
+            setIsDetailOpen(false);
+            setSelectedCanto(null);
+            await loadData();
+          }
+        }}
+        onRejectProposta={(c) => {
+          const prop = pendingProposteMap.get(c.id);
+          if (prop) {
+            setIsDetailOpen(false);
+            setRejectingProposta(prop);
+          }
+        }}
+        onWithdraw={async (c) => {
+          await ritiraPropostaLocale(c.id);
+          setIsDetailOpen(false);
+          setSelectedCanto(null);
+          await loadData();
         }}
         onEdit={(c) => {
           setIsDetailOpen(false);
@@ -637,6 +739,17 @@ export function CantiView() {
         onConfirm={handleDeleteConfirm}
         itemName={deletingCanto?.titolo || ''}
         isLoading={isDeleting}
+      />
+
+      {/* Modal In-App Rifiuta Proposta e Blocco Utente (Admin) */}
+      <RifiutaPropostaModal
+        proposta={rejectingProposta}
+        isOpen={Boolean(rejectingProposta)}
+        onClose={() => setRejectingProposta(null)}
+        onSuccess={async () => {
+          setSelectedCanto(null);
+          await loadData();
+        }}
       />
     </div>
   );

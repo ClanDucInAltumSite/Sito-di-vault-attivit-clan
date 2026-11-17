@@ -627,6 +627,182 @@ Oggi abbiamo parlato di **route** e ==green:bilancio==.
     const forWhatsApp = formatContentForWhatsApp(rawWithSub);
     expect(forWhatsApp).toBe('_Sottotitolo di Prova_');
   });
+
+  it('26. renderMarkdownToContainer non genera paragrafi vuoti <p><br></p> spuri sotto i titoli o tra blocchi separati da \\n\\n', () => {
+    const md = '# Titolo Principale\n\nQuesto è il primo paragrafo.\n\n## Secondo Titolo\n\nSecondo paragrafo.';
+    const container = document.createElement('div');
+    renderMarkdownToContainer(md, container);
+
+    // I nodi diretti devono essere esattamente 4 (h1, p, h2, p) SENZA paragrafi vuoti <p><br></p> intermedi
+    const children = Array.from(container.children);
+    expect(children.length).toBe(4);
+    expect(children[0].tagName.toUpperCase()).toBe('H1');
+    expect(children[0].textContent).toBe('Titolo Principale');
+    expect(children[1].tagName.toUpperCase()).toBe('P');
+    expect(children[1].textContent).toBe('Questo è il primo paragrafo.');
+    expect(children[2].tagName.toUpperCase()).toBe('H2');
+    expect(children[2].textContent).toBe('Secondo Titolo');
+    expect(children[3].tagName.toUpperCase()).toBe('P');
+    expect(children[3].textContent).toBe('Secondo paragrafo.');
+
+    // Nessun paragrafo sotto i titoli deve essere vuoto
+    const emptyParagraphs = Array.from(container.querySelectorAll('p')).filter((p) => !p.textContent?.trim());
+    expect(emptyParagraphs.length).toBe(0);
+
+    // Round-trip pulito
+    const roundtrip = domToMarkdown(container);
+    expect(roundtrip).toBe(md);
+  });
+
+  it('27. renderMarkdownToContainer preserva righe vuote intenzionali senza alterare la struttura dei titoli', () => {
+    // 2 righe vuote tra titolo e testo: la prima è il separatore normale, la seconda è vuota intenzionale
+    const mdWithExtraBlank = '# Titolo Isolato\n\n\nParagrafo dopo riga vuota.';
+    const container = document.createElement('div');
+    renderMarkdownToContainer(mdWithExtraBlank, container);
+
+    const children = Array.from(container.children);
+    expect(children.length).toBe(3);
+    expect(children[0].tagName.toUpperCase()).toBe('H1');
+    expect(children[1].tagName.toUpperCase()).toBe('P');
+    expect(children[1].querySelector('br')).not.toBeNull();
+    expect(children[2].tagName.toUpperCase()).toBe('P');
+    expect(children[2].textContent).toBe('Paragrafo dopo riga vuota.');
+
+    // Verifica round-trip di serializzazione: la riga vuota intenzionale viene preservata
+    const serialized = domToMarkdown(container);
+    expect(serialized).toBe(mdWithExtraBlank);
+  });
+
+  it('28. Parsing, rendering e serializzazione colori testo: isolamento e assenza di annidamenti spuri', () => {
+    const md = 'Testo normale [color:purple:parola viola] e poi [color:blue:parola blu] finale.';
+    const container = document.createElement('div');
+    renderMarkdownToContainer(md, container);
+
+    const p = container.querySelector('p');
+    expect(p).not.toBeNull();
+
+    const spans = Array.from(p!.querySelectorAll('span'));
+    expect(spans.length).toBe(2);
+    expect(spans[0].className).toContain('doc-color-purple');
+    expect(spans[0].dataset.color).toBe('purple');
+    expect(spans[0].textContent).toBe('parola viola');
+
+    expect(spans[1].className).toContain('doc-color-blue');
+    expect(spans[1].dataset.color).toBe('blue');
+    expect(spans[1].textContent).toBe('parola blu');
+
+    // Verifica che nessuno span sia annidato dentro l'altro
+    expect(spans[0].contains(spans[1])).toBe(false);
+    expect(spans[1].contains(spans[0])).toBe(false);
+
+    // Serializzazione round-trip fedele
+    const serialized = domToMarkdown(container);
+    expect(serialized).toBe(md);
+  });
+
+  it('29. Parsing, rendering ed evidenziatore pastello: supporto classi e dataset coerenti', () => {
+    const md = 'Evidenziare ==green:questo concetto verde== e ==coral:questo corallo==.';
+    const container = document.createElement('div');
+    renderMarkdownToContainer(md, container);
+
+    const marks = Array.from(container.querySelectorAll('mark'));
+    expect(marks.length).toBe(2);
+    expect(marks[0].className).toContain('doc-highlight-green');
+    expect(marks[0].dataset.highlight).toBe('green');
+    expect(marks[0].textContent).toBe('questo concetto verde');
+
+    expect(marks[1].className).toContain('doc-highlight-coral');
+    expect(marks[1].dataset.highlight).toBe('coral');
+    expect(marks[1].textContent).toBe('questo corallo');
+
+    const serialized = domToMarkdown(container);
+    expect(serialized).toBe(md);
+  });
+
+  it('30. Stepper dimensione testo: parsing ed emissione corretta del tag size', () => {
+    const md = 'Testo normale [size:22:testo grande 22px] fine.';
+    const container = document.createElement('div');
+    renderMarkdownToContainer(md, container);
+
+    const sizeSpan = container.querySelector('.doc-size-span') as HTMLElement;
+    expect(sizeSpan).not.toBeNull();
+    expect(sizeSpan.dataset.size).toBe('22');
+    expect(sizeSpan.style.fontSize).toBe('22px');
+    expect(sizeSpan.textContent).toBe('testo grande 22px');
+
+    const serialized = domToMarkdown(container);
+    expect(serialized).toBe(md);
+  });
+
+  it('31. Serializzazione da DOM pulita con liste ed intestazioni senza nodi invalidi', () => {
+    // Verifica che una lista con intestazione adiacente venga serializzata correttamente senza <h1><li>
+    const container = document.createElement('div');
+
+    const ul = document.createElement('ul');
+    const li1 = document.createElement('li');
+    li1.textContent = 'Punto uno';
+    ul.appendChild(li1);
+    container.appendChild(ul);
+
+    const h2 = document.createElement('h2');
+    h2.className = 'doc-h2';
+    h2.textContent = 'Titolo Intermedio';
+    container.appendChild(h2);
+
+    const ul2 = document.createElement('ul');
+    const li2 = document.createElement('li');
+    li2.textContent = 'Punto due';
+    ul2.appendChild(li2);
+    container.appendChild(ul2);
+
+    const serialized = domToMarkdown(container);
+    expect(serialized).toBe('- Punto uno\n\n## Titolo Intermedio\n\n- Punto due');
+
+    // Round-trip
+    const reContainer = document.createElement('div');
+    renderMarkdownToContainer(serialized, reContainer);
+    expect(reContainer.children.length).toBe(3);
+    expect(reContainer.children[0].tagName.toUpperCase()).toBe('UL');
+    expect(reContainer.children[1].tagName.toUpperCase()).toBe('H2');
+    expect(reContainer.children[2].tagName.toUpperCase()).toBe('UL');
+  });
+
+  it('32. Supporto completo per tutti i 12 colori testo e 8 evidenziatori pastello (Editor DOM + Reading Mode)', () => {
+    // 12 colori testo: purple, blue, cyan, green, lime, amber, red, pink, brown, navy, gray + default
+    const textColors = ['purple', 'blue', 'cyan', 'green', 'lime', 'amber', 'red', 'pink', 'brown', 'navy', 'gray'];
+    for (const c of textColors) {
+      const md = `Testo con [color:${c}:parola ${c}] fine.`;
+      const container = document.createElement('div');
+      renderMarkdownToContainer(md, container);
+      const span = container.querySelector(`.doc-color-${c}`) as HTMLElement;
+      expect(span).not.toBeNull();
+      expect(span.dataset.color).toBe(c);
+      expect(span.textContent).toBe(`parola ${c}`);
+      expect(domToMarkdown(container)).toBe(md);
+
+      // Reading mode parseInlineText
+      const readingNodes = parseInlineText(md);
+      expect(readingNodes.some((n: any) => n.props?.className?.includes(`doc-color-${c}`))).toBe(true);
+    }
+
+    // 8 evidenziatori: yellow, green, blue, coral, purple, amber, cyan, gray
+    const highlights = ['yellow', 'green', 'blue', 'coral', 'purple', 'amber', 'cyan', 'gray'];
+    for (const h of highlights) {
+      const md = `Evidenziazione ==${h}:concetto ${h}== completata.`;
+      const container = document.createElement('div');
+      renderMarkdownToContainer(md, container);
+      const mark = container.querySelector(`.doc-highlight-${h}`) as HTMLElement;
+      expect(mark).not.toBeNull();
+      expect(mark.dataset.highlight).toBe(h);
+      expect(mark.textContent).toBe(`concetto ${h}`);
+      expect(domToMarkdown(container)).toBe(md);
+
+      // Reading mode parseInlineText
+      const readingNodes = parseInlineText(md);
+      expect(readingNodes.some((n: any) => n.props?.className?.includes(`doc-highlight-${h}`))).toBe(true);
+    }
+  });
 });
+
 
 

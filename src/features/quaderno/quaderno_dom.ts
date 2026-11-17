@@ -123,9 +123,15 @@ function findBracketTag(text: string): MatchedBracketTag | null {
       span.dataset.color = color;
       if (color === 'purple') span.style.color = 'var(--color-quaderno)';
       else if (color === 'blue') span.style.color = 'var(--color-canti)';
+      else if (color === 'cyan') span.style.color = 'var(--color-doc-cyan)';
       else if (color === 'green') span.style.color = 'var(--color-calendario)';
-      else if (color === 'red') span.style.color = 'var(--color-bans)';
+      else if (color === 'lime') span.style.color = 'var(--color-doc-lime)';
       else if (color === 'amber') span.style.color = 'var(--color-giochi)';
+      else if (color === 'red') span.style.color = 'var(--color-bans)';
+      else if (color === 'pink') span.style.color = 'var(--color-doc-pink)';
+      else if (color === 'brown') span.style.color = 'var(--color-doc-brown)';
+      else if (color === 'navy') span.style.color = 'var(--color-doc-navy)';
+      else if (color === 'gray') span.style.color = 'var(--color-doc-gray)';
       return span;
     }
     if (tagSpec.startsWith('font:')) {
@@ -264,13 +270,22 @@ export function renderMarkdownToContainer(markdown: string, container: HTMLEleme
     const rawLine = lines[index] ?? '';
     const trimmed = rawLine.trim();
 
-    // 1. Linea vuota
+    // 1. Linee vuote: in Markdown standard 1 riga vuota tra blocchi è solo la spaziatura sintattica (\n\n).
+    // Solo righe vuote eccedenti (> 1) o all'inizio rappresentano paragrafi vuoti intenzionali.
     if (!trimmed) {
-      const p = document.createElement('p');
-      p.className = 'doc-p';
-      p.appendChild(document.createElement('br'));
-      container.appendChild(p);
-      index++;
+      let emptyCount = 0;
+      while (index < lines.length && !(lines[index] ?? '').trim()) {
+        emptyCount++;
+        index++;
+      }
+      const isStart = container.childNodes.length === 0;
+      const extraEmpty = isStart ? emptyCount : emptyCount - 1;
+      for (let i = 0; i < extraEmpty; i++) {
+        const p = document.createElement('p');
+        p.className = 'doc-p';
+        p.appendChild(document.createElement('br'));
+        container.appendChild(p);
+      }
       continue;
     }
 
@@ -441,6 +456,13 @@ export function renderMarkdownToContainer(markdown: string, container: HTMLEleme
       container.appendChild(p);
     }
   }
+
+  if (container.childNodes.length === 0) {
+    const p = document.createElement('p');
+    p.className = 'doc-p';
+    p.appendChild(document.createElement('br'));
+    container.appendChild(p);
+  }
 }
 
 /**
@@ -506,14 +528,25 @@ function serializeInlineNodes(node: Node): string {
       if (el.dataset.color !== 'default') {
         formatted = `[color:${el.dataset.color}:${formatted}]`;
       }
+    } else if (el.className && el.className.includes('doc-color-')) {
+      const match = el.className.match(/doc-color-([a-z]+)/);
+      if (match && match[1] && match[1] !== 'default') {
+        formatted = `[color:${match[1]}:${formatted}]`;
+      }
     } else if (el.style.color && el.style.color !== 'inherit') {
       const c = el.style.color;
       let colName = 'default';
       if (c.includes('quaderno')) colName = 'purple';
       else if (c.includes('canti')) colName = 'blue';
+      else if (c.includes('doc-cyan')) colName = 'cyan';
       else if (c.includes('calendario')) colName = 'green';
-      else if (c.includes('bans')) colName = 'red';
+      else if (c.includes('doc-lime')) colName = 'lime';
       else if (c.includes('giochi')) colName = 'amber';
+      else if (c.includes('bans')) colName = 'red';
+      else if (c.includes('doc-pink')) colName = 'pink';
+      else if (c.includes('doc-brown')) colName = 'brown';
+      else if (c.includes('doc-navy')) colName = 'navy';
+      else if (c.includes('doc-gray')) colName = 'gray';
       if (colName !== 'default') formatted = `[color:${colName}:${formatted}]`;
     }
 
@@ -523,6 +556,10 @@ function serializeInlineNodes(node: Node): string {
       if (el.classList.contains('doc-highlight-green')) hl = 'green';
       else if (el.classList.contains('doc-highlight-blue')) hl = 'blue';
       else if (el.classList.contains('doc-highlight-coral')) hl = 'coral';
+      else if (el.classList.contains('doc-highlight-purple')) hl = 'purple';
+      else if (el.classList.contains('doc-highlight-amber')) hl = 'amber';
+      else if (el.classList.contains('doc-highlight-cyan')) hl = 'cyan';
+      else if (el.classList.contains('doc-highlight-gray')) hl = 'gray';
       formatted = `==${hl}:${formatted}==`;
     }
 
@@ -639,6 +676,9 @@ export function domToMarkdown(container: HTMLElement): string {
         const text = serializeInlineNodes(el).trim();
         if (text) {
           blocks.push(text);
+        } else {
+          // Paragrafo vuoto intenzionale nel documento
+          blocks.push('');
         }
       }
     } else {
@@ -647,7 +687,34 @@ export function domToMarkdown(container: HTMLElement): string {
     }
   }
 
-  return blocks.join('\n\n').trim();
+  return joinMarkdownBlocks(blocks);
+}
+
+/**
+ * Unisce i blocchi Markdown preservando con precisione le righe vuote intenzionali.
+ */
+export function joinMarkdownBlocks(blocks: string[]): string {
+  const clean = [...blocks];
+  while (clean.length > 0 && clean[0] === '') {
+    clean.shift();
+  }
+  while (clean.length > 0 && clean[clean.length - 1] === '') {
+    clean.pop();
+  }
+  if (clean.length === 0) return '';
+
+  let result = '';
+  for (let i = 0; i < clean.length; i++) {
+    const b = clean[i] ?? '';
+    if (i === 0) {
+      result = b;
+    } else if (b === '') {
+      result += '\n';
+    } else {
+      result += '\n\n' + b;
+    }
+  }
+  return result;
 }
 
 /**

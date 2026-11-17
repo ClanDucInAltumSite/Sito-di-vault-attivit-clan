@@ -14,15 +14,24 @@ import { useAdmin } from '../../lib/auth';
 import { matchesQuery, HighlightText } from '../../lib/search';
 import { softDeleteRecord } from '../../lib/admin_actions';
 import { subscribeSyncState } from '../../lib/sync';
+import {
+  getPropostePerVisualizzazione,
+  ritiraPropostaLocale,
+  subscribeProposte,
+  approvaPropostaAdmin,
+  PropostaItem,
+} from '../../lib/proposte';
 import { GiocoDetailSheet } from './GiocoDetailSheet';
 import { GiocoFormSheet } from './GiocoFormSheet';
 import { DeleteConfirmModal } from '../../ui/DeleteConfirmModal';
+import { RifiutaPropostaModal } from '../admin/RifiutaPropostaModal';
 
 type SortOption = 'az' | 'za' | 'recenti' | 'vecchi';
 
 export function GiochiView() {
   const { isAdmin } = useAdmin();
   const [giochi, setGiochi] = useState<Gioco[]>([]);
+  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
 
   // Ripristino stato da sessionStorage
   const [search, setSearch] = useState(() => {
@@ -53,19 +62,46 @@ export function GiochiView() {
 
   const debounceTimerRef = useRef<any>(null);
 
-  // Caricamento dati da IndexedDB
+  const [pendingProposteMap, setPendingProposteMap] = useState<Map<string, PropostaItem>>(new Map());
+  const [rejectingProposta, setRejectingProposta] = useState<PropostaItem | null>(null);
+
+  // Caricamento dati da IndexedDB e Supabase (ufficiali + proposte in attesa)
   const loadData = async () => {
     const list = await getGiochi(false);
-    setGiochi(list);
+    const proposte = await getPropostePerVisualizzazione('giochi', isAdmin);
+
+    const map = new Map<string, PropostaItem>();
+    const pendingGiochi: Gioco[] = proposte.map((p) => {
+      map.set(p.id, p);
+      return {
+        id: p.id,
+        nome: p.dati.nome || p.titolo,
+        regole: p.dati.regole || '',
+        materiali: p.dati.materiali || '',
+        created_at: p.created_at,
+        updated_at: p.created_at,
+        deleted_at: null,
+      };
+    });
+
+    setPendingProposteMap(map);
+    setPendingIds(new Set(proposte.map((p) => p.id)));
+    setGiochi([...pendingGiochi, ...list]);
   };
 
   useEffect(() => {
     loadData();
-    const unsubscribe = subscribeSyncState(() => {
+    const unsubSync = subscribeSyncState(() => {
       loadData();
     });
-    return () => unsubscribe();
-  }, []);
+    const unsubProp = subscribeProposte(() => {
+      loadData();
+    });
+    return () => {
+      unsubSync();
+      unsubProp();
+    };
+  }, [isAdmin]);
 
   // Gestione ricerca con debounce ~200 ms e persistenza in sessionStorage
   const handleSearchChange = (val: string) => {
@@ -157,28 +193,26 @@ export function GiochiView() {
       />
 
       <div className="container" style={{ paddingTop: 'var(--space-4)' }}>
-        {/* Barra azione Admin (visibile SOLO con sessione admin valida) */}
-        {isAdmin ? (
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'flex-end',
-              marginBottom: 'var(--space-3)',
+        {/* Barra azione (Admin o Proposta Utente Non-Admin) */}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'flex-end',
+            marginBottom: 'var(--space-3)',
+          }}
+        >
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => {
+              setEditingGioco(null);
+              setIsFormOpen(true);
             }}
           >
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => {
-                setEditingGioco(null);
-                setIsFormOpen(true);
-              }}
-            >
-              <Icon name="plus" size={16} />
-              <span>{I18N.giochi.nuovoGioco}</span>
-            </Button>
-          </div>
-        ) : null}
+            <Icon name="plus" size={16} />
+            <span>{isAdmin ? I18N.giochi.nuovoGioco : 'Proponi un Gioco'}</span>
+          </Button>
+        </div>
 
         {/* 2. RICERCA E ORDINAMENTO FISSI SOTTO LA TESTATA */}
         <div
@@ -277,7 +311,8 @@ export function GiochiView() {
             footer="Tutti i giochi sono disponibili offline con regole e schemi di gioco."
           >
             {filteredList.map((gioco) => {
-              const isNew = gioco.id === latestGiocoId;
+              const isPending = pendingIds.has(gioco.id);
+              const isNew = !isPending && gioco.id === latestGiocoId;
 
               const subtitleText = gioco.materiali
                 ? `Materiali: ${gioco.materiali}`
@@ -286,34 +321,50 @@ export function GiochiView() {
                 : 'Regole e svolgimento';
 
               return (
-                <GroupedRow
-                  key={gioco.id}
-                  leading={<SectionIcon section="giochi" size="sm" />}
-                  title={
-                    <HighlightText
-                      text={gioco.nome}
-                      query={debouncedSearch}
-                    />
-                  }
-                  subtitle={
-                    <HighlightText
-                      text={subtitleText}
-                      query={debouncedSearch}
-                    />
-                  }
-                  trailing={
-                    isNew ? (
-                      <Badge variant="nuovo" size="sm">
-                        Nuovo
-                      </Badge>
-                    ) : null
-                  }
-                  chevron
-                  onClick={() => {
-                    setSelectedGioco(gioco);
-                    setIsDetailOpen(true);
-                  }}
-                />
+                <div key={gioco.id} className={isPending ? 'proposta-pending-card' : undefined} style={isPending ? { borderRadius: 'var(--radius-md)', margin: '2px 0' } : undefined}>
+                  <GroupedRow
+                    leading={<SectionIcon section="giochi" size="sm" />}
+                    title={
+                      <HighlightText
+                        text={gioco.nome}
+                        query={debouncedSearch}
+                      />
+                    }
+                    subtitle={
+                      <div>
+                        <HighlightText
+                          text={subtitleText}
+                          query={debouncedSearch}
+                        />
+                        {isPending ? (
+                          <span className="proposta-pending-caption">
+                            {isAdmin && pendingProposteMap.get(gioco.id)?.proponente_nome
+                              ? `Proposto da: ${pendingProposteMap.get(gioco.id)?.proponente_nome} • In attesa di approvazione`
+                              : isAdmin
+                              ? 'In attesa di approvazione dell\'Admin'
+                              : 'Visibile solo su questo dispositivo fino all\'approvazione dell\'Admin'}
+                          </span>
+                        ) : null}
+                      </div>
+                    }
+                    trailing={
+                      isPending ? (
+                        <Badge variant="giallo" size="sm">
+                          In attesa
+                        </Badge>
+                      ) : isNew ? (
+                        <Badge variant="nuovo" size="sm">
+                          Nuovo
+                        </Badge>
+                      ) : null
+                    }
+                    chevron
+                    onClick={() => {
+                      setSelectedGioco(gioco);
+                      setIsDetailOpen(true);
+                    }}
+                  />
+                </div>
               );
             })}
           </GroupedList>
@@ -325,7 +376,31 @@ export function GiochiView() {
         gioco={selectedGioco}
         isOpen={isDetailOpen}
         isNew={selectedGioco ? selectedGioco.id === latestGiocoId : false}
+        isPending={selectedGioco ? pendingIds.has(selectedGioco.id) : false}
+        proponenteNome={selectedGioco ? pendingProposteMap.get(selectedGioco.id)?.proponente_nome || null : null}
         onClose={() => setIsDetailOpen(false)}
+        onWithdraw={async (g) => {
+          await ritiraPropostaLocale(g.id);
+          setIsDetailOpen(false);
+          setSelectedGioco(null);
+          await loadData();
+        }}
+        onApproveProposta={async (g) => {
+          const prop = pendingProposteMap.get(g.id);
+          if (prop) {
+            await approvaPropostaAdmin(prop);
+            setIsDetailOpen(false);
+            setSelectedGioco(null);
+            await loadData();
+          }
+        }}
+        onRejectProposta={(g) => {
+          const prop = pendingProposteMap.get(g.id);
+          if (prop) {
+            setIsDetailOpen(false);
+            setRejectingProposta(prop);
+          }
+        }}
         onEdit={(g) => {
           setIsDetailOpen(false);
           setEditingGioco(g);
@@ -359,6 +434,17 @@ export function GiochiView() {
         onConfirm={handleDeleteConfirm}
         itemName={deletingGioco?.nome || ''}
         isLoading={isDeleting}
+      />
+
+      {/* Modal In-App Rifiuta Proposta e Blocco Utente (Admin) */}
+      <RifiutaPropostaModal
+        proposta={rejectingProposta}
+        isOpen={Boolean(rejectingProposta)}
+        onClose={() => setRejectingProposta(null)}
+        onSuccess={async () => {
+          setSelectedGioco(null);
+          await loadData();
+        }}
       />
     </div>
   );

@@ -852,6 +852,13 @@
   background-color: var(--color-interactive-tenue);
 }
 
+.ios-btn-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
 .ios-btn-spinner {
   width: 16px;
   height: 16px;
@@ -1193,6 +1200,7 @@
   align-items: flex-end;
   justify-content: center;
   animation: iosFadeIn var(--duration-fast) var(--ease-ios);
+  overflow: hidden;
 }
 
 .ios-sheet-container {
@@ -1279,7 +1287,29 @@
 .ios-sheet-body {
   padding: var(--space-4);
   overflow-y: auto;
+  overflow-x: hidden;
+  box-sizing: border-box;
   flex: 1;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
+
+.ios-sheet-body::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.ios-sheet-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ios-sheet-body::-webkit-scrollbar-thumb {
+  background-color: var(--color-border);
+  border-radius: var(--radius-full);
+}
+
+.ios-sheet-body::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-text-tertiary);
 }
 
 .ios-sheet-footer {
@@ -1644,6 +1674,25 @@
   border-color: var(--color-interactive);
 }
 
+input[type="date"].ios-form-input {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.evento-form-date-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (min-width: 480px) {
+  .evento-form-date-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
 select.ios-form-input {
   color: var(--color-text);
   background-color: var(--color-surface);
@@ -1661,6 +1710,7 @@ select.ios-form-input option {
   box-sizing: border-box;
   font-family: inherit;
   font-size: var(--font-size-base);
+  line-height: 1.6;
   color: var(--color-text);
   background-color: var(--color-surface);
   color-scheme: dark light;
@@ -1671,6 +1721,26 @@ select.ios-form-input option {
   resize: vertical;
   transition: border-color var(--duration-fast) var(--ease-ios);
   outline: none;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
+
+.ios-form-textarea::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.ios-form-textarea::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ios-form-textarea::-webkit-scrollbar-thumb {
+  background-color: var(--color-border);
+  border-radius: var(--radius-full);
+}
+
+.ios-form-textarea::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-text-tertiary);
 }
 
 .ios-form-textarea:focus {
@@ -2594,9 +2664,141 @@ select.ios-form-input option {
   .canto-review-pane-desktop {
     display: none !important;
   }
-  .canto-review-pane-active {
-    display: block !important;
-  }
+}
+
+/* Pulsanti Pennata e Preset Chitarra Apple-Grade */
+.pennata-sym-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+  color: var(--color-ink);
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all var(--duration-fast, 150ms) var(--ease-ios);
+  box-shadow: var(--shadow-subtle);
+  user-select: none;
+}
+
+.pennata-sym-btn:hover {
+  background-color: var(--color-surface-hover);
+  border-color: var(--color-interactive);
+  color: var(--color-interactive);
+  transform: translateY(-1px);
+}
+
+.pennata-sym-btn:active {
+  transform: translateY(0);
+  background-color: var(--color-interactive-tenue);
+}
+
+.pennata-preset-btn {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+  color: var(--color-ink);
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all var(--duration-fast, 150ms) var(--ease-ios);
+  box-shadow: var(--shadow-subtle);
+  user-select: none;
+}
+
+.pennata-preset-btn:hover {
+  background-color: var(--color-interactive-tenue);
+  border-color: var(--color-interactive);
+  color: var(--color-interactive);
+  transform: translateY(-1px);
+}
+
+.pennata-preset-btn:active {
+  transform: translateY(0);
+}
+
+/* Toolbar ed Editor Pulsanti Revisione Canto Apple-Grade */
+.canto-review-toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 28px;
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  font-size: 0.76rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all var(--duration-fast, 150ms) var(--ease-ios);
+  user-select: none;
+  box-shadow: var(--shadow-subtle, none);
+  box-sizing: border-box;
+}
+
+.canto-review-toolbar-btn:hover:not(:disabled) {
+  background-color: var(--color-surface-hover);
+  border-color: var(--color-interactive);
+  color: var(--color-interactive);
+  transform: translateY(-1px);
+}
+
+.canto-review-toolbar-btn:active:not(:disabled) {
+  transform: translateY(0);
+  background-color: var(--color-interactive-tenue);
+}
+
+.canto-review-toolbar-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Varianti tastiera accordi */
+.chord-btn-major {
+  font-weight: 700;
+  color: var(--color-ink);
+  background-color: var(--color-surface);
+  border-color: var(--color-border);
+}
+
+.chord-btn-major:hover:not(:disabled) {
+  background-color: var(--color-surface-hover);
+  border-color: var(--color-canti);
+  color: var(--color-canti);
+}
+
+.chord-btn-minor {
+  font-weight: 600;
+  color: var(--color-canti);
+  background-color: var(--color-surface);
+  border-color: var(--color-border);
+}
+
+.chord-btn-minor:hover:not(:disabled) {
+  background-color: var(--color-surface-hover);
+  border-color: var(--color-canti);
+}
+
+.chord-btn-rit {
+  font-weight: 700;
+  color: var(--color-interactive);
+  background-color: var(--color-interactive-tenue);
+  border-color: var(--color-interactive);
 }
 
 /* Toast/Banner Notifica senza overflow orizzontale */
@@ -2681,7 +2883,7 @@ select.ios-form-input option {
 }
 
 .canzoniere-line-item.has-chords {
-  margin-top: 1.5em;
+  margin-top: 0;
 }
 
 .canzoniere-line-item.is-chord-only {
@@ -2701,7 +2903,8 @@ select.ios-form-input option {
   left: 0;
   white-space: nowrap;
   font-family: 'Roboto', var(--font-sans), sans-serif;
-  font-weight: 700;
+  font-weight: 800;
+  font-size: 0.94em;
   color: var(--color-chord, var(--color-interactive));
   line-height: 1.2;
   pointer-events: none;
@@ -2709,7 +2912,8 @@ select.ios-form-input option {
 
 .canzoniere-chord-only-item {
   font-family: 'Roboto', var(--font-sans), sans-serif;
-  font-weight: 700;
+  font-weight: 800;
+  font-size: 0.94em;
   color: var(--color-chord, var(--color-interactive));
   white-space: pre;
   display: inline-block;
@@ -2718,7 +2922,7 @@ select.ios-form-input option {
 .canzoniere-chord-only-item .song-chord {
   position: static !important;
   display: inline-block;
-  font-weight: 700;
+  font-weight: 800;
   color: var(--color-chord, var(--color-interactive));
 }
 
@@ -2736,58 +2940,123 @@ select.ios-form-input option {
   margin-bottom: 0;
 }
 
-/* --- CANTO SCREEN READING MODE (RESPONSIVE CHORD-OVER-LYRIC) --- */
+/* --- CANTO SCREEN READING MODE (RESPONSIVE CHORD-OVER-LYRIC FLEXBOX) --- */
 .canto-screen-line {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
-  margin-top: var(--space-2);
-  margin-bottom: var(--space-2);
-  line-height: 1;
+  margin-top: 0.25em;
+  margin-bottom: 0.35em;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.canto-screen-line.has-chords {
+  margin-top: 0.85em;
+  margin-bottom: 0.6em;
+}
+
+/* Hanging indent su schermi stretti e tablet: se un verso lungo va a capo, la riga successiva rientra */
+@media (max-width: 768px) {
+  .canto-screen-line.has-chords {
+    padding-left: 1rem;
+    text-indent: -1rem;
+  }
 }
 
 .canto-word {
   display: inline-flex;
+  flex-direction: row;
+  align-items: flex-end;
   white-space: nowrap;
   vertical-align: bottom;
-  margin-right: 0.35em;
-  margin-bottom: 0.25em;
+  margin-right: 0.3em;
+  text-indent: 0;
 }
 
 .canto-unit {
   display: inline-flex;
   flex-direction: column;
+  justify-content: flex-end;
+  align-items: flex-start;
   vertical-align: bottom;
   position: relative;
-  white-space: pre;
+}
+
+.canto-unit.is-chord-only {
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: flex-start;
+  vertical-align: bottom;
 }
 
 .canto-unit-chord {
-  font-family: 'Roboto', var(--font-sans), sans-serif;
-  font-weight: 700;
-  font-size: 0.85em;
-  line-height: 1.25;
+  font-family: 'Roboto', -apple-system, BlinkMacSystemFont, var(--font-sans), sans-serif;
+  font-weight: 800;
+  font-size: 0.86em;
+  line-height: 1.15;
   color: var(--color-chord, var(--color-interactive));
-  min-height: 1.25em;
   white-space: nowrap;
   user-select: none;
-  padding-right: 0.12em;
+  pointer-events: none;
+  letter-spacing: 0.01em;
+  margin-bottom: 4px;
+}
+
+[data-theme='dark'] .canto-unit-chord {
+  color: oklch(0.82 0.16 220);
+}
+
+.canto-unit-chord-placeholder {
+  display: block;
+  font-size: 0.86em;
+  line-height: 1.15;
+  height: 1.15em;
+  visibility: hidden;
+  user-select: none;
+  pointer-events: none;
+  margin-bottom: 4px;
 }
 
 .canto-unit-lyric {
   font-family: inherit;
   font-size: 1em;
-  line-height: 1.45;
+  line-height: 1.3;
   color: var(--color-text);
   white-space: pre;
 }
 
-.canto-screen-line .canzoniere-chord-badge {
-  position: static !important;
-  display: block;
-  bottom: auto !important;
-  left: auto !important;
+/* Toolbar comandi lettura responsive (desktop inline, mobile a 2 micro-righe pulite) */
+.canto-reading-controls-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  border-top: 1px solid var(--color-border-subtle);
+  background-color: var(--color-surface-hover);
+  gap: 8px;
+  flex-wrap: wrap;
 }
+
+.canto-reading-controls-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+  .canto-reading-controls-bar {
+    padding: 5px 8px;
+    gap: 6px;
+  }
+  .canto-reading-controls-group {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
 
 /* ==============================================================================
    QUADERNO DI CLAN - EDITOR GOOGLE DOCS / OBSIDIAN & RENDERER VIRTUALE
@@ -3137,6 +3406,12 @@ select.ios-form-input option {
   gap: var(--space-2);
 }
 
+.doc-palette-grid-6 {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: var(--space-2);
+}
+
 .doc-chip {
   width: 28px;
   height: 28px;
@@ -3154,19 +3429,35 @@ select.ios-form-input option {
 .doc-chip-green { background-color: var(--color-highlight-green); }
 .doc-chip-blue { background-color: var(--color-highlight-blue); }
 .doc-chip-coral { background-color: var(--color-highlight-coral); }
+.doc-chip-purple-hl { background-color: var(--color-highlight-purple); }
+.doc-chip-amber-hl { background-color: var(--color-highlight-amber); }
+.doc-chip-cyan-hl { background-color: var(--color-highlight-cyan); }
+.doc-chip-gray-hl { background-color: var(--color-highlight-gray); }
 
 .doc-chip-ink { background-color: var(--color-text); }
 .doc-chip-purple { background-color: var(--color-quaderno); }
 .doc-chip-canti { background-color: var(--color-canti); }
+.doc-chip-cyan { background-color: var(--color-doc-cyan); }
 .doc-chip-calendario { background-color: var(--color-calendario); }
-.doc-chip-bans { background-color: var(--color-bans); }
+.doc-chip-lime { background-color: var(--color-doc-lime); }
 .doc-chip-giochi { background-color: var(--color-giochi); }
+.doc-chip-bans { background-color: var(--color-bans); }
+.doc-chip-pink { background-color: var(--color-doc-pink); }
+.doc-chip-brown { background-color: var(--color-doc-brown); }
+.doc-chip-navy { background-color: var(--color-doc-navy); }
+.doc-chip-gray { background-color: var(--color-doc-gray); }
 
-.doc-color-purple { color: var(--color-quaderno) !important; font-weight: 600; }
-.doc-color-blue { color: var(--color-canti) !important; font-weight: 600; }
-.doc-color-green { color: var(--color-calendario) !important; font-weight: 600; }
-.doc-color-red { color: var(--color-bans) !important; font-weight: 600; }
-.doc-color-amber { color: var(--color-giochi) !important; font-weight: 600; }
+.doc-color-purple { color: var(--color-quaderno) !important; }
+.doc-color-blue { color: var(--color-canti) !important; }
+.doc-color-cyan { color: var(--color-doc-cyan) !important; }
+.doc-color-green { color: var(--color-calendario) !important; }
+.doc-color-lime { color: var(--color-doc-lime) !important; }
+.doc-color-amber { color: var(--color-giochi) !important; }
+.doc-color-red { color: var(--color-bans) !important; }
+.doc-color-pink { color: var(--color-doc-pink) !important; }
+.doc-color-brown { color: var(--color-doc-brown) !important; }
+.doc-color-navy { color: var(--color-doc-navy) !important; }
+.doc-color-gray { color: var(--color-doc-gray) !important; }
 
 .doc-font-serif { font-family: Georgia, Cambria, "Times New Roman", serif !important; }
 .doc-font-mono { font-family: var(--font-mono) !important; }
@@ -3493,6 +3784,26 @@ select.ios-form-input option {
   color: var(--color-highlight-coral-text);
 }
 
+.doc-highlight-purple {
+  background-color: var(--color-highlight-purple);
+  color: var(--color-highlight-purple-text);
+}
+
+.doc-highlight-amber {
+  background-color: var(--color-highlight-amber);
+  color: var(--color-highlight-amber-text);
+}
+
+.doc-highlight-cyan {
+  background-color: var(--color-highlight-cyan);
+  color: var(--color-highlight-cyan-text);
+}
+
+.doc-highlight-gray {
+  background-color: var(--color-highlight-gray);
+  color: var(--color-highlight-gray-text);
+}
+
 /* Ottimizzazioni Mobile e Touch per Documenti Google / Quaderno */
 @media (max-width: 480px) {
   .doc-topbar-title {
@@ -3561,4 +3872,532 @@ select.ios-form-input option {
     display: none;
   }
 }
+
+/* ==========================================================================
+   Header Mobile con Menu ad Hamburger e Drawer Apple-grade
+   ========================================================================== */
+
+.ios-top-bar-trailing-desktop {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.ios-top-bar-trailing-mobile {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .ios-top-bar-trailing-desktop {
+    display: none !important;
+  }
+  .ios-top-bar-trailing-mobile {
+    display: flex !important;
+    align-items: center;
+  }
+}
+
+.ios-mobile-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: oklch(0 0 0 / 0.45);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 990;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.ios-mobile-drawer {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 56px);
+  right: var(--space-3);
+  left: var(--space-3);
+  max-width: 380px;
+  margin-left: auto;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 16px 36px oklch(0 0 0 / 0.22);
+  z-index: 1000;
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  animation: drawerSlideDown 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes drawerSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.ios-mobile-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.ios-mobile-drawer-sync-card {
+  background: var(--color-surface-hover, oklch(0.5 0 0 / 0.05));
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3);
+}
+
+.ios-mobile-drawer-items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.ios-mobile-drawer-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+  width: 100%;
+  color: var(--color-text);
+  box-sizing: border-box;
+}
+
+.ios-mobile-drawer-item:hover,
+.ios-mobile-drawer-item:active {
+  background: var(--color-surface-hover);
+  border-color: var(--color-interactive);
+  transform: translateY(-1px);
+}
+
+.ios-mobile-drawer-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ios-mobile-drawer-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.ios-mobile-drawer-title {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.ios-mobile-drawer-desc {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  margin-top: 1px;
+}
+/* --- TITOLI DI SEZIONE IN HOME --- */
+.section-title-sm {
+  font-size: var(--font-size-2xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-secondary);
+  padding: 0 var(--space-4);
+  margin: 0 0 var(--space-2);
+}
+
+/* --- CARTA DI CLAN HERO CARD --- */
+.carta-hero-card {
+  position: relative;
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  box-shadow: var(--shadow-rest);
+  border: 1px solid var(--color-border);
+  min-height: 220px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: var(--space-5);
+  margin-bottom: var(--space-6);
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform var(--duration-fast) var(--ease-ios), box-shadow var(--duration-fast) var(--ease-ios);
+}
+
+.carta-hero-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-elevated);
+}
+
+.carta-hero-card:active {
+  transform: scale(0.99);
+}
+
+.carta-hero-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+}
+
+.carta-hero-scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    oklch(0 0 0 / 0.20) 0%,
+    oklch(0 0 0 / 0.65) 50%,
+    oklch(0 0 0 / 0.90) 100%
+  );
+  z-index: 1;
+}
+
+.carta-hero-content {
+  position: relative;
+  z-index: 2;
+  color: oklch(1 0 0);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.carta-hero-badge-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.carta-hero-admin-btn {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 4px 10px;
+  background-color: oklch(0 0 0 / 0.50);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid oklch(1 0 0 / 0.35);
+  border-radius: var(--radius-full);
+  color: oklch(1 0 0);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-ios);
+}
+
+.carta-hero-admin-btn:hover {
+  background-color: oklch(0 0 0 / 0.75);
+}
+
+.carta-hero-title {
+  font-size: var(--font-size-2xl);
+  font-weight: 800;
+  color: oklch(1 0 0);
+  margin: 0;
+  letter-spacing: -0.02em;
+  text-shadow: 0 1px 3px oklch(0 0 0 / 0.6);
+}
+
+.carta-hero-desc {
+  font-size: var(--font-size-sm);
+  color: oklch(1 0 0 / 0.92);
+  margin: 0;
+  line-height: 1.4;
+  text-shadow: 0 1px 2px oklch(0 0 0 / 0.6);
+  max-width: 580px;
+}
+
+.carta-hero-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  align-self: flex-start;
+  padding: 8px 16px;
+  border-radius: var(--radius-full);
+  background-color: oklch(1 0 0 / 0.22);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid oklch(1 0 0 / 0.40);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  color: oklch(1 0 0);
+  letter-spacing: 0.02em;
+  transition: background-color var(--duration-fast) var(--ease-ios);
+}
+
+.carta-hero-card:hover .carta-hero-cta {
+  background-color: oklch(1 0 0 / 0.35);
+}
+
+/* --- REGOLE ESPANSE NELLA HOME --- */
+.regole-section {
+  margin-bottom: var(--space-6);
+}
+
+.regole-expanded-card {
+  background-color: var(--color-surface);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--color-border);
+  padding: var(--space-5);
+  box-shadow: var(--shadow-rest);
+}
+
+.regole-expanded-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-border-subtle);
+  flex-wrap: wrap;
+}
+
+.regole-expanded-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.regole-expanded-title {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.regole-expanded-desc {
+  margin: 2px 0 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.regole-expanded-content {
+  color: var(--color-text);
+  line-height: 1.6;
+}
+
+/* --- CANOVACCI CARD GRID NELLA HOME --- */
+.canovacci-section {
+  margin-bottom: var(--space-6);
+}
+
+.canovacci-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.canovacci-section-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.canovacci-section-title {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.canovacci-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+}
+
+@media (min-width: 640px) {
+  .canovacci-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.canovaccio-home-card {
+  background-color: var(--color-surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  padding: var(--space-4);
+  box-shadow: var(--shadow-rest);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--space-3);
+  transition: transform var(--duration-fast) var(--ease-ios), box-shadow var(--duration-fast) var(--ease-ios);
+}
+
+.canovaccio-home-card:hover {
+  box-shadow: var(--shadow-elevated);
+}
+
+.canovaccio-home-header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.canovaccio-home-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.canovaccio-home-title {
+  margin: 0;
+  font-size: var(--font-size-base);
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.canovaccio-home-desc {
+  margin: var(--space-1) 0 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+}
+
+.canovaccio-home-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border-subtle);
+  flex-wrap: wrap;
+}
+
+/* Modale Amministratore Vademecum con larghezza estesa su desktop */
+.vademecum-edit-sheet {
+  max-width: 680px;
+}
+
+/* Selettore e Anteprima Foto di Copertina Carta di Clan */
+.vademecum-cover-picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  background-color: var(--color-surface-hover);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3);
+}
+
+@media (min-width: 520px) {
+  .vademecum-cover-picker {
+    flex-direction: row;
+    align-items: center;
+  }
+}
+
+.vademecum-cover-preview-wrap {
+  position: relative;
+  width: 100%;
+  height: 120px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  flex-shrink: 0;
+  background-color: var(--color-surface);
+}
+
+@media (min-width: 520px) {
+  .vademecum-cover-preview-wrap {
+    width: 200px;
+    height: 110px;
+  }
+}
+
+.vademecum-cover-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.vademecum-cover-custom-badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  background-color: var(--color-interactive);
+  color: var(--color-interactive-contrast);
+  font-size: var(--font-size-2xs);
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: var(--radius-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  box-shadow: 0 1px 3px oklch(0 0 0 / 0.4);
+}
+
+.vademecum-cover-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 1;
+  min-width: 0;
+}
+
+/* Banner copertina per la lettura ampia */
+.doc-reading-cover-banner {
+  width: 100%;
+  max-height: 260px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  margin-bottom: var(--space-5);
+  border: 1px solid var(--color-border);
+}
+
+.doc-reading-cover-img {
+  width: 100%;
+  height: 100%;
+  max-height: 260px;
+  object-fit: cover;
+  display: block;
+}
+
+/* --- PROPOSTE NON-ADMIN & STATO IN ATTESA --- */
+.proposta-pending-card {
+  border: 1.5px dashed var(--color-interactive) !important;
+  background-color: var(--color-surface) !important;
+  position: relative;
+  transition: transform var(--duration-fast) var(--ease-ios), box-shadow var(--duration-fast) var(--ease-ios);
+}
+
+.proposta-pending-badge-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.proposta-pending-caption {
+  font-size: var(--font-size-2xs);
+  color: var(--color-text-secondary);
+  font-style: italic;
+  display: block;
+  margin-top: 2px;
+}
+
+
+
 
