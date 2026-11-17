@@ -62,7 +62,9 @@ export type IconName =
   | 'redo'
   | 'link'
   | 'external-link'
-  | 'menu';
+  | 'menu'
+  | 'bell'
+  | 'bell-off';
 
 export interface IconProps extends JSX.SVGAttributes<SVGSVGElement> {
   name: IconName;
@@ -543,6 +545,22 @@ export function Icon({
           <line x1="3" y1="12" x2="21" y2="12" />
           <line x1="3" y1="6" x2="21" y2="6" />
           <line x1="3" y1="18" x2="21" y2="18" />
+        </svg>
+      );
+    case 'bell':
+      return (
+        <svg {...commonProps}>
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+          <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+        </svg>
+      );
+    case 'bell-off':
+      return (
+        <svg {...commonProps}>
+          <path d="M8.7 3A6 6 0 0 1 18 8a21.3 21.3 0 0 0 .6 5" />
+          <path d="M17 17H3s3-2 3-9a4.67 4.67 0 0 1 .3-1.7" />
+          <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+          <line x1="1" y1="1" x2="23" y2="23" />
         </svg>
       );
     default:

@@ -28,21 +28,26 @@ describe('Sistema Proposte Utenti e Circuit Breaker Anti-Flood', () => {
     unblockLocalCircuitBreaker();
 
     // Mock chiamate Supabase in modo da operare senza latenza di rete e senza errori RLS
-    vi.spyOn(supabase, 'from').mockReturnValue({
-      insert: vi.fn().mockResolvedValue({ data: null, error: null }),
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          single: vi.fn().mockResolvedValue({ data: null, error: null }),
-        }),
-      }),
-      update: vi.fn().mockReturnValue({
-        eq: vi.fn().mockResolvedValue({ data: null, error: null }),
-      }),
-      delete: vi.fn().mockReturnValue({
-        eq: vi.fn().mockResolvedValue({ data: null, error: null }),
-      }),
-    } as any);
+    const createQueryBuilder = () => {
+      const qb: any = {
+        eq: vi.fn(),
+        order: vi.fn().mockResolvedValue({ data: [], error: null }),
+        single: vi.fn().mockResolvedValue({ data: null, error: null }),
+      };
+      qb.eq.mockReturnValue(qb);
+      return qb;
+    };
+
+    vi.spyOn(supabase, 'from').mockImplementation(() => {
+      const qb = createQueryBuilder();
+      return {
+        insert: vi.fn().mockResolvedValue({ data: null, error: null }),
+        upsert: vi.fn().mockResolvedValue({ data: null, error: null }),
+        select: vi.fn().mockReturnValue(qb),
+        update: vi.fn().mockReturnValue(qb),
+        delete: vi.fn().mockReturnValue(qb),
+      } as any;
+    });
 
     vi.spyOn(supabase, 'rpc').mockResolvedValue({ data: [], error: null } as any);
   });
@@ -211,5 +216,44 @@ describe('Sistema Proposte Utenti e Circuit Breaker Anti-Flood', () => {
     await rifiutaPropostaAdmin(propBan.id, 'Contenuto non idoneo alle attivita scout');
     const localiBans = await getProposteLocali('bans');
     expect(localiBans.some((b) => b.id === propBan.id)).toBe(false);
+  });
+
+  it('8. Visualizzazione proposte: non-admin vede solo locali, admin interroga anche remote', async () => {
+    const propLocal = await inviaProposta('canti', 'Canto Locale In Attesa', {
+      titolo: 'Canto Locale In Attesa',
+      categoria: 'scout',
+      testo_chordpro: 'Accordi...',
+    });
+
+    // Utente normale (isAdmin = false): ottiene solo proposte locali
+    const userView = await getPropostePerVisualizzazione('canti', false);
+    expect(userView.some((p) => p.id === propLocal.id)).toBe(true);
+
+    // Utente admin (isAdmin = true): ottiene sia proposte locali sia da Supabase
+    const adminView = await getPropostePerVisualizzazione('canti', true);
+    expect(adminView.some((p) => p.id === propLocal.id)).toBe(true);
+  });
+
+  it('9. Blocco utente spammer: inserisce blocco IP/device e blocca futuri invii', async () => {
+    const propSpam = await inviaProposta('giochi', 'Spam Non Serio', {
+      nome: 'Spam Non Serio',
+      regole: 'nonsense',
+      materiali: '',
+    });
+
+    // Admin rifiuta e blocca l'utente
+    await bloccaProponente(propSpam, 'Proposte non serie ripetute');
+
+    // Se l'utente era su questo stesso dispositivo, il circuit breaker locale scatta
+    expect(isLocalCircuitBreakerBlocked()).toBe(true);
+
+    // Tentativo di nuovo invio fallisce per blocco
+    await expect(
+      inviaProposta('giochi', 'Altra Proposta Non Seria', {
+        nome: 'Altra Proposta Non Seria',
+        regole: '',
+        materiali: '',
+      })
+    ).rejects.toThrow(/bloccato|sospeso/i);
   });
 });

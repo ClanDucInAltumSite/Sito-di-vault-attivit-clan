@@ -561,7 +561,7 @@ export async function unblockIp(targetIp: string): Promise<boolean> {
   }
 
   try {
-    const { data, error } = await supabase.rpc('unblock_ip', { target_ip: targetIp });
+    const { error } = await supabase.rpc('unblock_ip', { target_ip: targetIp });
     if (error) {
       // Fallback: aggiornamento diretto su tabella blocked_ips
       await supabase
