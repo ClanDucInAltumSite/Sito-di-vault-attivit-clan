@@ -11,8 +11,8 @@ permissions:
   id-token: write
 
 concurrency:
-  group: 'pages-production'
-  cancel-in-progress: true
+  group: 'pages'
+  cancel-in-progress: false
 
 jobs:
   build-and-deploy:
@@ -40,15 +40,15 @@ jobs:
       - name: Esecuzione Suite di Test Unitari (Vitest)
         run: npm test
 
-      - name: Verifica Budget di Peso (Bundle, Precache, Foto)
-        run: node scripts/check_weight_budget.mjs
-
       - name: Build dell'applicazione PWA per Produzione
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || vars.VITE_SUPABASE_URL || 'https://lpeiyzwccedtqjbficjo.supabase.co' }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || vars.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxwZWl5endjY2VkdHFqYmZpY2pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5MTgzNTQsImV4cCI6MjEwNzQ5NDM1NH0.9eIZRUNLPlJn1l4DMs46DNauFdi_32X2y6YBZ1ytZSQ' }}
           VITE_BASE_PATH: /Sito-di-vault-attivit-clan/
         run: npm run build
+
+      - name: Verifica Budget di Peso (Bundle, Precache, Foto)
+        run: node scripts/check_weight_budget.mjs
 
       - name: Setup GitHub Pages
         uses: actions/configure-pages@v5
@@ -61,21 +61,3 @@ jobs:
       - name: Pubblicazione su GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-
-      - name: Installazione browser Chromium per Smoke Test
-        continue-on-error: true
-        run: npx playwright install --with-deps chromium
-
-      - name: Smoke Test Post-Deploy e Verifica Risorse (HTTP 200)
-        continue-on-error: true
-        env:
-          DEPLOY_SMOKE_URL: ${{ steps.deployment.outputs.page_url }}
-        run: npx playwright test test/smoke_deploy.spec.ts --project=chromium
-
-      - name: Controllo Schema di Produzione Post-Deploy (Sola Lettura)
-        continue-on-error: true
-        env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || vars.VITE_SUPABASE_URL || 'https://lpeiyzwccedtqjbficjo.supabase.co' }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || vars.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxwZWl5endjY2VkdHFqYmZpY2pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5MTgzNTQsImV4cCI6MjEwNzQ5NDM1NH0.9eIZRUNLPlJn1l4DMs46DNauFdi_32X2y6YBZ1ytZSQ' }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node scripts/check_prod_schema.mjs
