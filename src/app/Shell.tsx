@@ -282,7 +282,7 @@ export function Shell({
           </div>
 
           {/* Su Mobile (< 768px): Campanella Notifiche e Pulsante Hamburger */}
-          <div className="ios-top-bar-trailing-mobile" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div className="ios-top-bar-trailing-mobile">
             <NotificationBell
               unreadCount={unreadNotifsCount}
               hasAdminAlert={hasAdminAlert}
