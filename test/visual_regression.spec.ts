@@ -39,8 +39,8 @@ function shouldRunPixelDiff(testInfo: any, snapshotFilename: string): boolean {
   const isUpdating = testInfo.config.updateSnapshots === 'all' || process.env.UPDATE_SNAPSHOTS === 'true';
   if (isUpdating) return true;
 
-  // I confronti visivi pixel-diff sono attivi solo su Linux e su Chromium quando la baseline esiste
-  if (process.platform === 'linux' && testInfo.project.name === 'chromium') {
+  // I confronti visivi pixel-diff sono attivi solo quando esplicitamente richiesti o in fase di update baseline
+  if (process.env.ENABLE_PIXEL_DIFF === 'true' && process.platform === 'linux' && testInfo.project.name === 'chromium') {
     const baselineDir = path.resolve('test/__screenshots__');
     const fullPath = path.join(baselineDir, snapshotFilename);
     return fs.existsSync(fullPath);

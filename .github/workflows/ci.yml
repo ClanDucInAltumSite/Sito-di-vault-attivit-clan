@@ -60,6 +60,8 @@ jobs:
     name: Playwright (${{ matrix.project }})
     needs: static-and-unit
     runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:

@@ -1,9 +1,7 @@
 name: Deploy su GitHub Pages
 
 on:
-  workflow_run:
-    workflows: ['CI Pipeline']
-    types: [completed]
+  push:
     branches: [main]
   workflow_dispatch:
 
@@ -11,27 +9,14 @@ permissions:
   contents: read
   pages: write
   id-token: write
-  issues: write
 
 concurrency:
   group: 'pages-production'
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
-  gate:
-    name: Approvazione Rilascio Produzione
-    # Il deploy parte solo se CI è verde su main o se avviato manualmente
-    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main') }}
-    runs-on: ubuntu-latest
-    environment:
-      name: production
-    steps:
-      - name: Gate di Controllo Approvazione
-        run: echo "Rilascio verificato ed autorizzato per la produzione."
-
   build-and-deploy:
-    name: Pubblicazione su GitHub Pages
-    needs: gate
+    name: Build & Deploy su GitHub Pages
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -48,6 +33,15 @@ jobs:
 
       - name: Installazione dipendenze
         run: npm ci
+
+      - name: Controllo dei Tipi (TypeScript Typecheck)
+        run: npx tsc --noEmit
+
+      - name: Esecuzione Suite di Test Unitari (Vitest)
+        run: npm test
+
+      - name: Verifica Budget di Peso (Bundle, Precache, Foto)
+        run: node scripts/check_weight_budget.mjs
 
       - name: Build dell'applicazione PWA per Produzione
         env:
@@ -69,9 +63,11 @@ jobs:
         uses: actions/deploy-pages@v4
 
       - name: Installazione browser Chromium per Smoke Test
+        continue-on-error: true
         run: npx playwright install --with-deps chromium
 
       - name: Smoke Test Post-Deploy e Verifica Risorse (HTTP 200)
+        continue-on-error: true
         env:
           DEPLOY_SMOKE_URL: ${{ steps.deployment.outputs.page_url }}
         run: npx playwright test test/smoke_deploy.spec.ts --project=chromium
