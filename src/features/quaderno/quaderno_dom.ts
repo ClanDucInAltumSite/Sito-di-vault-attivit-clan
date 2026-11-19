@@ -468,7 +468,7 @@ export function renderMarkdownToContainer(markdown: string, container: HTMLEleme
 /**
  * Serializza ricorsivamente nodi inline in formato Markdown arricchito.
  */
-function serializeInlineNodes(node: Node): string {
+function serializeInlineNodes(node: Node, options?: { ignoreLists?: boolean }): string {
   let result = '';
 
   for (const child of Array.from(node.childNodes)) {
@@ -483,6 +483,10 @@ function serializeInlineNodes(node: Node): string {
     const el = child as HTMLElement;
     const tag = el.tagName.toUpperCase();
 
+    if (options?.ignoreLists && (tag === 'UL' || tag === 'OL')) {
+      continue;
+    }
+
     if (tag === 'BR') {
       result += '\n';
       continue;
@@ -495,7 +499,7 @@ function serializeInlineNodes(node: Node): string {
       continue;
     }
 
-    const inner = serializeInlineNodes(el);
+    const inner = serializeInlineNodes(el, options);
     if (!inner) continue;
 
     let formatted = inner;
@@ -590,6 +594,59 @@ function serializeInlineNodes(node: Node): string {
 }
 
 /**
+ * Serializza un elemento elenco (UL o OL) preservando ciascun elemento,
+ * supportando ritorni a capo interni e gestendo eventuali elenchi annidati.
+ */
+function serializeListElement(
+  listEl: HTMLElement,
+  listType: 'ul' | 'ol',
+  indentLevel = 0
+): string[] {
+  const resultLines: string[] = [];
+  const indent = '  '.repeat(indentLevel);
+  let itemCounter = 1;
+
+  for (const child of Array.from(listEl.childNodes)) {
+    if (child.nodeType !== Node.ELEMENT_NODE) continue;
+    const el = child as HTMLElement;
+    const tag = el.tagName.toUpperCase();
+
+    if (tag === 'LI') {
+      // 1. Estrai il testo inline del <li> ignorando eventuali elenchi annidati
+      const rawText = serializeInlineNodes(el, { ignoreLists: true }).trim();
+      const lines = rawText ? rawText.split('\n').map((l) => l.trim()).filter(Boolean) : [];
+
+      if (lines.length > 0) {
+        for (const line of lines) {
+          const prefix = listType === 'ul' ? `${indent}- ` : `${indent}${itemCounter}. `;
+          resultLines.push(`${prefix}${line}`);
+          if (listType === 'ol') itemCounter++;
+        }
+      }
+
+      // 2. Controlla se il <li> contiene elenchi annidati
+      const subLists = Array.from(el.children).filter((c) => {
+        const cTag = c.tagName.toUpperCase();
+        return cTag === 'UL' || cTag === 'OL';
+      }) as HTMLElement[];
+
+      for (const subList of subLists) {
+        const subType = subList.tagName.toUpperCase() === 'OL' ? 'ol' : 'ul';
+        const subLines = serializeListElement(subList, subType, indentLevel + 1);
+        resultLines.push(...subLines);
+      }
+    } else if (tag === 'UL' || tag === 'OL') {
+      // Elenco direttamente dentro l'elenco (anomalia DOM a volte generata da incolla o execCommand)
+      const subType = tag === 'OL' ? 'ol' : 'ul';
+      const subLines = serializeListElement(el, subType, indentLevel + 1);
+      resultLines.push(...subLines);
+    }
+  }
+
+  return resultLines;
+}
+
+/**
  * Converte il contenuto di un container DOM (contenteditable) in Markdown pulito e strutturato.
  */
 export function domToMarkdown(container: HTMLElement): string {
@@ -607,8 +664,15 @@ export function domToMarkdown(container: HTMLElement): string {
     const el = node as HTMLElement;
     const tag = el.tagName.toUpperCase();
 
-    // Se un DIV contiene blocchi complessi, elabora ricorsivamente
-    if (tag === 'DIV' && el.querySelector('p, h1, h2, h3, h4, ul, ol, blockquote, figure, hr')) {
+    // Blocchi foglia standard che gestiscono direttamente il proprio contenuto
+    const isLeafBlock =
+      ['H1', 'H2', 'H3', 'H4', 'UL', 'OL', 'LI', 'BLOCKQUOTE', 'FIGURE', 'IMG', 'HR'].includes(tag) ||
+      el.classList.contains('doc-subtitle') ||
+      el.dataset.role === 'subtitle';
+
+    // Se un elemento contenitore (DIV, P, SECTION, ecc.) racchiude blocchi annidati (come un elenco <ul> dentro un <p>),
+    // elabora ricorsivamente per estrarre tutti i blocchi senza appiattirli in una singola riga inline.
+    if (!isLeafBlock && el.querySelector('p, h1, h2, h3, h4, ul, ol, li, blockquote, figure, hr')) {
       const innerBlocks = domToMarkdown(el);
       if (innerBlocks) blocks.push(innerBlocks);
       continue;
@@ -641,20 +705,21 @@ export function domToMarkdown(container: HTMLElement): string {
         if (text) blocks.push(`> ${text}`);
       }
     } else if (tag === 'UL') {
-      const lis = Array.from(el.querySelectorAll('li'));
-      const items = lis
-        .map((li) => `- ${serializeInlineNodes(li).trim()}`)
-        .filter((line) => line !== '-');
-      if (items.length > 0) {
-        blocks.push(items.join('\n'));
+      const listLines = serializeListElement(el, 'ul');
+      if (listLines.length > 0) {
+        blocks.push(listLines.join('\n'));
       }
     } else if (tag === 'OL') {
-      const lis = Array.from(el.querySelectorAll('li'));
-      const items = lis
-        .map((li, idx) => `${idx + 1}. ${serializeInlineNodes(li).trim()}`)
-        .filter((line) => !/^\d+\.\s*$/.test(line));
-      if (items.length > 0) {
-        blocks.push(items.join('\n'));
+      const listLines = serializeListElement(el, 'ol');
+      if (listLines.length > 0) {
+        blocks.push(listLines.join('\n'));
+      }
+    } else if (tag === 'LI') {
+      // Elemento di elenco orfano al livello radice del documento
+      const rawText = serializeInlineNodes(el, { ignoreLists: true }).trim();
+      const lines = rawText ? rawText.split('\n').map((l) => l.trim()).filter(Boolean) : [];
+      if (lines.length > 0) {
+        blocks.push(lines.map((l) => `- ${l}`).join('\n'));
       }
     } else if (tag === 'FIGURE') {
       const img = el.querySelector('img');

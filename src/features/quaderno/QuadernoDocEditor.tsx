@@ -11,11 +11,14 @@ import { Icon } from '../../ui/Icon';
 import { compressImageForDocument } from './quaderno_image';
 import { renderMarkdownToContainer, domToMarkdown } from './quaderno_dom';
 import { getCategoryPillColors } from './quaderno_colors';
+import { VademecumItem, saveVademecumItem, compressCoverImage } from '../../lib/vademecum';
+import { Badge } from '../../ui/Badge';
 
 export interface QuadernoDocEditorProps {
-  pagina: QuadernoPagina;
+  pagina?: QuadernoPagina | null;
+  vademecumItem?: VademecumItem | null;
   isOpen: boolean;
-  onClose: (updatedPagina: QuadernoPagina, wasPoppedByBrowser?: boolean) => void;
+  onClose: (updated: any, wasPoppedByBrowser?: boolean) => void;
 }
 
 type SaveStatus = 'saved' | 'saving' | 'dirty' | 'error';
@@ -173,12 +176,36 @@ function tryExpandToWord(range: Range): Range | null {
   return null;
 }
 
-export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditorProps) {
-  const [titolo, setTitolo] = useState(pagina.titolo || '');
-  const [categoria, setCategoria] = useState<QuadernoCategoria>(pagina.categoria || 'riunione');
-  const [data, setData] = useState(pagina.data || '');
+export function QuadernoDocEditor({ pagina, vademecumItem, isOpen, onClose }: QuadernoDocEditorProps) {
+  const isVademecum = Boolean(vademecumItem);
+  const [titolo, setTitolo] = useState((isVademecum ? vademecumItem?.titolo : pagina?.titolo) || '');
+  const [categoria, setCategoria] = useState<QuadernoCategoria>(pagina?.categoria || 'riunione');
+  const [data, setData] = useState(pagina?.data || '');
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Campi specifici Vademecum (Carta di Clan, Regole, Canovacci)
+  const [descrizioneBreve, setDescrizioneBreve] = useState(vademecumItem?.descrizioneBreve || '');
+  const descrizioneBreveRef = useRef(descrizioneBreve);
+  descrizioneBreveRef.current = descrizioneBreve;
+
+  const [fotoCopertinaUrl, setFotoCopertinaUrl] = useState<string | null>(vademecumItem?.fotoCopertinaUrl || null);
+  const fotoCopertinaUrlRef = useRef<string | null>(fotoCopertinaUrl);
+  fotoCopertinaUrlRef.current = fotoCopertinaUrl;
+
+  const [pdfNome, setPdfNome] = useState<string | null>(vademecumItem?.pdfNome || null);
+  const pdfNomeRef = useRef<string | null>(pdfNome);
+  pdfNomeRef.current = pdfNome;
+
+  const [pdfDataUrl, setPdfDataUrl] = useState<string | null>(vademecumItem?.pdfDataUrl || null);
+  const pdfDataUrlRef = useRef<string | null>(pdfDataUrl);
+  pdfDataUrlRef.current = pdfDataUrl;
+
+  const [pdfSize, setPdfSize] = useState<number | null>(vademecumItem?.pdfSize || null);
+  const pdfSizeRef = useRef<number | null>(pdfSize);
+  pdfSizeRef.current = pdfSize;
+
+  const [isCompressingCover, setIsCompressingCover] = useState(false);
 
   // Popover toolbar
   const [isHeadingMenuOpen, setIsHeadingMenuOpen] = useState(false);
@@ -212,7 +239,7 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
   const typingTimerRef = useRef<any>(null);
   const isClosingRef = useRef<boolean>(false);
   const isPoppedByBrowserRef = useRef<boolean>(false);
-  const inFlightPromiseRef = useRef<Promise<QuadernoPagina> | null>(null);
+  const inFlightPromiseRef = useRef<Promise<any> | null>(null);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
 
@@ -220,8 +247,11 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
 
   const editorRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const coverFileInputRef = useRef<HTMLInputElement>(null);
+  const pdfFileInputRef = useRef<HTMLInputElement>(null);
   const saveTimerRef = useRef<any>(null);
-  const lastSavedPaginaRef = useRef<QuadernoPagina>(pagina);
+  const lastSavedPaginaRef = useRef<QuadernoPagina | null>(pagina || null);
+  const lastSavedVademecumRef = useRef<VademecumItem | null>(vademecumItem || null);
   const savedRangeRef = useRef<Range | null>(null);
 
   // Salva la selezione corrente (Range) per ripristinarla dai menu a tendina
@@ -250,13 +280,15 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
     const editor = editorRef.current;
     if (!editor) return;
 
+    let nativeListUnordered = false;
+    let nativeListOrdered = false;
     try {
       setIsBold(document.queryCommandState('bold'));
       setIsItalic(document.queryCommandState('italic'));
       setIsUnderline(document.queryCommandState('underline'));
       setIsStrike(document.queryCommandState('strikeThrough'));
-      setIsListUnordered(document.queryCommandState('insertUnorderedList'));
-      setIsListOrdered(document.queryCommandState('insertOrderedList'));
+      nativeListUnordered = document.queryCommandState('insertUnorderedList');
+      nativeListOrdered = document.queryCommandState('insertOrderedList');
       const nativeUndo = document.queryCommandEnabled('undo');
       const nativeRedo = document.queryCommandEnabled('redo');
       setCanUndo(nativeUndo || undoStackRef.current.length > 1);
@@ -273,6 +305,8 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
     let curr: Node | null = range.commonAncestorContainer;
     let foundHeading: HeadingLevel = 0;
     let foundBlockquote = false;
+    let foundListUnordered = false;
+    let foundListOrdered = false;
     let foundSize = 16;
     let foundColor = 'default';
     let foundHighlight = 'yellow';
@@ -282,7 +316,9 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
         const el = curr as HTMLElement;
         const tag = el.tagName.toUpperCase();
 
-        if (tag === 'H1') foundHeading = 1;
+        if (tag === 'UL') foundListUnordered = true;
+        else if (tag === 'OL') foundListOrdered = true;
+        else if (tag === 'H1') foundHeading = 1;
         else if (tag === 'H2') foundHeading = 2;
         else if (tag === 'H3') foundHeading = 3;
         else if (tag === 'H4') foundHeading = 4;
@@ -317,6 +353,8 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
       curr = curr.parentNode;
     }
 
+    setIsListUnordered(foundListUnordered || nativeListUnordered);
+    setIsListOrdered(foundListOrdered || nativeListOrdered);
     setActiveHeading(foundHeading);
     setIsBlockquote(foundBlockquote);
     setActiveFontSize(foundSize);
@@ -327,21 +365,32 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
   // Caricamento iniziale del documento nel foglio contenteditable
   useEffect(() => {
     if (isOpen && editorRef.current) {
-      setTitolo(pagina.titolo || '');
-      setCategoria(pagina.categoria || 'riunione');
-      setData(pagina.data || '');
+      const initialTitolo = (isVademecum ? vademecumItem?.titolo : pagina?.titolo) || '';
+      const initialContenuto = (isVademecum ? vademecumItem?.contenuto : pagina?.contenuto) || '';
+      setTitolo(initialTitolo);
+      if (isVademecum && vademecumItem) {
+        setDescrizioneBreve(vademecumItem.descrizioneBreve || '');
+        setFotoCopertinaUrl(vademecumItem.fotoCopertinaUrl || null);
+        setPdfNome(vademecumItem.pdfNome || null);
+        setPdfDataUrl(vademecumItem.pdfDataUrl || null);
+        setPdfSize(vademecumItem.pdfSize || null);
+        lastSavedVademecumRef.current = vademecumItem;
+      } else if (pagina) {
+        setCategoria(pagina.categoria || 'riunione');
+        setData(pagina.data || '');
+        lastSavedPaginaRef.current = pagina;
+      }
       setSaveStatus('saved');
       setErrorMessage(null);
-      lastSavedPaginaRef.current = pagina;
 
       // Inizializza stack cronologia Undo/Redo
-      undoStackRef.current = [pagina.contenuto || ''];
+      undoStackRef.current = [initialContenuto];
       redoStackRef.current = [];
       setCanUndo(false);
       setCanRedo(false);
 
       // Popola il DOM del foglio con il contenuto Markdown renderizzato
-      renderMarkdownToContainer(pagina.contenuto || '', editorRef.current);
+      renderMarkdownToContainer(initialContenuto, editorRef.current);
       if (!editorRef.current.textContent?.trim()) {
         editorRef.current.setAttribute('data-empty', 'true');
       } else {
@@ -352,7 +401,7 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
       } catch {}
       updateActiveToolbarState();
     }
-  }, [isOpen, pagina.id]);
+  }, [isOpen, pagina?.id, vademecumItem?.id]);
 
   // Listener per selezione e click
   useEffect(() => {
@@ -377,9 +426,8 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
 
   // Salvataggio effettivo con lock anti-concorrenza
   const doSave = useCallback(
-    async (titleToSave: string, catToSave: QuadernoCategoria, dateToSave: string, markdownContent: string): Promise<QuadernoPagina | null> => {
-      const cleanTitle = titleToSave.trim();
-      if (!cleanTitle || !dateToSave) return null;
+    async (titleToSave: string, catToSave: QuadernoCategoria, dateToSave: string, markdownContent: string): Promise<QuadernoPagina | VademecumItem | null> => {
+      const cleanTitle = titleToSave.trim() || (isVademecum ? vademecumItem?.titolo : pagina?.titolo) || 'Senza titolo';
 
       if (inFlightPromiseRef.current) {
         try {
@@ -388,24 +436,41 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
       }
 
       setSaveStatus('saving');
-      const savePromise = saveQuadernoPagina({
-        id: pagina.id,
-        titolo: cleanTitle,
-        categoria: catToSave,
-        data: dateToSave,
-        contenuto: markdownContent,
-        evento_id: pagina.evento_id,
-      });
+      const savePromise = isVademecum && vademecumItem
+        ? saveVademecumItem({
+            id: vademecumItem.id,
+            section: vademecumItem.section,
+            titolo: cleanTitle,
+            descrizioneBreve: descrizioneBreveRef.current,
+            contenuto: markdownContent,
+            fotoCopertinaUrl: fotoCopertinaUrlRef.current,
+            pdfNome: pdfNomeRef.current,
+            pdfDataUrl: pdfDataUrlRef.current,
+            pdfSize: pdfSizeRef.current,
+          })
+        : saveQuadernoPagina({
+            id: pagina!.id,
+            titolo: cleanTitle,
+            categoria: catToSave,
+            data: dateToSave,
+            contenuto: markdownContent,
+            evento_id: pagina?.evento_id,
+          });
+
       inFlightPromiseRef.current = savePromise;
 
       try {
         const saved = await savePromise;
-        lastSavedPaginaRef.current = saved;
+        if (isVademecum) {
+          lastSavedVademecumRef.current = saved as VademecumItem;
+        } else {
+          lastSavedPaginaRef.current = saved as QuadernoPagina;
+        }
         setSaveStatus('saved');
         setErrorMessage(null);
         return saved;
       } catch (err: any) {
-        console.warn('Errore autosave quaderno:', err);
+        console.warn('Errore autosave documento:', err);
         setSaveStatus('error');
         setErrorMessage(err.message || 'Impossibile salvare la bozza.');
         return null;
@@ -415,7 +480,7 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
         }
       }
     },
-    [pagina.id, pagina.evento_id]
+    [isVademecum, vademecumItem, pagina?.id, pagina?.evento_id]
   );
 
   // Pianificazione salvataggio automatico (debounce 1000ms)
@@ -615,10 +680,14 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
     isClosingRef.current = false;
     isPoppedByBrowserRef.current = false;
 
-    if (window.history.state?.quadernoReadingOpen) {
-      window.history.replaceState({ quadernoEditorOpen: true, paginaId: pagina.id }, '');
-    } else if (!window.history.state?.quadernoEditorOpen) {
-      window.history.pushState({ quadernoEditorOpen: true, paginaId: pagina.id }, '');
+    const editorKey = isVademecum ? 'vademecumEditorOpen' : 'quadernoEditorOpen';
+    const readingKey = isVademecum ? 'vademecumReadingOpen' : 'quadernoReadingOpen';
+    const docId = isVademecum ? vademecumItem?.id : pagina?.id;
+
+    if (window.history.state?.[readingKey]) {
+      window.history.replaceState({ [editorKey]: true, docId }, '');
+    } else if (!window.history.state?.[editorKey]) {
+      window.history.pushState({ [editorKey]: true, docId }, '');
     }
 
     const handlePopState = () => {
@@ -632,11 +701,11 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
 
     return () => {
       window.removeEventListener('popstate', handlePopState);
-      if (!isPoppedByBrowserRef.current && window.history.state?.quadernoEditorOpen) {
+      if (!isPoppedByBrowserRef.current && window.history.state?.[editorKey]) {
         window.history.replaceState(null, '');
       }
     };
-  }, [isOpen, pagina.id]);
+  }, [isOpen, isVademecum, pagina?.id, vademecumItem?.id]);
 
 
 
@@ -1174,6 +1243,256 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
     pushHistorySnapshot(true);
   };
 
+  // Helper per normalizzare liste nel foglio DOM (rimuove annidamenti spuri creati da execCommand o incolla)
+  const normalizeListDom = useCallback((editor: HTMLElement) => {
+    const nestedLists = Array.from(editor.querySelectorAll('p > ul, p > ol, div > ul, div > ol'));
+    for (const list of nestedLists) {
+      const parent = list.parentElement;
+      if (parent && parent !== editor) {
+        parent.after(list);
+        if (!parent.childNodes.length || (parent.childNodes.length === 1 && parent.firstChild?.nodeName === 'BR') || !parent.textContent?.trim()) {
+          parent.remove();
+        }
+      }
+    }
+
+    editor.querySelectorAll('ul').forEach((ul) => {
+      if (!ul.classList.contains('doc-ul')) ul.className = 'doc-ul';
+    });
+    editor.querySelectorAll('ol').forEach((ol) => {
+      if (!ol.classList.contains('doc-ol')) ol.className = 'doc-ol';
+    });
+    editor.querySelectorAll('li').forEach((li) => {
+      if (!li.classList.contains('doc-li')) li.className = 'doc-li';
+    });
+  }, []);
+
+  // 6c. Attivazione, disattivazione e conversione sicura di elenchi puntati (UL) e numerati (OL)
+  const toggleList = useCallback(
+    (targetType: 'ul' | 'ol') => {
+      closeAllMenus();
+      const editor = editorRef.current;
+      if (!editor) return;
+
+      restoreSelection();
+      editor.focus();
+
+      let range = savedRangeRef.current;
+      const sel = window.getSelection();
+      if ((!range || !editor.contains(range.commonAncestorContainer)) && sel && sel.rangeCount > 0) {
+        if (editor.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+          range = sel.getRangeAt(0);
+        }
+      }
+      if (!range) {
+        editor.focus();
+        return;
+      }
+
+      // 1. Verifica se la selezione è già all'interno di un elenco UL o OL
+      let currentLi: HTMLElement | null = null;
+      let currentList: HTMLElement | null = null;
+      let curr: Node | null = range.commonAncestorContainer;
+      while (curr && curr !== editor) {
+        if (curr.nodeType === Node.ELEMENT_NODE) {
+          const el = curr as HTMLElement;
+          const tag = el.tagName.toUpperCase();
+          if (tag === 'LI' && !currentLi) {
+            currentLi = el;
+          }
+          if (tag === 'UL' || tag === 'OL') {
+            currentList = el;
+            break;
+          }
+        }
+        curr = curr.parentNode;
+      }
+
+      if (currentList) {
+        const currentType = currentList.tagName.toLowerCase() as 'ul' | 'ol';
+
+        if (currentType === targetType) {
+          // TOGGLE OFF: Torna a paragrafo normale per i <li> selezionati
+          const lisToConvert: HTMLElement[] = [];
+          if (currentLi) {
+            lisToConvert.push(currentLi);
+          } else {
+            Array.from(currentList.querySelectorAll('li')).forEach((li) => {
+              if (sel && sel.containsNode(li, true)) lisToConvert.push(li as HTMLElement);
+            });
+            if (lisToConvert.length === 0) {
+              lisToConvert.push(...(Array.from(currentList.children) as HTMLElement[]));
+            }
+          }
+
+          let lastP: HTMLElement | null = null;
+          for (const li of lisToConvert) {
+            const p = document.createElement('p');
+            p.className = 'doc-p';
+            while (li.firstChild) {
+              p.appendChild(li.firstChild);
+            }
+            if (!p.childNodes.length || (p.childNodes.length === 1 && p.firstChild?.nodeName === 'BR')) {
+              p.replaceChildren(document.createElement('br'));
+            }
+
+            const succeedingLis: HTMLElement[] = [];
+            let next = li.nextElementSibling;
+            while (next) {
+              if (next.tagName.toUpperCase() === 'LI') succeedingLis.push(next as HTMLElement);
+              next = next.nextElementSibling;
+            }
+
+            if (succeedingLis.length > 0) {
+              const afterList = currentList.cloneNode(false) as HTMLElement;
+              for (const sli of succeedingLis) afterList.appendChild(sli);
+              currentList.after(afterList);
+            }
+
+            currentList.after(p);
+            li.remove();
+
+            if (!currentList.children.length) {
+              currentList.remove();
+            }
+            lastP = p;
+          }
+
+          if (lastP) {
+            editor.focus();
+            const newRange = document.createRange();
+            newRange.selectNodeContents(lastP);
+            newRange.collapse(false);
+            if (sel) {
+              sel.removeAllRanges();
+              sel.addRange(newRange);
+            }
+            savedRangeRef.current = newRange.cloneRange();
+          }
+
+          setIsListUnordered(false);
+          setIsListOrdered(false);
+          handleContentChanged();
+          pushHistorySnapshot(true);
+          return;
+        } else {
+          // SWITCH: Da UL a OL o da OL a UL
+          const newList = document.createElement(targetType);
+          newList.className = targetType === 'ul' ? 'doc-ul' : 'doc-ol';
+          while (currentList.firstChild) {
+            newList.appendChild(currentList.firstChild);
+          }
+          currentList.replaceWith(newList);
+
+          editor.focus();
+          const newRange = document.createRange();
+          if (currentLi && newList.contains(currentLi)) {
+            newRange.selectNodeContents(currentLi);
+            newRange.collapse(false);
+          } else {
+            newRange.selectNodeContents(newList);
+            newRange.collapse(false);
+          }
+          if (sel) {
+            sel.removeAllRanges();
+            sel.addRange(newRange);
+          }
+          savedRangeRef.current = newRange.cloneRange();
+
+          setIsListUnordered(targetType === 'ul');
+          setIsListOrdered(targetType === 'ol');
+          handleContentChanged();
+          pushHistorySnapshot(true);
+          return;
+        }
+      }
+
+      // 2. La selezione NON è in un elenco: converti il blocco corrente o i blocchi interessati
+      let blockNode: Node | null = range.commonAncestorContainer;
+      while (blockNode && blockNode.parentNode !== editor) {
+        blockNode = blockNode.parentNode;
+      }
+
+      if (!blockNode || blockNode === editor) {
+        try {
+          document.execCommand(targetType === 'ul' ? 'insertUnorderedList' : 'insertOrderedList');
+        } catch {}
+        normalizeListDom(editor);
+        captureSelection();
+        handleContentChanged();
+        pushHistorySnapshot(true);
+        return;
+      }
+
+      const targetEl = blockNode as HTMLElement;
+      const newList = document.createElement(targetType);
+      newList.className = targetType === 'ul' ? 'doc-ul' : 'doc-ol';
+
+      const hasBr = !!targetEl.querySelector('br');
+      if (hasBr) {
+        let curLi = document.createElement('li');
+        curLi.className = 'doc-li';
+
+        Array.from(targetEl.childNodes).forEach((child) => {
+          if (child.nodeType === Node.ELEMENT_NODE && (child as HTMLElement).tagName.toUpperCase() === 'BR') {
+            if (curLi.childNodes.length > 0) {
+              newList.appendChild(curLi);
+            }
+            curLi = document.createElement('li');
+            curLi.className = 'doc-li';
+          } else {
+            curLi.appendChild(child.cloneNode(true));
+          }
+        });
+
+        if (curLi.childNodes.length > 0) {
+          newList.appendChild(curLi);
+        }
+      } else {
+        const li = document.createElement('li');
+        li.className = 'doc-li';
+        while (targetEl.firstChild) {
+          li.appendChild(targetEl.firstChild);
+        }
+        if (!li.childNodes.length) {
+          li.appendChild(document.createElement('br'));
+        }
+        newList.appendChild(li);
+      }
+
+      if (!newList.children.length) {
+        const li = document.createElement('li');
+        li.className = 'doc-li';
+        li.appendChild(document.createElement('br'));
+        newList.appendChild(li);
+      }
+
+      targetEl.replaceWith(newList);
+
+      const firstLi = newList.firstElementChild as HTMLElement;
+      editor.focus();
+      const newRange = document.createRange();
+      if (firstLi) {
+        newRange.selectNodeContents(firstLi);
+        newRange.collapse(false);
+      } else {
+        newRange.selectNodeContents(newList);
+        newRange.collapse(false);
+      }
+      if (sel) {
+        sel.removeAllRanges();
+        sel.addRange(newRange);
+      }
+      savedRangeRef.current = newRange.cloneRange();
+
+      setIsListUnordered(targetType === 'ul');
+      setIsListOrdered(targetType === 'ol');
+      handleContentChanged();
+      pushHistorySnapshot(true);
+    },
+    [closeAllMenus, restoreSelection, captureSelection, handleContentChanged, pushHistorySnapshot, normalizeListDom]
+  );
+
   // 6b. Blocco citazione con focus preservato
   const toggleBlockquote = () => {
     const editor = editorRef.current;
@@ -1485,6 +1804,123 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
       }
     }
 
+    // Gestione Invio in un elemento di elenco (li) vuoto per uscire dall'elenco
+    if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0 && editorRef.current) {
+        const range = sel.getRangeAt(0);
+        if (editorRef.current.contains(range.commonAncestorContainer)) {
+          let liBlock: HTMLElement | null = null;
+          let curr: Node | null = range.commonAncestorContainer;
+          while (curr && curr !== editorRef.current) {
+            if (curr.nodeType === Node.ELEMENT_NODE && (curr as HTMLElement).tagName.toUpperCase() === 'LI') {
+              liBlock = curr as HTMLElement;
+              break;
+            }
+            curr = curr.parentNode;
+          }
+
+          if (liBlock && !liBlock.textContent?.trim()) {
+            e.preventDefault();
+            const parentList = liBlock.parentElement;
+            const p = document.createElement('p');
+            p.className = 'doc-p';
+            p.appendChild(document.createElement('br'));
+
+            if (parentList) {
+              const succeedingLis: HTMLElement[] = [];
+              let next = liBlock.nextElementSibling;
+              while (next) {
+                if (next.tagName.toUpperCase() === 'LI') succeedingLis.push(next as HTMLElement);
+                next = next.nextElementSibling;
+              }
+
+              if (succeedingLis.length > 0) {
+                const afterList = parentList.cloneNode(false) as HTMLElement;
+                for (const sli of succeedingLis) afterList.appendChild(sli);
+                parentList.after(afterList);
+              }
+
+              parentList.after(p);
+              liBlock.remove();
+
+              if (!parentList.children.length) {
+                parentList.remove();
+              }
+            } else {
+              liBlock.replaceWith(p);
+            }
+
+            const newRange = document.createRange();
+            newRange.setStart(p, 0);
+            newRange.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(newRange);
+            savedRangeRef.current = newRange.cloneRange();
+            setIsListUnordered(false);
+            setIsListOrdered(false);
+            handleContentChanged();
+            pushHistorySnapshot(true);
+            return;
+          }
+        }
+      }
+    }
+
+    // Gestione Backspace in un elemento di elenco (li) vuoto per convertirlo in paragrafo
+    if (e.key === 'Backspace' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0 && editorRef.current) {
+        const range = sel.getRangeAt(0);
+        if (range.collapsed && editorRef.current.contains(range.commonAncestorContainer)) {
+          let liBlock: HTMLElement | null = null;
+          let curr: Node | null = range.commonAncestorContainer;
+          while (curr && curr !== editorRef.current) {
+            if (curr.nodeType === Node.ELEMENT_NODE && (curr as HTMLElement).tagName.toUpperCase() === 'LI') {
+              liBlock = curr as HTMLElement;
+              break;
+            }
+            curr = curr.parentNode;
+          }
+
+          if (liBlock && !liBlock.textContent?.trim()) {
+            const rangeToStart = document.createRange();
+            rangeToStart.setStart(liBlock, 0);
+            rangeToStart.setEnd(range.startContainer, range.startOffset);
+            if (!rangeToStart.toString()) {
+              e.preventDefault();
+              const parentList = liBlock.parentElement;
+              const p = document.createElement('p');
+              p.className = 'doc-p';
+              p.appendChild(document.createElement('br'));
+
+              if (parentList) {
+                parentList.after(p);
+                liBlock.remove();
+                if (!parentList.children.length) {
+                  parentList.remove();
+                }
+              } else {
+                liBlock.replaceWith(p);
+              }
+
+              const newRange = document.createRange();
+              newRange.setStart(p, 0);
+              newRange.collapse(true);
+              sel.removeAllRanges();
+              sel.addRange(newRange);
+              savedRangeRef.current = newRange.cloneRange();
+              setIsListUnordered(false);
+              setIsListOrdered(false);
+              handleContentChanged();
+              pushHistorySnapshot(true);
+              return;
+            }
+          }
+        }
+      }
+    }
+
     // Tasto Tab per indentare senza perdere il focus del foglio
     if (e.key === 'Tab') {
       e.preventDefault();
@@ -1519,14 +1955,108 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
     }
   };
 
+  const handleCoverFileInput = async (e: Event) => {
+    const input = e.target as HTMLInputElement;
+    if (input.files && input.files[0]) {
+      setIsCompressingCover(true);
+      try {
+        const compressed = await compressCoverImage(input.files[0]);
+        setFotoCopertinaUrl(compressed);
+        fotoCopertinaUrlRef.current = compressed;
+        const currentMarkdown = editorRef.current ? domToMarkdown(editorRef.current) : (vademecumItem?.contenuto || '');
+        scheduleAutoSave(titolo, categoria, data, currentMarkdown);
+      } catch (err: any) {
+        setErrorMessage(err.message || "Errore durante l'elaborazione della foto di copertina.");
+      } finally {
+        setIsCompressingCover(false);
+        if (coverFileInputRef.current) coverFileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleRemoveCover = () => {
+    setFotoCopertinaUrl(null);
+    fotoCopertinaUrlRef.current = null;
+    const currentMarkdown = editorRef.current ? domToMarkdown(editorRef.current) : (vademecumItem?.contenuto || '');
+    scheduleAutoSave(titolo, categoria, data, currentMarkdown);
+  };
+
+  const handlePdfFileInput = (e: Event) => {
+    const input = e.target as HTMLInputElement;
+    if (input.files && input.files[0]) {
+      const file = input.files[0];
+      if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+        setErrorMessage('Formato non valido. Carica un file PDF.');
+        return;
+      }
+      if (file.size > 15 * 1024 * 1024) {
+        setErrorMessage('Il file supera la dimensione massima di 15 MB.');
+        return;
+      }
+      setErrorMessage(null);
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        setPdfDataUrl(result);
+        pdfDataUrlRef.current = result;
+        setPdfNome(file.name);
+        pdfNomeRef.current = file.name;
+        setPdfSize(file.size);
+        pdfSizeRef.current = file.size;
+        const currentMarkdown = editorRef.current ? domToMarkdown(editorRef.current) : (vademecumItem?.contenuto || '');
+        scheduleAutoSave(titolo, categoria, data, currentMarkdown);
+      };
+      reader.onerror = () => {
+        setErrorMessage('Errore durante la lettura del file PDF.');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemovePdf = () => {
+    setPdfNome(null);
+    pdfNomeRef.current = null;
+    setPdfDataUrl(null);
+    pdfDataUrlRef.current = null;
+    setPdfSize(null);
+    pdfSizeRef.current = null;
+    if (pdfFileInputRef.current) pdfFileInputRef.current.value = '';
+    const currentMarkdown = editorRef.current ? domToMarkdown(editorRef.current) : (vademecumItem?.contenuto || '');
+    scheduleAutoSave(titolo, categoria, data, currentMarkdown);
+  };
+
+  const handleTitleKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (editorRef.current) {
+        editorRef.current.focus();
+        const sel = window.getSelection();
+        if (sel && editorRef.current.firstChild) {
+          const range = document.createRange();
+          range.setStart(editorRef.current.firstChild, 0);
+          range.collapse(true);
+          sel.removeAllRanges();
+          sel.addRange(range);
+        }
+      }
+    }
+  };
+
+  const formatSize = (bytes: number | null | undefined): string => {
+    if (!bytes) return '';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
   // 10. Chiusura e salvataggio immediato
   const handleDone = async (wasPoppedByBrowser = false) => {
     if (saveTimerRef.current) {
       clearTimeout(saveTimerRef.current);
       saveTimerRef.current = null;
     }
-    const cleanTitle = titolo.trim() || pagina.titolo;
-    const currentMarkdown = editorRef.current ? domToMarkdown(editorRef.current) : (pagina.contenuto || '');
+    const cleanTitle = titolo.trim() || (isVademecum ? vademecumItem?.titolo : pagina?.titolo) || 'Senza titolo';
+    const currentMarkdown = editorRef.current ? domToMarkdown(editorRef.current) : (isVademecum ? vademecumItem?.contenuto : pagina?.contenuto) || '';
 
     if (inFlightPromiseRef.current) {
       try {
@@ -1536,20 +2066,40 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
 
     setSaveStatus('saving');
     try {
-      const saved = await saveQuadernoPagina({
-        id: pagina.id,
-        titolo: cleanTitle,
-        categoria,
-        data,
-        contenuto: currentMarkdown,
-        evento_id: pagina.evento_id,
-      });
-      lastSavedPaginaRef.current = saved;
+      const saved = isVademecum && vademecumItem
+        ? await saveVademecumItem({
+            id: vademecumItem.id,
+            section: vademecumItem.section,
+            titolo: cleanTitle,
+            descrizioneBreve: descrizioneBreveRef.current,
+            contenuto: currentMarkdown,
+            fotoCopertinaUrl: fotoCopertinaUrlRef.current,
+            pdfNome: pdfNomeRef.current,
+            pdfDataUrl: pdfDataUrlRef.current,
+            pdfSize: pdfSizeRef.current,
+          })
+        : await saveQuadernoPagina({
+            id: pagina!.id,
+            titolo: cleanTitle,
+            categoria,
+            data,
+            contenuto: currentMarkdown,
+            evento_id: pagina?.evento_id,
+          });
+
+      if (isVademecum) {
+        lastSavedVademecumRef.current = saved as VademecumItem;
+      } else {
+        lastSavedPaginaRef.current = saved as QuadernoPagina;
+      }
       setSaveStatus('saved');
       setErrorMessage(null);
       isClosingRef.current = true;
-      if (!wasPoppedByBrowser && window.history.state?.quadernoEditorOpen) {
-        window.history.back();
+      if (!wasPoppedByBrowser) {
+        const stateKey = isVademecum ? 'vademecumEditorOpen' : 'quadernoEditorOpen';
+        if (window.history.state?.[stateKey]) {
+          window.history.back();
+        }
       }
       onClose(saved, wasPoppedByBrowser);
     } catch (err: any) {
@@ -2061,7 +2611,7 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
             type="button"
             className={`doc-toolbar-btn ${isListUnordered ? 'doc-toolbar-btn-active' : ''}`}
             onMouseDown={(e) => e.preventDefault()}
-            onClick={() => execCmd('insertUnorderedList')}
+            onClick={() => toggleList('ul')}
             title={I18N.quaderno.editor.elencoPuntato}
             aria-label={I18N.quaderno.editor.elencoPuntato}
           >
@@ -2071,7 +2621,7 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
             type="button"
             className={`doc-toolbar-btn ${isListOrdered ? 'doc-toolbar-btn-active' : ''}`}
             onMouseDown={(e) => e.preventDefault()}
-            onClick={() => execCmd('insertOrderedList')}
+            onClick={() => toggleList('ol')}
             title={I18N.quaderno.editor.elencoNumerato}
             aria-label={I18N.quaderno.editor.elencoNumerato}
           >
@@ -2102,101 +2652,267 @@ export function QuadernoDocEditor({ pagina, isOpen, onClose }: QuadernoDocEditor
           className="doc-sheet"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Header del foglio: Titolo Documento, Categoria e Data */}
+          {/* Header del foglio: Titolo Documento, Categoria/Vademecum Meta e Data */}
           <div className="doc-sheet-header">
-            <input
-              type="text"
-              className="doc-sheet-title-input"
-              value={titolo}
-              placeholder="Titolo del documento..."
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === 'ArrowDown') {
-                  e.preventDefault();
-                  if (editorRef.current) {
-                    editorRef.current.focus();
-                    const sel = window.getSelection();
-                    if (sel && editorRef.current.firstChild) {
-                      const range = document.createRange();
-                      range.setStart(editorRef.current.firstChild, 0);
-                      range.collapse(true);
-                      sel.removeAllRanges();
-                      sel.addRange(range);
-                    }
-                  }
-                }
-              }}
-              onInput={(e) => {
-                const val = (e.target as HTMLInputElement).value;
-                setTitolo(val);
-                const currentMarkdown = editorRef.current ? domToMarkdown(editorRef.current) : (pagina.contenuto || '');
-                scheduleAutoSave(val, categoria, data, currentMarkdown);
-              }}
-            />
+            {isVademecum ? (
+              <div className="doc-sheet-vademecum-meta">
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {vademecumItem?.section === 'carta_clan' && (
+                      <Badge variant="azzurro" size="sm">Carta di Clan</Badge>
+                    )}
+                    {vademecumItem?.section === 'regole_clan' && (
+                      <Badge variant="giallo" size="sm">Regole del Clan</Badge>
+                    )}
+                    {vademecumItem?.section === 'canovaccio' && (
+                      <Badge variant="neutral" size="sm">Canovaccio di Pattuglia</Badge>
+                    )}
+                    {pdfNome && (
+                      <Badge variant="nuovo" size="sm">PDF Allegato</Badge>
+                    )}
+                  </div>
 
-            <div className="doc-sheet-meta-row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 'var(--space-3)' }}>
-              <div className="doc-sheet-cat-picker" style={{ width: '100%' }}>
-                <label className="doc-sheet-meta-label" style={{ marginBottom: '6px', display: 'block' }}>Categoria:</label>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                  {categories.map((c) => {
-                    const isSelected = categoria === c.key;
-                    const style = getCategoryPillColors(c.key, isSelected);
-                    return (
+                  {/* Azioni PDF */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <input
+                      type="file"
+                      ref={pdfFileInputRef}
+                      accept="application/pdf"
+                      style={{ display: 'none' }}
+                      onChange={handlePdfFileInput}
+                    />
+                    <button
+                      type="button"
+                      className="ios-btn ios-btn-secondary ios-btn-sm"
+                      onClick={() => pdfFileInputRef.current?.click()}
+                    >
+                      <Icon name="file" size={13} />
+                      <span>{pdfNome ? 'Sostituisci PDF' : 'Allega PDF'}</span>
+                    </button>
+                    {pdfNome && (
                       <button
-                        key={c.key}
                         type="button"
-                        onClick={() => {
-                          setCategoria(c.key);
-                          const currentMarkdown = editorRef.current ? domToMarkdown(editorRef.current) : (pagina.contenuto || '');
-                          scheduleAutoSave(titolo, c.key, data, currentMarkdown);
-                        }}
+                        className="ios-btn ios-btn-danger ios-btn-sm"
+                        onClick={handleRemovePdf}
+                        title="Rimuovi file PDF"
+                      >
+                        <Icon name="trash" size={13} />
+                        <span>Rimuovi PDF</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Anteprima foto copertina SOLO se Carta di Clan */}
+                {vademecumItem?.section === 'carta_clan' && (
+                  <div className="doc-sheet-cover-preview-wrap">
+                    <input
+                      type="file"
+                      ref={coverFileInputRef}
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={handleCoverFileInput}
+                    />
+                    {fotoCopertinaUrl ? (
+                      <div style={{ position: 'relative', width: '100%', height: '180px', borderRadius: '12px', overflow: 'hidden' }}>
+                        <img
+                          src={fotoCopertinaUrl}
+                          alt="Copertina Carta di Clan"
+                          className="doc-sheet-cover-img"
+                        />
+                        <div className="doc-sheet-cover-actions">
+                          <button
+                            type="button"
+                            className="ios-btn ios-btn-secondary ios-btn-sm"
+                            onClick={() => coverFileInputRef.current?.click()}
+                            disabled={isCompressingCover}
+                          >
+                            <Icon name="camera" size={13} />
+                            <span>{isCompressingCover ? 'Compressione…' : 'Cambia foto'}</span>
+                          </button>
+                          <button
+                            type="button"
+                            className="ios-btn ios-btn-danger ios-btn-sm"
+                            onClick={handleRemoveCover}
+                          >
+                            <Icon name="trash" size={13} />
+                            <span>Rimuovi</span>
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div
                         style={{
-                          display: 'inline-flex',
+                          padding: '16px',
+                          border: '2px dashed var(--color-border)',
+                          borderRadius: '12px',
+                          display: 'flex',
                           alignItems: 'center',
-                          gap: '6px',
-                          padding: '6px 12px',
-                          borderRadius: 'var(--radius-full, 9999px)',
-                          fontSize: 'var(--font-size-xs)',
-                          fontWeight: isSelected ? 700 : 500,
-                          border: '1px solid',
-                          borderColor: style.border,
-                          backgroundColor: style.bg,
-                          color: style.color,
-                          cursor: 'pointer',
-                          transition: 'all var(--duration-fast) var(--ease-ios)',
+                          justifyContent: 'space-between',
+                          gap: '12px',
+                          backgroundColor: 'var(--color-bg-secondary, #f8f9fa)',
                         }}
                       >
-                        <span
-                          style={{
-                            width: '7px',
-                            height: '7px',
-                            borderRadius: '50%',
-                            backgroundColor: style.dotColor,
-                            flexShrink: 0,
-                          }}
-                          aria-hidden="true"
-                        />
-                        <span>{c.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <Icon name="image" size={20} style={{ color: 'var(--color-text-secondary)' }} />
+                          <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+                            Foto di copertina personalizzata (opzionale)
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          className="ios-btn ios-btn-secondary ios-btn-sm"
+                          onClick={() => coverFileInputRef.current?.click()}
+                          disabled={isCompressingCover}
+                        >
+                          <Icon name="plus" size={13} />
+                          <span>{isCompressingCover ? 'Caricamento…' : 'Aggiungi copertina'}</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
 
-              <div className="doc-sheet-date-picker">
-                <label className="doc-sheet-meta-label">Data:</label>
+                {/* Dettagli PDF allegato se presente */}
+                {pdfNome && (
+                  <div
+                    style={{
+                      padding: '10px 14px',
+                      borderRadius: '10px',
+                      backgroundColor: 'var(--color-bg-secondary, #f8f9fa)',
+                      border: '1px solid var(--color-border)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      fontSize: 'var(--font-size-xs)',
+                    }}
+                  >
+                    <Icon name="file" size={18} style={{ color: 'var(--color-canti)' }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {pdfNome}
+                      </div>
+                      {pdfSize && (
+                        <div style={{ color: 'var(--color-text-secondary)' }}>
+                          {formatSize(pdfSize)}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Input Titolo Vademecum */}
                 <input
-                  type="date"
-                  className="doc-sheet-date-input"
-                  value={data}
+                  type="text"
+                  className="doc-sheet-title-input"
+                  value={titolo}
+                  placeholder="Titolo del documento..."
+                  onKeyDown={handleTitleKeyDown}
                   onInput={(e) => {
                     const val = (e.target as HTMLInputElement).value;
-                    setData(val);
-                    const currentMarkdown = editorRef.current ? domToMarkdown(editorRef.current) : (pagina.contenuto || '');
-                    scheduleAutoSave(titolo, categoria, val, currentMarkdown);
+                    setTitolo(val);
+                    const currentMarkdown = editorRef.current ? domToMarkdown(editorRef.current) : (vademecumItem?.contenuto || '');
+                    scheduleAutoSave(val, categoria, data, currentMarkdown);
+                  }}
+                />
+
+                {/* Sottotitolo / Descrizione Breve */}
+                <input
+                  type="text"
+                  className="doc-sheet-desc-input"
+                  value={descrizioneBreve}
+                  placeholder="Descrizione breve / sottotitolo..."
+                  onInput={(e) => {
+                    const val = (e.target as HTMLInputElement).value;
+                    setDescrizioneBreve(val);
+                    descrizioneBreveRef.current = val;
+                    const currentMarkdown = editorRef.current ? domToMarkdown(editorRef.current) : (vademecumItem?.contenuto || '');
+                    scheduleAutoSave(titolo, categoria, data, currentMarkdown);
                   }}
                 />
               </div>
-            </div>
+            ) : (
+              <>
+                <input
+                  type="text"
+                  className="doc-sheet-title-input"
+                  value={titolo}
+                  placeholder="Titolo del documento..."
+                  onKeyDown={handleTitleKeyDown}
+                  onInput={(e) => {
+                    const val = (e.target as HTMLInputElement).value;
+                    setTitolo(val);
+                    const currentMarkdown = editorRef.current ? domToMarkdown(editorRef.current) : (pagina?.contenuto || '');
+                    scheduleAutoSave(val, categoria, data, currentMarkdown);
+                  }}
+                />
+
+                <div className="doc-sheet-meta-row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 'var(--space-3)' }}>
+                  <div className="doc-sheet-cat-picker" style={{ width: '100%' }}>
+                    <label className="doc-sheet-meta-label" style={{ marginBottom: '6px', display: 'block' }}>Categoria:</label>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                      {categories.map((c) => {
+                        const isSelected = categoria === c.key;
+                        const style = getCategoryPillColors(c.key, isSelected);
+                        return (
+                          <button
+                            key={c.key}
+                            type="button"
+                            onClick={() => {
+                              setCategoria(c.key);
+                              const currentMarkdown = editorRef.current ? domToMarkdown(editorRef.current) : (pagina?.contenuto || '');
+                              scheduleAutoSave(titolo, c.key, data, currentMarkdown);
+                            }}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '6px 12px',
+                              borderRadius: 'var(--radius-full, 9999px)',
+                              fontSize: 'var(--font-size-xs)',
+                              fontWeight: isSelected ? 700 : 500,
+                              border: '1px solid',
+                              borderColor: style.border,
+                              backgroundColor: style.bg,
+                              color: style.color,
+                              cursor: 'pointer',
+                              transition: 'all var(--duration-fast) var(--ease-ios)',
+                            }}
+                          >
+                            <span
+                              style={{
+                                width: '7px',
+                                height: '7px',
+                                borderRadius: '50%',
+                                backgroundColor: style.dotColor,
+                                flexShrink: 0,
+                              }}
+                              aria-hidden="true"
+                            />
+                            <span>{c.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="doc-sheet-date-picker">
+                    <label className="doc-sheet-meta-label">Data:</label>
+                    <input
+                      type="date"
+                      className="doc-sheet-date-input"
+                      value={data}
+                      onInput={(e) => {
+                        const val = (e.target as HTMLInputElement).value;
+                        setData(val);
+                        const currentMarkdown = editorRef.current ? domToMarkdown(editorRef.current) : (pagina?.contenuto || '');
+                        scheduleAutoSave(titolo, categoria, val, currentMarkdown);
+                      }}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
           <hr className="doc-sheet-divider" />

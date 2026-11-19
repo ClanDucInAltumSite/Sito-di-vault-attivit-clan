@@ -802,6 +802,93 @@ Oggi abbiamo parlato di **route** e ==green:bilancio==.
       expect(readingNodes.some((n: any) => n.props?.className?.includes(`doc-highlight-${h}`))).toBe(true);
     }
   });
+
+  it('33. domToMarkdown preserva elenchi puntati e numerati anche se annidati in <p> o <div>', () => {
+    // Caso 1: Browser che annida <ul> dentro <p class="doc-p">
+    const pContainer = document.createElement('div');
+    const p = document.createElement('p');
+    p.className = 'doc-p';
+    const ul = document.createElement('ul');
+    ul.className = 'doc-ul';
+    const li1 = document.createElement('li');
+    li1.textContent = 'Primo punto';
+    const li2 = document.createElement('li');
+    li2.textContent = 'Secondo punto';
+    ul.appendChild(li1);
+    ul.appendChild(li2);
+    p.appendChild(ul);
+    pContainer.appendChild(p);
+
+    const mdUl = domToMarkdown(pContainer);
+    expect(mdUl).toBe('- Primo punto\n- Secondo punto');
+
+    // Caso 2: Browser che annida <ol> dentro <p class="doc-p">
+    const pContainerOl = document.createElement('div');
+    const pOl = document.createElement('p');
+    pOl.className = 'doc-p';
+    const ol = document.createElement('ol');
+    ol.className = 'doc-ol';
+    const liOl1 = document.createElement('li');
+    liOl1.textContent = 'Fase uno';
+    const liOl2 = document.createElement('li');
+    liOl2.textContent = 'Fase due';
+    ol.appendChild(liOl1);
+    ol.appendChild(liOl2);
+    pOl.appendChild(ol);
+    pContainerOl.appendChild(pOl);
+
+    const mdOl = domToMarkdown(pContainerOl);
+    expect(mdOl).toBe('1. Fase uno\n2. Fase due');
+  });
+
+  it('34. domToMarkdown gestisce ritorni a capo <br> dentro <li>, elenchi annidati e <li> orfani', () => {
+    // <li> con <br> (più righe in un singolo item create da incolla o shift-enter)
+    const container = document.createElement('div');
+    const ul = document.createElement('ul');
+    const li = document.createElement('li');
+    li.appendChild(document.createTextNode('Riga A'));
+    li.appendChild(document.createElement('br'));
+    li.appendChild(document.createTextNode('Riga B'));
+    ul.appendChild(li);
+    container.appendChild(ul);
+
+    expect(domToMarkdown(container)).toBe('- Riga A\n- Riga B');
+
+    // <ol> con <br>
+    const containerOl = document.createElement('div');
+    const ol = document.createElement('ol');
+    const liOl = document.createElement('li');
+    liOl.appendChild(document.createTextNode('Passo A'));
+    liOl.appendChild(document.createElement('br'));
+    liOl.appendChild(document.createTextNode('Passo B'));
+    ol.appendChild(liOl);
+    containerOl.appendChild(ol);
+
+    expect(domToMarkdown(containerOl)).toBe('1. Passo A\n2. Passo B');
+
+    // Elenco annidato
+    const nestedContainer = document.createElement('div');
+    const parentUl = document.createElement('ul');
+    const parentLi = document.createElement('li');
+    parentLi.appendChild(document.createTextNode('Genitore'));
+    const subUl = document.createElement('ul');
+    const subLi = document.createElement('li');
+    subLi.appendChild(document.createTextNode('Figlio'));
+    subUl.appendChild(subLi);
+    parentLi.appendChild(subUl);
+    parentUl.appendChild(parentLi);
+    nestedContainer.appendChild(parentUl);
+
+    expect(domToMarkdown(nestedContainer)).toBe('- Genitore\n  - Figlio');
+
+    // <li> orfano al livello radice
+    const orphanContainer = document.createElement('div');
+    const orphanLi = document.createElement('li');
+    orphanLi.textContent = 'Elemento orfano';
+    orphanContainer.appendChild(orphanLi);
+
+    expect(domToMarkdown(orphanContainer)).toBe('- Elemento orfano');
+  });
 });
 
 

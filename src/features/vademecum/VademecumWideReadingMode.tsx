@@ -7,7 +7,7 @@ import { VademecumItem, subscribeVademecum, getVademecumItem } from '../../lib/v
 import { useAdmin } from '../../lib/auth';
 import { Icon } from '../../ui/Icon';
 import { QuadernoDocRenderer } from '../quaderno/QuadernoDocRenderer';
-import { VademecumEditSheet } from './VademecumEditSheet';
+import { QuadernoDocEditor } from '../quaderno/QuadernoDocEditor';
 import { WhatsAppShareModal } from '../calendario/WhatsAppShareModal';
 
 export interface VademecumWideReadingModeProps {
@@ -339,14 +339,17 @@ export function VademecumWideReadingMode({
         </main>
       </div>
 
-      {/* Editor per l'Admin */}
+      {/* Editor per l'Admin: Documenti Google WYSIWYG completo come nel Quaderno */}
       {isEditing && currentItem && (
-        <VademecumEditSheet
-          item={currentItem}
-          section={currentItem.section}
+        <QuadernoDocEditor
+          vademecumItem={currentItem}
           isOpen={isEditing}
-          onClose={() => setIsEditing(false)}
-          onSaved={handleSaved}
+          onClose={(updated: VademecumItem) => {
+            setIsEditing(false);
+            if (updated) {
+              handleSaved(updated);
+            }
+          }}
         />
       )}
 

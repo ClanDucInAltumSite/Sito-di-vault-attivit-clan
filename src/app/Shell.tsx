@@ -1,14 +1,22 @@
-import { useState } from 'preact/hooks';
+import { useState, useEffect } from 'preact/hooks';
 import { I18N } from '../lib/i18n';
 import { useRoute, navigate, RouteName } from './router';
 import { useAdmin } from '../lib/auth';
 import { AdminLoginModal } from '../features/admin/AdminLoginModal';
+import { ProposteReviewSheet } from '../features/admin/ProposteReviewSheet';
 import { Icon, IconName } from '../ui/Icon';
 import { Toast } from '../ui/Toast';
 import { shareWebApp } from '../lib/share';
 import { BrandLogo } from '../ui/BrandLogo';
 import { TopographicBackground } from '../ui/TopographicBackground';
 import { CompassSync } from '../ui/ScoutMotifs';
+import { NotificationBell } from '../ui/NotificationBell';
+import { NotificationCenterSheet } from '../features/notifications/NotificationCenterSheet';
+import {
+  initNotificationEngine,
+  subscribeNotifications,
+} from '../lib/notifications';
+import { getProposteAdmin } from '../lib/proposte';
 
 export interface ShellProps {
   isOnline: boolean;
@@ -34,6 +42,41 @@ export function Shell({
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Stato Centro Notifiche e Moderazione Proposte
+  const [isNotifSheetOpen, setIsNotifSheetOpen] = useState(false);
+  const [unreadNotifsCount, setUnreadNotifsCount] = useState(0);
+  const [hasAdminAlert, setHasAdminAlert] = useState(false);
+  const [pendingProposteCount, setPendingProposteCount] = useState(0);
+  const [isProposteSheetOpen, setIsProposteSheetOpen] = useState(false);
+
+  useEffect(() => {
+    const cleanupNotifs = initNotificationEngine({ isAdmin });
+
+    const unsubscribeNotifs = subscribeNotifications((notifs, unread) => {
+      setUnreadNotifsCount(unread);
+      const hasPendingAdmin = notifs.some((n) => n.type === 'proposta_nuova' && !n.read);
+      setHasAdminAlert(hasPendingAdmin);
+    });
+
+    if (isAdmin) {
+      getProposteAdmin()
+        .then((list) => {
+          setPendingProposteCount(list.length);
+          if (list.length > 0) {
+            setHasAdminAlert(true);
+          }
+        })
+        .catch(() => {});
+    } else {
+      setPendingProposteCount(0);
+    }
+
+    return () => {
+      cleanupNotifs();
+      unsubscribeNotifs();
+    };
+  }, [isAdmin]);
 
   const handleShare = async () => {
     try {
@@ -153,6 +196,13 @@ export function Shell({
               <CompassSync isSyncing={isSyncing} size={20} />
             </button>
 
+            {/* Centro Notifiche Desktop */}
+            <NotificationBell
+              unreadCount={unreadNotifsCount}
+              hasAdminAlert={hasAdminAlert}
+              onClick={() => setIsNotifSheetOpen(true)}
+            />
+
             {/* Condivisione Web App */}
             <button
               type="button"
@@ -190,17 +240,39 @@ export function Shell({
               }}
               aria-label={I18N.nav.admin}
               title={isAdmin ? I18N.auth.loggedInAsAdmin : I18N.auth.loginTitle}
-              style={{ padding: '0 10px' }}
+              style={{ padding: '0 10px', position: 'relative' }}
             >
               <Icon name="admin" size={18} />
               <span style={{ fontSize: '13px', marginLeft: '4px' }}>
                 {isAdmin ? 'Admin' : 'Accedi'}
               </span>
+              {isAdmin && pendingProposteCount > 0 && (
+                <span
+                  style={{
+                    marginLeft: '6px',
+                    background: 'var(--color-bans, #FF9800)',
+                    color: '#000000',
+                    fontWeight: 700,
+                    fontSize: '11px',
+                    padding: '1px 6px',
+                    borderRadius: '10px',
+                    lineHeight: '14px',
+                  }}
+                  title={`${pendingProposteCount} proposte in attesa`}
+                >
+                  {pendingProposteCount}
+                </span>
+              )}
             </button>
           </div>
 
-          {/* Su Mobile (< 768px): Pulsante Hamburger */}
-          <div className="ios-top-bar-trailing-mobile">
+          {/* Su Mobile (< 768px): Campanella Notifiche e Pulsante Hamburger */}
+          <div className="ios-top-bar-trailing-mobile" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <NotificationBell
+              unreadCount={unreadNotifsCount}
+              hasAdminAlert={hasAdminAlert}
+              onClick={() => setIsNotifSheetOpen(true)}
+            />
             <button
               type="button"
               className={`ios-btn ios-btn-sm ${isMobileMenuOpen ? 'ios-btn-primary' : 'ios-btn-ghost'}`}
@@ -302,6 +374,46 @@ export function Shell({
 
             {/* Voci di Azione Rapida */}
             <div className="ios-mobile-drawer-items">
+              {/* Centro Notifiche Mobile */}
+              <button
+                type="button"
+                className="ios-mobile-drawer-item"
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  setIsNotifSheetOpen(true);
+                }}
+              >
+                <div
+                  className="ios-mobile-drawer-icon"
+                  style={{
+                    background: hasAdminAlert ? 'var(--color-bans-tenue, #FFF9C4)' : 'var(--color-interactive-tenue)',
+                    color: hasAdminAlert ? 'var(--color-rosso, #E53935)' : 'var(--color-interactive, #462679)',
+                  }}
+                >
+                  <Icon name="bell" size={20} />
+                </div>
+                <div className="ios-mobile-drawer-text">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span className="ios-mobile-drawer-title">Centro Notifiche</span>
+                    {unreadNotifsCount > 0 && (
+                      <span
+                        style={{
+                          fontSize: '0.68rem',
+                          background: hasAdminAlert ? 'var(--color-rosso, #E53935)' : 'var(--color-primary, #462679)',
+                          color: '#FFFFFF',
+                          padding: '1px 6px',
+                          borderRadius: '10px',
+                          fontWeight: 700,
+                        }}
+                      >
+                        {unreadNotifsCount}
+                      </span>
+                    )}
+                  </div>
+                  <span className="ios-mobile-drawer-desc">Promemoria uscite, eventi e avvisi</span>
+                </div>
+              </button>
+
               {/* Condividi */}
               <button
                 type="button"
@@ -369,14 +481,14 @@ export function Shell({
                       <span
                         style={{
                           fontSize: '0.68rem',
-                          background: 'var(--color-giochi-tenue)',
-                          color: 'var(--color-giochi-badge-text)',
+                          background: pendingProposteCount > 0 ? 'var(--color-bans, #FF9800)' : 'var(--color-giochi-tenue)',
+                          color: pendingProposteCount > 0 ? '#000000' : 'var(--color-giochi-badge-text)',
                           padding: '1px 6px',
                           borderRadius: '10px',
                           fontWeight: 700,
                         }}
                       >
-                        Attivo
+                        {pendingProposteCount > 0 ? `${pendingProposteCount} da approvare` : 'Attivo'}
                       </span>
                     )}
                   </div>
@@ -421,6 +533,45 @@ export function Shell({
           );
         })}
       </nav>
+
+      {/* Centro Notifiche BottomSheet */}
+      <NotificationCenterSheet
+        isOpen={isNotifSheetOpen}
+        onClose={() => setIsNotifSheetOpen(false)}
+        isAdmin={isAdmin}
+        onOpenProposteReview={() => {
+          setIsNotifSheetOpen(false);
+          setIsProposteSheetOpen(true);
+        }}
+      />
+
+      {/* Modale Revisione Proposte per l'Admin */}
+      {isAdmin && (
+        <ProposteReviewSheet
+          isOpen={isProposteSheetOpen}
+          onClose={() => {
+            setIsProposteSheetOpen(false);
+            if (isAdmin) {
+              getProposteAdmin()
+                .then((list) => {
+                  setPendingProposteCount(list.length);
+                  setHasAdminAlert(list.length > 0);
+                })
+                .catch(() => {});
+            }
+          }}
+          onItemsChanged={() => {
+            if (isAdmin) {
+              getProposteAdmin()
+                .then((list) => {
+                  setPendingProposteCount(list.length);
+                  setHasAdminAlert(list.length > 0);
+                })
+                .catch(() => {});
+            }
+          }}
+        />
+      )}
 
       {/* Modale BottomSheet Login Admin */}
       <AdminLoginModal

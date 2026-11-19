@@ -65,6 +65,9 @@ const VademecumEditSheet = lazy(() =>
 const CartaFotoEditModal = lazy(() =>
   import('../vademecum/CartaFotoEditModal').then((m) => ({ default: m.CartaFotoEditModal }))
 );
+const QuadernoDocEditor = lazy(() =>
+  import('../quaderno/QuadernoDocEditor').then((m) => ({ default: m.QuadernoDocEditor }))
+);
 
 const RifiutaPropostaModal = lazy(() =>
   import('../admin/RifiutaPropostaModal').then((m) => ({ default: m.RifiutaPropostaModal }))
@@ -849,16 +852,27 @@ export function HomeView() {
           )}
 
           {isEditOpen && (
-            <VademecumEditSheet
-              item={editingItem}
-              section={editingSection}
-              isOpen={isEditOpen}
-              onClose={() => setIsEditOpen(false)}
-              onSaved={() => {
-                loadData();
-                setIsEditOpen(false);
-              }}
-            />
+            (editingSection === 'carta_clan' || editingSection === 'regole_clan') ? (
+              <QuadernoDocEditor
+                vademecumItem={editingItem}
+                isOpen={isEditOpen}
+                onClose={() => {
+                  setIsEditOpen(false);
+                  loadData();
+                }}
+              />
+            ) : (
+              <VademecumEditSheet
+                item={editingItem}
+                section={editingSection}
+                isOpen={isEditOpen}
+                onClose={() => setIsEditOpen(false)}
+                onSaved={() => {
+                  loadData();
+                  setIsEditOpen(false);
+                }}
+              />
+            )
           )}
 
           {isDeleteOpen && (
