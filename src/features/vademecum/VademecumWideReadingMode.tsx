@@ -5,6 +5,7 @@
 import { useState, useEffect } from 'preact/hooks';
 import { VademecumItem, subscribeVademecum, getVademecumItem } from '../../lib/vademecum';
 import { useAdmin } from '../../lib/auth';
+import { openPdfDocument, downloadPdfDocument } from '../../lib/pdf_utils';
 import { Icon } from '../../ui/Icon';
 import { QuadernoDocRenderer } from '../quaderno/QuadernoDocRenderer';
 import { QuadernoDocEditor } from '../quaderno/QuadernoDocEditor';
@@ -15,6 +16,7 @@ export interface VademecumWideReadingModeProps {
   isOpen: boolean;
   onClose: () => void;
   onItemUpdated?: (updated: VademecumItem) => void;
+  onDelete?: (item: VademecumItem) => void;
 }
 
 export function VademecumWideReadingMode({
@@ -22,6 +24,7 @@ export function VademecumWideReadingMode({
   isOpen,
   onClose,
   onItemUpdated,
+  onDelete,
 }: VademecumWideReadingModeProps) {
   const { isAdmin } = useAdmin();
   const [isEditing, setIsEditing] = useState(false);
@@ -102,23 +105,12 @@ export function VademecumWideReadingMode({
 
   const handleOpenPdf = () => {
     if (!currentItem.pdfDataUrl) return;
-    const win = window.open();
-    if (win) {
-      win.document.write(
-        `<iframe src="${currentItem.pdfDataUrl}" frameborder="0" style="border:0; top:0; left:0; bottom:0; right:0; width:100%; height:100%;" allowfullscreen></iframe>`
-      );
-      win.document.title = currentItem.pdfNome || currentItem.titolo;
-    }
+    openPdfDocument(currentItem.pdfDataUrl, currentItem.pdfNome || currentItem.titolo);
   };
 
   const handleDownloadPdf = () => {
     if (!currentItem.pdfDataUrl) return;
-    const a = document.createElement('a');
-    a.href = currentItem.pdfDataUrl;
-    a.download = currentItem.pdfNome || `${currentItem.titolo}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    downloadPdfDocument(currentItem.pdfDataUrl, currentItem.pdfNome || currentItem.titolo);
   };
 
   const handleSaved = (saved: VademecumItem) => {
@@ -194,6 +186,23 @@ export function VademecumWideReadingMode({
               <Icon name="share" size={15} />
               <span className="doc-topbar-btn-text">Condividi</span>
             </button>
+
+            {/* Elimina per Admin (solo canovacci) */}
+            {isAdmin && onDelete && currentItem.section === 'canovaccio' && (
+              <button
+                type="button"
+                className="ios-btn ios-btn-ghost ios-btn-sm"
+                style={{ color: 'var(--color-bans)' }}
+                onClick={() => {
+                  onDelete(currentItem);
+                  handleClose();
+                }}
+                title="Elimina canovaccio"
+              >
+                <Icon name="trash" size={15} />
+                <span className="doc-topbar-btn-text">Elimina</span>
+              </button>
+            )}
 
             {/* Modifica per Admin */}
             {isAdmin && (

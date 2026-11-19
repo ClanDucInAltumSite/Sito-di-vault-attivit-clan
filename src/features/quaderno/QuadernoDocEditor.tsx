@@ -2750,7 +2750,7 @@ export function QuadernoDocEditor({ pagina, vademecumItem, isOpen, onClose }: Qu
                           alignItems: 'center',
                           justifyContent: 'space-between',
                           gap: '12px',
-                          backgroundColor: 'var(--color-bg-secondary, #f8f9fa)',
+                          backgroundColor: 'var(--color-surface-hover)',
                         }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -2777,26 +2777,46 @@ export function QuadernoDocEditor({ pagina, vademecumItem, isOpen, onClose }: Qu
                 {pdfNome && (
                   <div
                     style={{
-                      padding: '10px 14px',
-                      borderRadius: '10px',
-                      backgroundColor: 'var(--color-bg-secondary, #f8f9fa)',
+                      padding: '12px 14px',
+                      borderRadius: 'var(--radius-lg, 12px)',
+                      backgroundColor: 'var(--color-surface-hover)',
                       border: '1px solid var(--color-border)',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '10px',
-                      fontSize: 'var(--font-size-xs)',
+                      gap: '12px',
                     }}
                   >
-                    <Icon name="file" size={18} style={{ color: 'var(--color-canti)' }} />
+                    <div
+                      style={{
+                        width: '36px',
+                        height: '36px',
+                        borderRadius: 'var(--radius-md, 8px)',
+                        backgroundColor: 'var(--color-bans-tenue)',
+                        color: 'var(--color-bans)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Icon name="file" size={18} />
+                    </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <div
+                        style={{
+                          fontSize: 'var(--font-size-sm, 14px)',
+                          fontWeight: 600,
+                          color: 'var(--color-ink)',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
                         {pdfNome}
                       </div>
-                      {pdfSize && (
-                        <div style={{ color: 'var(--color-text-secondary)' }}>
-                          {formatSize(pdfSize)}
-                        </div>
-                      )}
+                      <div style={{ fontSize: 'var(--font-size-xs, 12px)', color: 'var(--color-text-secondary)' }}>
+                        PDF {pdfSize ? `• ${formatSize(pdfSize)}` : ''}
+                      </div>
                     </div>
                   </div>
                 )}

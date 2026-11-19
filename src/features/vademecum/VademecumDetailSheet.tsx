@@ -8,6 +8,7 @@ import { Icon } from '../../ui/Icon';
 import { Badge } from '../../ui/Badge';
 import { VademecumItem } from '../../lib/vademecum';
 import { useAdmin } from '../../lib/auth';
+import { openPdfDocument, downloadPdfDocument } from '../../lib/pdf_utils';
 import { QuadernoDocRenderer } from '../quaderno/QuadernoDocRenderer';
 import { VademecumEditSheet } from './VademecumEditSheet';
 
@@ -42,23 +43,12 @@ export function VademecumDetailSheet({
 
   const handleOpenPdf = () => {
     if (!currentItem.pdfDataUrl) return;
-    const win = window.open();
-    if (win) {
-      win.document.write(
-        `<iframe src="${currentItem.pdfDataUrl}" frameborder="0" style="border:0; top:0; left:0; bottom:0; right:0; width:100%; height:100%;" allowfullscreen></iframe>`
-      );
-      win.document.title = currentItem.pdfNome || 'Documento PDF';
-    }
+    openPdfDocument(currentItem.pdfDataUrl, currentItem.pdfNome || 'Documento PDF');
   };
 
   const handleDownloadPdf = () => {
     if (!currentItem.pdfDataUrl) return;
-    const a = document.createElement('a');
-    a.href = currentItem.pdfDataUrl;
-    a.download = currentItem.pdfNome || `${currentItem.id}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    downloadPdfDocument(currentItem.pdfDataUrl, currentItem.pdfNome || `${currentItem.id}.pdf`);
   };
 
   const formatSize = (bytes: number | null | undefined): string => {

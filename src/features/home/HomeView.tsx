@@ -26,6 +26,7 @@ import {
   subscribeSyncState,
 } from '../../lib/sync';
 import { useAdmin } from '../../lib/auth';
+import { openPdfDocument } from '../../lib/pdf_utils';
 import { Button } from '../../ui/Button';
 import { lazy, Suspense } from 'preact/compat';
 import {
@@ -229,13 +230,7 @@ export function HomeView() {
 
   const handleOpenPdf = (item: VademecumItem) => {
     if (!item.pdfDataUrl) return;
-    const win = window.open();
-    if (win) {
-      win.document.write(
-        `<iframe src="${item.pdfDataUrl}" frameborder="0" style="border:0; top:0; left:0; bottom:0; right:0; width:100%; height:100%;" allowfullscreen></iframe>`
-      );
-      win.document.title = item.pdfNome || item.titolo;
-    }
+    openPdfDocument(item.pdfDataUrl, item.pdfNome || item.titolo);
   };
 
   return (
@@ -711,6 +706,16 @@ export function HomeView() {
                 <div
                   key={item.id}
                   className={`canovaccio-home-card ${isPending ? 'proposta-pending-card' : ''}`}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => handleOpenWideDoc(item)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleOpenWideDoc(item);
+                    }
+                  }}
+                  aria-label={`Apri Canovaccio: ${item.titolo}`}
                 >
                   {isPending && (
                     <div className="proposta-pending-badge-row">
@@ -744,7 +749,10 @@ export function HomeView() {
                         <Button
                           variant="secondary"
                           size="sm"
-                          onClick={() => handleOpenPdf(item)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenPdf(item);
+                          }}
                         >
                           <Icon name="file" size={14} />
                           <span>Apri PDF</span>
@@ -753,7 +761,10 @@ export function HomeView() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleOpenWideDoc(item)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenWideDoc(item);
+                        }}
                       >
                         <Icon name="book-open" size={14} />
                         <span>Leggi traccia</span>
@@ -761,11 +772,15 @@ export function HomeView() {
                     </div>
 
                     {isAdmin && isPending ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                      <div
+                        style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <Button
                           variant="danger"
                           size="sm"
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             const prop = pendingProposteMap.get(item.id);
                             if (prop) setRejectingProposta(prop);
                           }}
@@ -776,7 +791,8 @@ export function HomeView() {
                         <Button
                           variant="primary"
                           size="sm"
-                          onClick={async () => {
+                          onClick={async (e) => {
+                            e.stopPropagation();
                             const prop = pendingProposteMap.get(item.id);
                             if (prop) {
                               await approvaPropostaAdmin(prop);
@@ -792,32 +808,15 @@ export function HomeView() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleRitiraProposta(item.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRitiraProposta(item.id);
+                        }}
                         style={{ color: 'var(--color-bans)' }}
                       >
                         <Icon name="trash" size={14} />
                         <span>Ritira</span>
                       </Button>
-                    ) : isAdmin ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleOpenEdit(item, 'canovaccio')}
-                          aria-label={`Modifica ${item.titolo}`}
-                        >
-                          <Icon name="edit" size={14} />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteRequest(item)}
-                          style={{ color: 'var(--color-bans)' }}
-                          aria-label={`Elimina ${item.titolo}`}
-                        >
-                          <Icon name="trash" size={14} />
-                        </Button>
-                      </div>
                     ) : null}
                   </div>
                 </div>
@@ -843,10 +842,16 @@ export function HomeView() {
             <VademecumWideReadingMode
               item={selectedWideDoc}
               isOpen={isWideOpen}
-              onClose={() => setIsWideOpen(false)}
+              onClose={() => {
+                setIsWideOpen(false);
+                setSelectedWideDoc(null);
+              }}
               onItemUpdated={(updated) => {
                 setSelectedWideDoc(updated);
                 loadData();
+              }}
+              onDelete={(itemToDelete) => {
+                handleDeleteRequest(itemToDelete);
               }}
             />
           )}

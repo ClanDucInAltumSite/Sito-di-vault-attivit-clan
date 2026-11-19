@@ -10,6 +10,7 @@ import { Badge } from '../../ui/Badge';
 import { DeleteConfirmModal } from '../../ui/DeleteConfirmModal';
 import { VademecumItem, deleteVademecumItem } from '../../lib/vademecum';
 import { useAdmin } from '../../lib/auth';
+import { openPdfDocument, downloadPdfDocument } from '../../lib/pdf_utils';
 import { getPropostePerVisualizzazione, approvaPropostaAdmin, ritiraPropostaLocale, subscribeProposte, PropostaItem } from '../../lib/proposte';
 import { QuadernoDocRenderer } from '../quaderno/QuadernoDocRenderer';
 import { VademecumEditSheet } from './VademecumEditSheet';
@@ -59,23 +60,12 @@ export function CanovacciSheet({
 
   const handleOpenPdf = (item: VademecumItem) => {
     if (!item.pdfDataUrl) return;
-    const win = window.open();
-    if (win) {
-      win.document.write(
-        `<iframe src="${item.pdfDataUrl}" frameborder="0" style="border:0; top:0; left:0; bottom:0; right:0; width:100%; height:100%;" allowfullscreen></iframe>`
-      );
-      win.document.title = item.pdfNome || item.titolo;
-    }
+    openPdfDocument(item.pdfDataUrl, item.pdfNome || item.titolo);
   };
 
   const handleDownloadPdf = (item: VademecumItem) => {
     if (!item.pdfDataUrl) return;
-    const a = document.createElement('a');
-    a.href = item.pdfDataUrl;
-    a.download = item.pdfNome || `${item.titolo}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    downloadPdfDocument(item.pdfDataUrl, item.pdfNome || item.titolo);
   };
 
   const handleCreateNew = () => {

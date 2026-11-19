@@ -4361,10 +4361,13 @@ select.ios-form-input option {
   justify-content: space-between;
   gap: var(--space-3);
   transition: transform var(--duration-fast) var(--ease-ios), box-shadow var(--duration-fast) var(--ease-ios);
+  cursor: pointer;
+  user-select: none;
 }
 
 .canovaccio-home-card:hover {
   box-shadow: var(--shadow-elevated);
+  transform: translateY(-2px);
 }
 
 .canovaccio-home-header {
