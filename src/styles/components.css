@@ -3425,6 +3425,18 @@ select.ios-form-input option {
   transform: scale(1.15);
 }
 
+.doc-chip-active {
+  outline: 2px solid var(--color-brand-purple);
+  outline-offset: 2px;
+  transform: scale(1.15);
+}
+
+.doc-menu-item-active {
+  background-color: var(--color-surface-hover);
+  color: var(--color-brand-purple);
+  font-weight: 700;
+}
+
 .doc-chip-yellow { background-color: var(--color-highlight-yellow); }
 .doc-chip-green { background-color: var(--color-highlight-green); }
 .doc-chip-blue { background-color: var(--color-highlight-blue); }

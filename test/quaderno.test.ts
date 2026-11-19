@@ -889,6 +889,60 @@ Oggi abbiamo parlato di **route** e ==green:bilancio==.
 
     expect(domToMarkdown(orphanContainer)).toBe('- Elemento orfano');
   });
+
+  it('35. domToMarkdown con contenitori/span colorati che avvolgono blocchi: preserva i colori su ciascun blocco', () => {
+    // Simulazione di una selezione di più blocchi (es. intero testo Ctrl+A) colorata in verde
+    const container = document.createElement('div');
+    const colorSpan = document.createElement('span');
+    colorSpan.className = 'doc-color-green';
+    colorSpan.dataset.color = 'green';
+
+    const h1 = document.createElement('h1');
+    h1.textContent = "Parte 1: Logistica diun'uscita";
+    const p = document.createElement('p');
+    p.textContent = 'Prima si definisce il tipo di uscita...';
+    const ol = document.createElement('ol');
+    const li = document.createElement('li');
+    li.textContent = 'Base e accoglienza';
+    ol.appendChild(li);
+
+    colorSpan.appendChild(h1);
+    colorSpan.appendChild(p);
+    colorSpan.appendChild(ol);
+    container.appendChild(colorSpan);
+
+    const md = domToMarkdown(container);
+    expect(md).toContain("# [color:green:Parte 1: Logistica diun'uscita]");
+    expect(md).toContain('[color:green:Prima si definisce il tipo di uscita...]');
+    expect(md).toContain('1. [color:green:Base e accoglienza]');
+
+    // Round-trip: renderMarkdownToContainer deve ricostruire i nodi con la classe doc-color-green
+    const rendered = document.createElement('div');
+    renderMarkdownToContainer(md, rendered);
+    expect(rendered.querySelector('h1 .doc-color-green')).not.toBeNull();
+    expect(rendered.querySelector('p .doc-color-green')).not.toBeNull();
+    expect(rendered.querySelector('ol li .doc-color-green')).not.toBeNull();
+  });
+
+  it('36. domToMarkdown preserva blocchi già colorati e non duplica i tag di colore se avvolti', () => {
+    const container = document.createElement('div');
+    const colorSpan = document.createElement('span');
+    colorSpan.className = 'doc-color-red';
+    colorSpan.dataset.color = 'red';
+
+    const h2 = document.createElement('h2');
+    const innerColor = document.createElement('span');
+    innerColor.className = 'doc-color-blue';
+    innerColor.dataset.color = 'blue';
+    innerColor.textContent = 'Titolo già blu';
+    h2.appendChild(innerColor);
+    colorSpan.appendChild(h2);
+    container.appendChild(colorSpan);
+
+    const md = domToMarkdown(container);
+    // Non deve contenere [color:red:[color:blue:...]] duplicato
+    expect(md).toBe('## [color:blue:Titolo già blu]');
+  });
 });
 
 

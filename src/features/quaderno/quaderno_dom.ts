@@ -670,11 +670,38 @@ export function domToMarkdown(container: HTMLElement): string {
       el.classList.contains('doc-subtitle') ||
       el.dataset.role === 'subtitle';
 
-    // Se un elemento contenitore (DIV, P, SECTION, ecc.) racchiude blocchi annidati (come un elenco <ul> dentro un <p>),
+    // Se un elemento contenitore (DIV, P, SECTION, SPAN ecc.) racchiude blocchi annidati,
     // elabora ricorsivamente per estrarre tutti i blocchi senza appiattirli in una singola riga inline.
     if (!isLeafBlock && el.querySelector('p, h1, h2, h3, h4, ul, ol, li, blockquote, figure, hr')) {
-      const innerBlocks = domToMarkdown(el);
-      if (innerBlocks) blocks.push(innerBlocks);
+      let innerBlocks = domToMarkdown(el);
+      if (innerBlocks) {
+        // Se il contenitore esterno (es. span o div) aveva un colore o formattazione,
+        // propagalo a ciascuna riga o blocco interno per evitare che diventi bianco
+        const containerColor = el.dataset.color || el.className.match(/doc-color-([a-z]+)/)?.[1];
+        if (containerColor && containerColor !== 'default') {
+          const lines = innerBlocks.split('\n');
+          const colored = lines.map((line) => {
+            const trimmed = line.trim();
+            if (!trimmed || trimmed.startsWith('---') || trimmed.startsWith('![')) return line;
+            if (line.includes('[color:')) return line; // Già colorato internamente
+            // Intestazione
+            if (/^#{1,4}\s+/.test(line)) {
+              return line.replace(/^(#{1,4}\s+)(.*)$/, `$1[color:${containerColor}:$2]`);
+            }
+            // Elenco puntato
+            if (/^(\s*[-*]\s+)(.*)$/.test(line)) {
+              return line.replace(/^(\s*[-*]\s+)(.*)$/, `$1[color:${containerColor}:$2]`);
+            }
+            // Elenco numerato
+            if (/^(\s*\d+\.\s+)(.*)$/.test(line)) {
+              return line.replace(/^(\s*\d+\.\s+)(.*)$/, `$1[color:${containerColor}:$2]`);
+            }
+            return `[color:${containerColor}:${line}]`;
+          });
+          innerBlocks = colored.join('\n');
+        }
+        blocks.push(innerBlocks);
+      }
       continue;
     }
 

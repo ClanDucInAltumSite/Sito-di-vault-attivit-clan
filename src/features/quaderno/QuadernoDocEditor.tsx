@@ -303,6 +303,9 @@ export function QuadernoDocEditor({ pagina, vademecumItem, isOpen, onClose }: Qu
     const range = sel.getRangeAt(0);
 
     let curr: Node | null = range.commonAncestorContainer;
+    if (curr === editor && range.startContainer) {
+      curr = range.startContainer;
+    }
     let foundHeading: HeadingLevel = 0;
     let foundBlockquote = false;
     let foundListUnordered = false;
@@ -841,27 +844,97 @@ export function QuadernoDocEditor({ pagina, vademecumItem, isOpen, onClose }: Qu
       });
 
       if (createWrapper && value && value !== 'default' && value !== 'clear') {
-        const wrapper = createWrapper(value);
-        wrapper.appendChild(frag);
-        effectiveRange.insertNode(wrapper);
+        const hasBlocks = !!frag.querySelector('p, h1, h2, h3, h4, ul, ol, li, blockquote, div');
 
-        const newRange = document.createRange();
-        newRange.selectNodeContents(wrapper);
-        editor.focus();
-        if (sel) {
-          sel.removeAllRanges();
-          sel.addRange(newRange);
+        if (!hasBlocks) {
+          // Selezione puramente inline (all'interno di un singolo blocco o riga)
+          const wrapper = createWrapper(value);
+          wrapper.appendChild(frag);
+          effectiveRange.insertNode(wrapper);
+
+          const newRange = document.createRange();
+          newRange.selectNodeContents(wrapper);
+          editor.focus();
+          if (sel) {
+            sel.removeAllRanges();
+            sel.addRange(newRange);
+          }
+          savedRangeRef.current = newRange.cloneRange();
+        } else {
+          // Selezione multi-blocco (più paragrafi, elenchi, o intero documento Ctrl+A)
+          // Applica il wrapper ai contenuti inline di ciascun blocco foglia
+          const wrapBlockContents = (blockEl: HTMLElement) => {
+            if (blockEl.childNodes.length > 0) {
+              const w = createWrapper(value);
+              while (blockEl.firstChild) {
+                w.appendChild(blockEl.firstChild);
+              }
+              blockEl.appendChild(w);
+            }
+          };
+
+          const processNode = (node: Node) => {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              const el = node as HTMLElement;
+              const tag = el.tagName.toUpperCase();
+
+              if (tag === 'UL' || tag === 'OL') {
+                Array.from(el.children).forEach((c) => processNode(c));
+                return;
+              }
+
+              if (['P', 'H1', 'H2', 'H3', 'H4', 'LI', 'BLOCKQUOTE'].includes(tag) || el.classList.contains('doc-subtitle') || el.dataset.role === 'subtitle') {
+                wrapBlockContents(el);
+                return;
+              }
+
+              if (el.querySelector('p, h1, h2, h3, h4, ul, ol, li, blockquote, div')) {
+                Array.from(el.childNodes).forEach((c) => processNode(c));
+                return;
+              }
+
+              // Elemento generico foglia
+              wrapBlockContents(el);
+            } else if (node.nodeType === Node.TEXT_NODE && (node.textContent || '').trim()) {
+              const parent = node.parentNode;
+              if (parent) {
+                const w = createWrapper(value);
+                parent.insertBefore(w, node);
+                w.appendChild(node);
+              }
+            }
+          };
+
+          Array.from(frag.childNodes).forEach(processNode);
+
+          const firstInserted = frag.firstChild;
+          const lastInserted = frag.lastChild;
+          effectiveRange.insertNode(frag);
+
+          const newRange = document.createRange();
+          if (firstInserted && lastInserted && firstInserted.parentNode && lastInserted.parentNode) {
+            newRange.setStartBefore(firstInserted);
+            newRange.setEndAfter(lastInserted);
+          } else {
+            newRange.setStart(effectiveRange.startContainer, effectiveRange.startOffset);
+            newRange.collapse(true);
+          }
+          editor.focus();
+          if (sel) {
+            sel.removeAllRanges();
+            sel.addRange(newRange);
+          }
+          savedRangeRef.current = newRange.cloneRange();
         }
-        savedRangeRef.current = newRange.cloneRange();
       } else {
-        const firstChild = frag.firstChild;
-        const lastChild = frag.lastChild;
+        const firstInserted = frag.firstChild;
+        const lastInserted = frag.lastChild;
         effectiveRange.insertNode(frag);
 
         const newRange = document.createRange();
-        if (firstChild && lastChild) {
-          newRange.setStartBefore(firstChild);
-          newRange.setEndAfter(lastChild);
+        if (firstInserted && lastInserted && firstInserted.parentNode && lastInserted.parentNode) {
+          newRange.setStartBefore(firstInserted);
+          newRange.setEndAfter(lastInserted);
         } else {
           newRange.setStart(effectiveRange.startContainer, effectiveRange.startOffset);
           newRange.collapse(true);
@@ -981,35 +1054,62 @@ export function QuadernoDocEditor({ pagina, vademecumItem, isOpen, onClose }: Qu
     }
 
     // Trova tutti i blocchi da convertire
-    const affectedBlocks: HTMLElement[] = [];
-    if (editor.contains(range.commonAncestorContainer) && range.commonAncestorContainer !== editor) {
-      let curr: Node | null = range.commonAncestorContainer;
+    const findBlockParent = (node: Node | null): HTMLElement | null => {
+      let curr = node;
       while (curr && curr !== editor) {
         if (curr.nodeType === Node.ELEMENT_NODE) {
           const el = curr as HTMLElement;
           const tag = el.tagName.toUpperCase();
-          if (['P', 'H1', 'H2', 'H3', 'H4', 'DIV', 'BLOCKQUOTE', 'LI'].includes(tag)) {
-            affectedBlocks.push(el);
-            break;
+          if (['P', 'H1', 'H2', 'H3', 'H4', 'LI', 'BLOCKQUOTE'].includes(tag) || el.classList.contains('doc-subtitle') || el.dataset.role === 'subtitle') {
+            return el;
           }
         }
         curr = curr.parentNode;
       }
-    } else {
-      Array.from(editor.children).forEach((child) => {
-        if (child.nodeType === Node.ELEMENT_NODE && sel && sel.containsNode(child, true)) {
-          affectedBlocks.push(child as HTMLElement);
+      return null;
+    };
+
+    const affectedBlocks: HTMLElement[] = [];
+    const startBlock = findBlockParent(range.startContainer);
+    const endBlock = findBlockParent(range.endContainer);
+
+    if (startBlock && endBlock) {
+      if (startBlock === endBlock) {
+        affectedBlocks.push(startBlock);
+      } else {
+        const walker = document.createTreeWalker(editor, NodeFilter.SHOW_ELEMENT, {
+          acceptNode(node) {
+            const el = node as HTMLElement;
+            const tag = el.tagName.toUpperCase();
+            if (['P', 'H1', 'H2', 'H3', 'H4', 'LI', 'BLOCKQUOTE'].includes(tag) || el.classList.contains('doc-subtitle') || el.dataset.role === 'subtitle') {
+              return NodeFilter.FILTER_ACCEPT;
+            }
+            return NodeFilter.FILTER_SKIP;
+          },
+        });
+
+        let inside = false;
+        let curr = walker.nextNode();
+        while (curr) {
+          if (curr === startBlock) inside = true;
+          if (inside) affectedBlocks.push(curr as HTMLElement);
+          if (curr === endBlock) break;
+          curr = walker.nextNode();
         }
-      });
+      }
     }
 
     if (affectedBlocks.length === 0) {
-      let node: Node | null = range.startContainer;
-      while (node && node.parentNode !== editor) {
-        node = node.parentNode;
-      }
-      if (node && node.nodeType === Node.ELEMENT_NODE) {
-        affectedBlocks.push(node as HTMLElement);
+      if (startBlock) affectedBlocks.push(startBlock);
+      else if (endBlock) affectedBlocks.push(endBlock);
+      else {
+        let node: Node | null = range.startContainer;
+        while (node && node.parentNode !== editor) {
+          node = node.parentNode;
+        }
+        if (node && node.nodeType === Node.ELEMENT_NODE) {
+          affectedBlocks.push(node as HTMLElement);
+        }
       }
     }
 
@@ -2157,23 +2257,65 @@ export function QuadernoDocEditor({ pagina, vademecumItem, isOpen, onClose }: Qu
           onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
         >
-          <button type="button" className="doc-menu-item" onMouseDown={(e) => e.preventDefault()} onClick={() => applyHeading(0)}>
-            {I18N.quaderno.editor.normale}
+          <button
+            type="button"
+            className={`doc-menu-item ${activeHeading === 0 ? 'doc-menu-item-active' : ''}`}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => applyHeading(0)}
+          >
+            <span>{I18N.quaderno.editor.normale}</span>
+            {activeHeading === 0 && <Icon name="check" size={14} />}
           </button>
-          <button type="button" className="doc-menu-item doc-menu-h1" onMouseDown={(e) => e.preventDefault()} onClick={() => applyHeading(1)}>
-            {I18N.quaderno.editor.titolo1}
+          <button
+            type="button"
+            className={`doc-menu-item doc-menu-h1 ${activeHeading === 1 ? 'doc-menu-item-active' : ''}`}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => applyHeading(1)}
+          >
+            <span>{I18N.quaderno.editor.titolo1}</span>
+            {activeHeading === 1 && <Icon name="check" size={14} />}
           </button>
-          <button type="button" className="doc-menu-item doc-menu-sub" onMouseDown={(e) => e.preventDefault()} onClick={() => applyHeading('sub')}>
-            {I18N.quaderno.editor.sottotitolo}
+          <button
+            type="button"
+            className={`doc-menu-item doc-menu-sub ${activeHeading === 'sub' ? 'doc-menu-item-active' : ''}`}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => applyHeading('sub')}
+          >
+            <span>{I18N.quaderno.editor.sottotitolo}</span>
+            {activeHeading === 'sub' && <Icon name="check" size={14} />}
           </button>
-          <button type="button" className="doc-menu-item doc-menu-h2" onMouseDown={(e) => e.preventDefault()} onClick={() => applyHeading(2)}>
-            {I18N.quaderno.editor.titolo2}
+          <button
+            type="button"
+            className={`doc-menu-item doc-menu-h2 ${activeHeading === 2 ? 'doc-menu-item-active' : ''}`}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => applyHeading(2)}
+          >
+            <span>{I18N.quaderno.editor.titolo2}</span>
+            {activeHeading === 2 && <Icon name="check" size={14} />}
           </button>
-          <button type="button" className="doc-menu-item doc-menu-h3" onMouseDown={(e) => e.preventDefault()} onClick={() => applyHeading(3)}>
-            {I18N.quaderno.editor.titolo3}
+          <button
+            type="button"
+            className={`doc-menu-item doc-menu-h3 ${activeHeading === 3 ? 'doc-menu-item-active' : ''}`}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => applyHeading(3)}
+          >
+            <span>{I18N.quaderno.editor.titolo3}</span>
+            {activeHeading === 3 && <Icon name="check" size={14} />}
           </button>
-          <button type="button" className="doc-menu-item doc-menu-h4" onMouseDown={(e) => e.preventDefault()} onClick={() => applyHeading(4)}>
-            {I18N.quaderno.editor.titolo4}
+          <button
+            type="button"
+            className={`doc-menu-item doc-menu-h4 ${activeHeading === 4 ? 'doc-menu-item-active' : ''}`}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => applyHeading(4)}
+          >
+            <span>{I18N.quaderno.editor.titolo4}</span>
+            {activeHeading === 4 && <Icon name="check" size={14} />}
           </button>
         </div>
       )}
@@ -2267,89 +2409,99 @@ export function QuadernoDocEditor({ pagina, vademecumItem, isOpen, onClose }: Qu
           <div className="doc-palette-grid-6">
             <button
               type="button"
-              className="doc-chip doc-chip-ink"
+              className={`doc-chip doc-chip-ink ${activeColor === 'default' ? 'doc-chip-active' : ''}`}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => applyTextColor('default')}
               title="Predefinito"
             />
             <button
               type="button"
-              className="doc-chip doc-chip-purple"
+              className={`doc-chip doc-chip-purple ${activeColor === 'purple' ? 'doc-chip-active' : ''}`}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => applyTextColor('purple')}
               title="Viola Clan"
             />
             <button
               type="button"
-              className="doc-chip doc-chip-canti"
+              className={`doc-chip doc-chip-canti ${activeColor === 'blue' ? 'doc-chip-active' : ''}`}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => applyTextColor('blue')}
               title="Blu Canti"
             />
             <button
               type="button"
-              className="doc-chip doc-chip-cyan"
+              className={`doc-chip doc-chip-cyan ${activeColor === 'cyan' ? 'doc-chip-active' : ''}`}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => applyTextColor('cyan')}
               title="Ciano Turchese"
             />
             <button
               type="button"
-              className="doc-chip doc-chip-calendario"
+              className={`doc-chip doc-chip-calendario ${activeColor === 'green' ? 'doc-chip-active' : ''}`}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => applyTextColor('green')}
               title="Verde Bosco"
             />
             <button
               type="button"
-              className="doc-chip doc-chip-lime"
+              className={`doc-chip doc-chip-lime ${activeColor === 'lime' ? 'doc-chip-active' : ''}`}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => applyTextColor('lime')}
               title="Verde Lime"
             />
             <button
               type="button"
-              className="doc-chip doc-chip-giochi"
+              className={`doc-chip doc-chip-giochi ${activeColor === 'amber' ? 'doc-chip-active' : ''}`}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => applyTextColor('amber')}
               title="Ambra Giochi"
             />
             <button
               type="button"
-              className="doc-chip doc-chip-bans"
+              className={`doc-chip doc-chip-bans ${activeColor === 'red' ? 'doc-chip-active' : ''}`}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => applyTextColor('red')}
               title="Rosso Bans"
             />
             <button
               type="button"
-              className="doc-chip doc-chip-pink"
+              className={`doc-chip doc-chip-pink ${activeColor === 'pink' ? 'doc-chip-active' : ''}`}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => applyTextColor('pink')}
               title="Rosa Fucsia"
             />
             <button
               type="button"
-              className="doc-chip doc-chip-brown"
+              className={`doc-chip doc-chip-brown ${activeColor === 'brown' ? 'doc-chip-active' : ''}`}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => applyTextColor('brown')}
               title="Marrone Terra"
             />
             <button
               type="button"
-              className="doc-chip doc-chip-navy"
+              className={`doc-chip doc-chip-navy ${activeColor === 'navy' ? 'doc-chip-active' : ''}`}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => applyTextColor('navy')}
               title="Blu Notte"
             />
             <button
               type="button"
-              className="doc-chip doc-chip-gray"
+              className={`doc-chip doc-chip-gray ${activeColor === 'gray' ? 'doc-chip-active' : ''}`}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => applyTextColor('gray')}
               title="Grigio Cenere"
             />
           </div>
+          <button
+            type="button"
+            className="doc-menu-item"
+            style={{ marginTop: '8px', fontSize: 'var(--font-size-xs)', display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => applyTextColor('default')}
+          >
+            <Icon name="close" size={13} />
+            <span>Ripristina colore predefinito</span>
+          </button>
         </div>
       )}
 
