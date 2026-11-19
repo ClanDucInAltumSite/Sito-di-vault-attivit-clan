@@ -15,12 +15,9 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build-and-deploy:
-    name: Build & Deploy su GitHub Pages
+  build:
+    name: Compilazione e Verifica PWA
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout del codice
         uses: actions/checkout@v4
@@ -58,6 +55,14 @@ jobs:
         with:
           path: './dist'
 
-      - name: Pubblicazione su GitHub Pages
+  deploy:
+    name: Pubblicazione su GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy su GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
