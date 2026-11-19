@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'preact/hooks';
+import { lazy, Suspense } from 'preact/compat';
 import { I18N } from '../lib/i18n';
 import { useRoute, navigate, RouteName } from './router';
 import { useAdmin } from '../lib/auth';
-import { AdminLoginModal } from '../features/admin/AdminLoginModal';
-import { ProposteReviewSheet } from '../features/admin/ProposteReviewSheet';
 import { Icon, IconName } from '../ui/Icon';
 import { Toast } from '../ui/Toast';
 import { shareWebApp } from '../lib/share';
@@ -11,12 +10,16 @@ import { BrandLogo } from '../ui/BrandLogo';
 import { TopographicBackground } from '../ui/TopographicBackground';
 import { CompassSync } from '../ui/ScoutMotifs';
 import { NotificationBell } from '../ui/NotificationBell';
-import { NotificationCenterSheet } from '../features/notifications/NotificationCenterSheet';
-import {
-  initNotificationEngine,
-  subscribeNotifications,
-} from '../lib/notifications';
-import { getProposteAdmin } from '../lib/proposte';
+
+const AdminLoginModal = lazy(() =>
+  import('../features/admin/AdminLoginModal').then((m) => ({ default: m.AdminLoginModal }))
+);
+const ProposteReviewSheet = lazy(() =>
+  import('../features/admin/ProposteReviewSheet').then((m) => ({ default: m.ProposteReviewSheet }))
+);
+const NotificationCenterSheet = lazy(() =>
+  import('../features/notifications/NotificationCenterSheet').then((m) => ({ default: m.NotificationCenterSheet }))
+);
 
 export interface ShellProps {
   isOnline: boolean;
@@ -51,30 +54,42 @@ export function Shell({
   const [isProposteSheetOpen, setIsProposteSheetOpen] = useState(false);
 
   useEffect(() => {
-    const cleanupNotifs = initNotificationEngine({ isAdmin });
+    let cleanupNotifs: (() => void) | undefined;
+    let unsubscribeNotifs: (() => void) | undefined;
+    let isMounted = true;
 
-    const unsubscribeNotifs = subscribeNotifications((notifs, unread) => {
-      setUnreadNotifsCount(unread);
-      const hasPendingAdmin = notifs.some((n) => n.type === 'proposta_nuova' && !n.read);
-      setHasAdminAlert(hasPendingAdmin);
+    import('../lib/notifications').then(({ initNotificationEngine, subscribeNotifications }) => {
+      if (!isMounted) return;
+      cleanupNotifs = initNotificationEngine({ isAdmin });
+      unsubscribeNotifs = subscribeNotifications((notifs, unread) => {
+        if (!isMounted) return;
+        setUnreadNotifsCount(unread);
+        const hasPendingAdmin = notifs.some((n) => n.type === 'proposta_nuova' && !n.read);
+        setHasAdminAlert(hasPendingAdmin);
+      });
     });
 
     if (isAdmin) {
-      getProposteAdmin()
-        .then((list) => {
-          setPendingProposteCount(list.length);
-          if (list.length > 0) {
-            setHasAdminAlert(true);
-          }
-        })
-        .catch(() => {});
+      import('../lib/proposte').then(({ getProposteAdmin }) => {
+        if (!isMounted) return;
+        getProposteAdmin()
+          .then((list) => {
+            if (!isMounted) return;
+            setPendingProposteCount(list.length);
+            if (list.length > 0) {
+              setHasAdminAlert(true);
+            }
+          })
+          .catch(() => {});
+      });
     } else {
       setPendingProposteCount(0);
     }
 
     return () => {
-      cleanupNotifs();
-      unsubscribeNotifs();
+      isMounted = false;
+      cleanupNotifs?.();
+      unsubscribeNotifs?.();
     };
   }, [isAdmin]);
 
@@ -535,53 +550,67 @@ export function Shell({
       </nav>
 
       {/* Centro Notifiche BottomSheet */}
-      <NotificationCenterSheet
-        isOpen={isNotifSheetOpen}
-        onClose={() => setIsNotifSheetOpen(false)}
-        isAdmin={isAdmin}
-        onOpenProposteReview={() => {
-          setIsNotifSheetOpen(false);
-          setIsProposteSheetOpen(true);
-        }}
-      />
+      {isNotifSheetOpen && (
+        <Suspense fallback={null}>
+          <NotificationCenterSheet
+            isOpen={isNotifSheetOpen}
+            onClose={() => setIsNotifSheetOpen(false)}
+            isAdmin={isAdmin}
+            onOpenProposteReview={() => {
+              setIsNotifSheetOpen(false);
+              setIsProposteSheetOpen(true);
+            }}
+          />
+        </Suspense>
+      )}
 
       {/* Modale Revisione Proposte per l'Admin */}
-      {isAdmin && (
-        <ProposteReviewSheet
-          isOpen={isProposteSheetOpen}
-          onClose={() => {
-            setIsProposteSheetOpen(false);
-            if (isAdmin) {
-              getProposteAdmin()
-                .then((list) => {
-                  setPendingProposteCount(list.length);
-                  setHasAdminAlert(list.length > 0);
-                })
-                .catch(() => {});
-            }
-          }}
-          onItemsChanged={() => {
-            if (isAdmin) {
-              getProposteAdmin()
-                .then((list) => {
-                  setPendingProposteCount(list.length);
-                  setHasAdminAlert(list.length > 0);
-                })
-                .catch(() => {});
-            }
-          }}
-        />
+      {isAdmin && isProposteSheetOpen && (
+        <Suspense fallback={null}>
+          <ProposteReviewSheet
+            isOpen={isProposteSheetOpen}
+            onClose={() => {
+              setIsProposteSheetOpen(false);
+              if (isAdmin) {
+                import('../lib/proposte').then(({ getProposteAdmin }) => {
+                  getProposteAdmin()
+                    .then((list) => {
+                      setPendingProposteCount(list.length);
+                      setHasAdminAlert(list.length > 0);
+                    })
+                    .catch(() => {});
+                });
+              }
+            }}
+            onItemsChanged={() => {
+              if (isAdmin) {
+                import('../lib/proposte').then(({ getProposteAdmin }) => {
+                  getProposteAdmin()
+                    .then((list) => {
+                      setPendingProposteCount(list.length);
+                      setHasAdminAlert(list.length > 0);
+                    })
+                    .catch(() => {});
+                });
+              }
+            }}
+          />
+        </Suspense>
       )}
 
       {/* Modale BottomSheet Login Admin */}
-      <AdminLoginModal
-        isOpen={isLoginModalOpen}
-        onClose={() => setIsLoginModalOpen(false)}
-        onSuccess={() => {
-          setIsLoginModalOpen(false);
-          navigate('admin');
-        }}
-      />
+      {isLoginModalOpen && (
+        <Suspense fallback={null}>
+          <AdminLoginModal
+            isOpen={isLoginModalOpen}
+            onClose={() => setIsLoginModalOpen(false)}
+            onSuccess={() => {
+              setIsLoginModalOpen(false);
+              navigate('admin');
+            }}
+          />
+        </Suspense>
+      )}
 
       {/* Notifica Toast Fluttuante */}
       {toastMessage && (
