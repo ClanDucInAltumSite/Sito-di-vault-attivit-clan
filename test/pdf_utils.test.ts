@@ -20,7 +20,7 @@ describe('pdf_utils - Gestione sicura Blob e apertura PDF', () => {
     openPdfDocument(sampleDataUrl, 'test.pdf');
 
     expect(createObjectUrlMock).toHaveBeenCalledTimes(1);
-    expect(windowOpenMock).toHaveBeenCalledWith('blob:http://localhost/test-pdf', '_blank', 'noopener,noreferrer');
+    expect(windowOpenMock).toHaveBeenCalledWith('blob:http://localhost/test-pdf', '_blank');
 
     createObjectUrlMock.mockRestore();
     windowOpenMock.mockRestore();

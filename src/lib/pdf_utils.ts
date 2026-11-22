@@ -39,14 +39,15 @@ export function openPdfDocument(dataUrlOrBlobUrl: string, fileName?: string): vo
     }
   }
 
-  // Apri in una nuova finestra o scheda
-  const win = window.open(url, '_blank', 'noopener,noreferrer');
+  // Apri in una nuova finestra o scheda senza 'noreferrer',
+  // poiché i browser Chromium (Chrome/Edge/Brave) bloccano l'apertura
+  // dei viewer PDF interni su blob/URL quando il referrer è anonimizzato.
+  const win = window.open(url, '_blank');
   if (!win) {
     // Se bloccato dal popup blocker del browser, simula il click su link temporaneo
     const a = document.createElement('a');
     a.href = url;
     a.target = '_blank';
-    a.rel = 'noopener noreferrer';
     if (fileName) {
       a.download = fileName;
     }

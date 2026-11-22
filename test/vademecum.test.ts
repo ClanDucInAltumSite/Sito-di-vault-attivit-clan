@@ -19,12 +19,12 @@ describe('Vademecum e Regole del Clan (Carta, Regole, Canovacci)', () => {
     expect(carta).toBeDefined();
     expect(carta?.titolo).toBe('Carta di Clan');
     expect(carta?.descrizioneBreve).toContain('valori');
-    expect(carta?.contenuto).toContain('STRADA');
+    expect(carta?.contenuto).toContain('Strada');
 
     const regole = items.find((d) => d.section === 'regole_clan');
     expect(regole).toBeDefined();
     expect(regole?.titolo).toBe('Regole del Clan');
-    expect(regole?.contenuto).toContain('PUNTUALITÀ');
+    expect(regole?.contenuto).toContain('Riunione');
 
     const canovacci = items.filter((d) => d.section === 'canovaccio');
     expect(canovacci.length).toBeGreaterThanOrEqual(1);

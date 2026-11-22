@@ -41,54 +41,25 @@ function getVademecumDb(): Promise<IDBPDatabase> {
   return vademecumDbPromise;
 }
 
-// Dati predefiniti curati e realistici per Clan Scout
+const getAssetUrl = (relativePath: string) => {
+  const base = (typeof import.meta !== 'undefined' && import.meta.env?.BASE_URL) || '/';
+  const cleanBase = base.endsWith('/') ? base : `${base}/`;
+  const cleanPath = relativePath.startsWith('/') ? relativePath.slice(1) : relativePath;
+  return `${cleanBase}${cleanPath}`;
+};
+
+// Dati predefiniti curati e reali del Clan Duc In Altum
 export const DEFAULT_VADEMECUM_ITEMS: VademecumItem[] = [
   {
     id: 'carta_clan',
     section: 'carta_clan',
     titolo: 'Carta di Clan',
     descrizioneBreve: 'I valori, la legge della strada e gli impegni comunitari del Clan',
-    contenuto: `# CARTA DI CLAN — DUC IN ALTUM
-
-> "La felicità non viene dal possedere o dall'essere serviti, ma dall'essere utili agli altri e dal percorrere la strada insieme."
-> — Baden-Powell
-
----
-
-### PREAMBOLO
-Noi, Rover e Scolte della Comunità di Clan, scegliamo di camminare insieme alla scoperta di noi stessi, dei nostri fratelli e del mondo.
-Questa Carta è il nostro patto d'onore e il riferimento costante del nostro percorso verso la Partenza.
-
----
-
-### I QUATTRO PILASTRI DEL NOSTRO CAMMINO
-
-#### 1. LA STRADA
-- La strada è fatica vissuta nella gioia, zaino essenziale sulle spalle e passo condiviso con chi è più lento.
-- Camminare all'aperto ci insegna il silenzio, l'essenzialità e lo stupore davanti alla bellezza del creato.
-- Non lasciamo tracce negative del nostro passaggio, ma custodiamo ogni sentiero con rispetto.
-
-#### 2. LA COMUNITÀ
-- Nel Clan nessuno è invisibile: ogni voce ha diritto di ascolto e ogni opinione è accolta con lealtà.
-- La verifica fraterna non è giudizio, ma aiuto reciproco a crescere nelle scelte di vita.
-- Viviamo la corresponsabilità: la riuscita delle attività e la custodia della nostra sede dipendono da ciascuno.
-
-#### 3. LA FEDE
-- Ci mettiamo in cammino come cercatori di Dio, confrontando le nostre scelte quotidiane con il Vangelo.
-- La preghiera attorno al fuoco e la riflessione personale ci aiutano a discernere la nostra vocazione.
-
-#### 4. IL SERVIZIO
-- Il servizio non è beneficenza occasionale, ma stile di vita: farsi prossimo con umiltà, continuità e gioia.
-- Ci impegniamo ad amare il nostro territorio e ad agire come cittadini attivi e responsabili.
-
----
-
-### LA PARTENZA
-Chi sceglie la Partenza testimonia che i valori scout non restano confinati nel Clan, ma diventano la bussola dell'età adulta: operare nel mondo da persone libere, leali e accoglienti.`,
+    contenuto: "## [color:amber:Fede]\n\n[size:16:La fede è un viaggio in continuo divenire che ha come obiettivo la costruzione di un rapporto con Dio.][size:16: ]\n\n[size:16:Come clan crediamo che sia importante vivere il percorso di fede sia in modo personale che all'interno della comunità attraverso la ricerca e nel riconoscimento dei valori base del cristianesimo.][size:16: ]\n\n[size:16:Come clan ci impegniamo ad essere più intraprendenti e autonomi nel fare le attività di fede come:]\n\n- portare avanti il progetto ACE (almeno una volta al mese)\n\n- catechesi più vicine a noi\n- condivisioni spontanee.\n\n\n# [color:lime:Strada]\n\n[size:16:La strada dá e crea.][size:16: L'importanza di essa risiede nel modo con cui la viviamo.][size:16: ]\n\n[size:16:Fare strada muta i legami ed i punti di vista all'interno della comunità.][size:16: ]\n\n[size:16:É un modo per crescere,][size:16: conoscere ed affrontare i propri limiti attraverso la fatica,][size:16: per contemplare la bellezza della natura ed aumentare il nostro contatto con essa.][size:16: ]\n\n[size:16:La strada la percorriamo insieme,][size:16: passo dopo passo,][size:16: aiutandoci e confortandoci con l'obiettivo di arrivare alla meta prefissata.][size:16: ]\n\n[size:16:Come clan ci impegniamo a mantenere una buona costanza nelle uscite di strada.][size:16: Ci impegniamo a trovare un punto d'incontro nella natura della camminata.]\n\n# **[color:blue:Servizio]**\n\nServire è una scelta di vita quotidiana.\n\nL'essenza del servizio è essere utili per il prossimo con la consapevolezza di non essere indispensabili.\n\nDonare il proprio tempo agli altri senza aspettarsi nulla in cambio è un'opportunità per crescere ed arricchirsi.\n\n*\"Chi semina datteri, non mangia datteri\" *\n\nCome clan riconosciamo la bellezza nell' interfacciarsi con nuove realtà, aquisendone consapevolezza e gratitudine.\n\nNoi del clan ci impegniamo ad essere costanti ed attivi nei servizi affidati, vivendoli al meglio sia singolarmente che in comunità, e a dedicare alcune delle uscite al servizio di comunità.\n\n\n# [color:purple:Stile]\n\n[size:16:Siamo scout,][size:16: non facciamo scout.][size:16: Indossare l'uniforme e' una presa di posizione molto forte,][size:16: con o senza di essa abbracciamo gli ideali e i principi dello scoutismo.][size:16: ]\n\n[size:16:Siccome rappresentiamo a livello nazionale un'associazione,][size:16: e a livello mondiale un movimento,][size:16: crediamo sia importante mantenere un comportamento adeguato e rispettoso indipendentemente dalle circostanze.][size:16: ]\n\n[size:16:Come uniforme perfetta intendiamo:][size:16: camicia o polo,][size:16: fazzolettone,][size:16: pantaloni,][size:16: cintura,][size:16: maglione,][size:16: calzettoni e scarpe chiuse.][size:16: ]\n\n[size:16:Riconosciamo di dover indossare l'uniforme in queste occasioni:]\n\n- cerimonie ufficiali\n\n- messa\n\n- mezzi di trasporto\n\nIn tutti gli altri casi ci riserviamo di poterci confrontare per trovare il giusto compromesso.\n\n\n# [color:red:Comunità]\n\n[size:16:La nostra comunità e' un gruppo di persone sullo stesso piano che cresce e cammina verso degli obbiettivi in comune,][size:16: sotto le stesse regole e gli stessi ideali,][size:16: per migliorarsi.][size:16: ]\n\n[size:16:Crediamo che in una comunità sia importante cercare un punto d'incontro attraverso il dialogo,][size:16: l'ascolto e la riflessione.][size:16: ]\n\n[size:16:Siamo felici di accogliere nuovi membri nella comunità.][size:16: Sulla base di questi presupposti ci impegniamo attraverso il gioco e il lavoro a essere presenti con la volontà di mantenere la parola data.][size:16: ]\n\n[size:16:Inoltre,][size:16: crediamo che i seguenti elementi possano rafforzare la comunità:]\n\n- essere presenti e attivi con costanza\n- essere propensi alla condivisione\n- essere intraprendenti mettendo a disposizione le proprie capacità.\n\nCi prefiggiamo di fare almeno un'uscita ogni mese e mezzo ed una riunione a settimana.\n\n\n# [color:brown:Territorio]\n\nNoi del clan siamo cittadini del mondo percio' puntiamo a mantenere gli stessi valori che applichiamo nella nostra zona. In tutto il territorio.\n\nLa zona in cui compiamo piu' cittadinanza attiva e' Ponte San Giovanni e aree limitrofe.\n\nQuando parliamo di territorio non intendiamo solo il territorio fisico, ma anche l'insieme delle relazioni e associazioni che ne fanno parte. Per questo noi del clan ci impegniamo a:\n\n- organizzare un'attivita' che coinvolga gli abitanti del territorio\n- dare disponibilita' alle richieste di aiuto da parte degli altri enti della zona\n\n*\"Lasciate il mondo un po' migliore di come l'avete trovato\"*\"",
     pdfNome: null,
     pdfDataUrl: null,
     pdfSize: null,
-    fotoCopertinaUrl: null,
+    fotoCopertinaUrl: getAssetUrl('vademecum/carta-clan-cover.webp'),
     updatedAt: new Date().toISOString(),
   },
   {
@@ -96,91 +67,23 @@ Chi sceglie la Partenza testimonia che i valori scout non restano confinati nel 
     section: 'regole_clan',
     titolo: 'Regole del Clan',
     descrizioneBreve: 'Patto di convivenza, orari, sede, telefoni e cassa',
-    contenuto: `# REGOLE DEL CLAN E PATTO DI CONVIVENZA
-
-Il rispetto di queste regole è segno della nostra fraternità scout e della nostra maturità comunitaria.
-
----
-
-### 1. PUNTUALITÀ E PARTECIPAZIONE
-- L'orario di inizio riunione è sacro: arrivare in ritardo significa mancare di rispetto al tempo degli altri.
-- Le assenze vanno comunicate ai Capi e alla propria Pattuglia almeno **24 ore prima**, con motivazione valida.
-- Chi accumula assenze ingiustificate è chiamato a un colloquio con i Capi e a un servizio comunitario per il Clan.
-
----
-
-### 2. USO DELLO SMARTPHONE E DISPOSITIVI DIGITALI
-- Durante le riunioni di Clan e di Pattuglia i telefoni rimangono riposti nello zaino e silenziosi.
-- Durante le uscite e le route i telefoni sono in **modalità non disturbare**: vogliamo vivere il momento presente e guardarci negli occhi, non attraverso uno schermo.
-- L'uso è consentito solo per esigenze di sicurezza, orientamento GPS o contatti autorizzati dai Capi.
-
----
-
-### 3. CURA DELLA SEDE E DEL MATERIALE
-- La sede è la nostra casa scout: al termine di ogni attività si lasciano pavimenti puliti, tavoli ordinati e luci spente.
-- Il materiale comune (tende, fornellini, teloni, attrezzi) va controllato prima dell'uso e riposto rigorosamente asciutto e pulito.
-- Chi danneggia un materiale per negligenza ne cura la riparazione o la sostituzione.
-
----
-
-### 4. CASSA DI CLAN E AUTOFINANZIAMENTO
-- Il pagamento delle quote avviene sempre nei tempi concordati.
-- Ognuno si impegna attivamente nei lavori di autofinanziamento per sostenere le uscite di chi ha maggiori difficoltà.
-- La cassa è gestita con totale trasparenza e rendicontata ad ogni Punto della Strada.
-
----
-
-### 5. SPIRITO DI PATTUGLIA E INCARICHI
-- Ciascuna pattuglia svolge con cura il proprio incarico (animazione, cassa, materiale, liturgia, pronto soccorso).
-- Ognuno porta il proprio contributo senza scaricare il lavoro sugli altri.`,
+    contenuto: "Riunione martedì/mercoledì alternando e gestita da due di noi\nNO cuffiette categorico\n\n[size:16:* Telefoni: a riunione usarli il meno possibile, in uscita mai (ci ritagliamo un piccolo momento dopo le attività prima di andare a dormire)\n* Fumo: nei momenti morti fuori dalle attività, senza sottrarsi alla comunità solo secondo le proprie necessità\n* se non si viene a riunione motivare il perché\n* rispondere ai messaggi che vengono inviati\n* non parlare sopra agli altri\n* mantenere un linguaggio opportuno (assolutamente no bestemmie, le parolacce non devono diventare un'abitudine nel linguaggio).\n* ogni membro della comunità si prende la responsabilità di richiamare gli altri in caso di trasgressione delle regole (ci poniamo come obiettivo di non arrivare ad un doppio richiamo)]",
     pdfNome: null,
     pdfDataUrl: null,
     pdfSize: null,
+    fotoCopertinaUrl: null,
     updatedAt: new Date().toISOString(),
   },
   {
-    id: 'canovaccio_uscita_pattuglia',
+    id: 'canovaccio_logistica',
     section: 'canovaccio',
-    titolo: 'Canovaccio Uscita e Hike di Pattuglia',
-    descrizioneBreve: 'Traccia organizzativa per orari, percorso, budget, menu e sicurezza',
-    contenuto: `# CANOVACCIO USCITA / HIKE DI PATTUGLIA
-
-Traccia operativa da compilare prima di presentare l'uscita ai Capi Unità.
-
----
-
-### 1. SCHEDA GENERALE
-- **Pattuglia responsabile:** [Nome Pattuglia]
-- **Data e orari:** Partenza [Giorno / Ora] — Rientro [Giorno / Ora]
-- **Luogo di destinazione:** [Nome località, quota e comune]
-- **Mezzi di trasporto:** [Treno / Autobus / A piedi / Orari e coincidenze]
-
----
-
-### 2. ITINERARIO E CARTOGRAFIA
-- **Sentieri CAI previsti:** [Numeri segnavia e tappe intermedie]
-- **Dislivello:** Salita: +[X] m | Discesa: -[Y] m | Distanza: [Z] km
-- **Tempo stimato di marcia:** [Ore previste con pause]
-- **Punti acqua verificati:** [Sorgenti e fontane attive lungo il percorso]
-- **Piano B (Percorso alternativo in caso di maltempo):** [Descrivere la variante]
-
----
-
-### 3. MENU ED ENERGIA
-- **Pranzo al sacco:** [Alimenti leggeri ed energetici]
-- **Cena al fuoco / fornellino:** [Menu caldo, facile da cucinare e nutriente]
-- **Colazione:** [Biscotti, frutta secca, marmellata, tè caldo]
-- **Budget complessivo a testa:** Euro [Cifra prevista]
-
----
-
-### 4. MATERIALI E SICUREZZA
-- **Cassetta di pronto soccorso:** Controllata con disinfettante, garze, cerotti vesciche, telo termico.
-- **Dotazione di pattuglia:** Tenda leggera, fornellino con bombola piena, cordino, pala pieghevole.
-- **Numeri di emergenza registrati:** Soccorso Alpino 112/118, numeri Capi Unità, stazione Carabinieri locale.`,
-    pdfNome: null,
-    pdfDataUrl: null,
-    pdfSize: null,
+    titolo: 'Canovaccio Logistica uscita/route',
+    descrizioneBreve: "Guida operativa per imparare da zero a realizzare la logistica di un'uscita o di una route.",
+    contenuto: "[color:green:Parte 1: Logistica diun'uscita]\n\nPrima si definisce il tipo di uscita, poi si mette in sicurezza una base semplice e funzionale. Il percorso segue l'attività, mentre la logistica rende il programma davvero realizzabile.\n\n**1. Base e accoglienza**\n- Definire il tipo di uscita: scegliere tra strada o servizio.\n- Trovare dove dormire (in ordine di priorità): parrocchia -> sede o sale tramite conoscenze -> base scout.\n- Verificare gli spazi: chiedere spazio per dormire, bagno e — se servisse — cucina.\n- Chiudere gli accordi: confermare disponibilità, offerta e referente.\n\n[color:red:2. Percorso, attività e budget]\n- Allineare il percorso all'attività: verificare che sia coerente con catechesi, animazione, panorama o eremo.",
+    pdfNome: 'Canovaccio Pattuglia Logistica_compressed.pdf',
+    pdfDataUrl: getAssetUrl('docs/Canovaccio_Pattuglia_Logistica_compressed.pdf'),
+    pdfSize: 1261347,
+    fotoCopertinaUrl: null,
     updatedAt: new Date().toISOString(),
   },
   {
@@ -221,6 +124,7 @@ Traccia per animare una veglia serale profonda e coinvolgente.
     pdfNome: null,
     pdfDataUrl: null,
     pdfSize: null,
+    fotoCopertinaUrl: null,
     updatedAt: new Date().toISOString(),
   },
 ];
@@ -234,6 +138,33 @@ async function ensureVademecumDefaults(db: IDBPDatabase): Promise<void> {
     const tx = db.transaction('vademecum_items', 'readwrite');
     for (const item of DEFAULT_VADEMECUM_ITEMS) {
       await tx.store.put(item);
+    }
+    await tx.done;
+    return;
+  }
+
+  // Se il database locale contiene ancora i vecchi template generici o segnaposto,
+  // effettua l'upgrade immediato ai documenti reali recuperati del Clan
+  const items = await db.getAll('vademecum_items');
+  const hasOldPlaceholder = items.some(
+    (i) => i.contenuto && (
+      i.contenuto.includes('I QUATTRO PILASTRI DEL NOSTRO CAMMINO') ||
+      i.contenuto.includes("L'orario di inizio riunione è sacro")
+    )
+  );
+
+  if (hasOldPlaceholder || !items.some(i => i.titolo && i.titolo.includes('Logistica'))) {
+    const tx = db.transaction('vademecum_items', 'readwrite');
+    for (const def of DEFAULT_VADEMECUM_ITEMS) {
+      const existing = items.find((i) => i.id === def.id || (i.section === def.section && def.section !== 'canovaccio'));
+      if (
+        !existing ||
+        existing.contenuto.includes('I QUATTRO PILASTRI DEL NOSTRO CAMMINO') ||
+        existing.contenuto.includes("L'orario di inizio riunione è sacro") ||
+        (def.section === 'canovaccio' && def.id === 'canovaccio_logistica' && !items.some(i => i.titolo.includes('Logistica')))
+      ) {
+        await tx.store.put(def);
+      }
     }
     await tx.done;
   }
@@ -407,8 +338,8 @@ export function isVademecumCustomized(items: VademecumItem[]): boolean {
     if (item.titolo !== def.titolo) return true;
     if (item.contenuto !== def.contenuto) return true;
     if (item.descrizioneBreve !== def.descrizioneBreve) return true;
-    if (item.fotoCopertinaUrl) return true;
-    if (item.pdfDataUrl) return true;
+    if (item.fotoCopertinaUrl !== def.fotoCopertinaUrl) return true;
+    if (item.pdfDataUrl !== def.pdfDataUrl) return true;
   }
   return false;
 }
@@ -420,6 +351,9 @@ export function isVademecumCustomized(items: VademecumItem[]): boolean {
 export async function pushVademecumToRemote(client: any = supabase, itemsToPush?: VademecumItem[]): Promise<boolean> {
   try {
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      return false;
+    }
+    if (typeof process !== 'undefined' && process.env.VITEST && client === supabase) {
       return false;
     }
     if (!client || typeof client.from !== 'function') {
@@ -467,6 +401,9 @@ export async function pullVademecumFromRemote(client: any = supabase): Promise<b
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       return false;
     }
+    if (typeof process !== 'undefined' && process.env.VITEST && client === supabase) {
+      return false;
+    }
     if (!client || typeof client.from !== 'function') {
       return false;
     }
@@ -507,9 +444,28 @@ export async function pullVademecumFromRemote(client: any = supabase): Promise<b
         }
       }
 
-      // Se locale non è personalizzato (è ancora allo stato default),
-      // oppure se il server ha un timestamp più recente: sovrascrivi locale
-      if (!localCustomized || (remoteUpdatedAt && remoteUpdatedAt > localMaxUpdated)) {
+      const remoteCustomized = isVademecumCustomized(remoteItems);
+      const remoteHasOldPlaceholder = remoteItems.some(
+        (i) => i.contenuto && (
+          i.contenuto.includes('I QUATTRO PILASTRI DEL NOSTRO CAMMINO') ||
+          i.contenuto.includes("L'orario di inizio riunione è sacro")
+        )
+      );
+
+      // REGOLA FERREA DI PROTEZIONE DATI:
+      // 1. Se il server contiene vecchi placeholder generici o default non personalizzati
+      //    e il dispositivo locale ha documenti reali, NON sovrascrivere mai il locale!
+      if (remoteHasOldPlaceholder && !localCustomized) {
+        return false;
+      }
+      if (localCustomized && !remoteCustomized) {
+        // Salva i dati locali su cloud se admin
+        pushVademecumToRemote(client, localItems).catch(() => {});
+        return false;
+      }
+
+      // Sovrascrivi solo se locale non è personalizzato o remoto è personalizzato e più recente
+      if (!localCustomized || (remoteCustomized && remoteUpdatedAt && remoteUpdatedAt > localMaxUpdated)) {
         // Garantisce che carta_clan e regole_clan siano sempre presenti
         const finalItems = [...remoteItems];
         for (const def of DEFAULT_VADEMECUM_ITEMS) {
