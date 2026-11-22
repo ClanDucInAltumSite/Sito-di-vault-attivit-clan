@@ -1,9 +1,10 @@
 // src/lib/vademecum.ts
 // Modulo per la gestione dei Documenti Fondamentali e Regole del Clan (Vademecum)
 // Carta di Clan, Regole del Clan e Canovacci per Pattuglie con supporto allegati PDF
-// Persistenza locale autonoma e sicura su IndexedDB, modificabile istantaneamente da admin
+// Persistenza locale autonoma e sicura su IndexedDB con sincronizzazione cloud automatica su Supabase (system_meta)
 
 import { openDB, IDBPDatabase } from 'idb';
+import { supabase } from './supabase';
 
 export type VademecumDocType = 'carta_clan' | 'regole_clan' | 'canovaccio';
 
@@ -238,6 +239,22 @@ async function ensureVademecumDefaults(db: IDBPDatabase): Promise<void> {
   }
 }
 
+let vademecumSyncTimer: any = null;
+
+/**
+ * Avvia la sincronizzazione Vademecum in background con debounce
+ */
+export function triggerBackgroundVademecumSync(delayMs = 300): void {
+  if (typeof window === 'undefined') return;
+  if (typeof process !== 'undefined' && process.env.VITEST) return;
+  if (vademecumSyncTimer) clearTimeout(vademecumSyncTimer);
+  vademecumSyncTimer = setTimeout(() => {
+    syncVademecum().catch((err) => {
+      console.warn('[Vademecum] Sincronizzazione background non riuscita:', err);
+    });
+  }, delayMs);
+}
+
 /**
  * Recupera tutti i documenti Vademecum
  */
@@ -245,6 +262,7 @@ export async function getVademecumItems(): Promise<VademecumItem[]> {
   try {
     const db = await getVademecumDb();
     await ensureVademecumDefaults(db);
+    triggerBackgroundVademecumSync();
     return await db.getAll('vademecum_items');
   } catch (err) {
     console.error('Errore getVademecumItems:', err);
@@ -303,6 +321,9 @@ export async function saveVademecumItem(input: {
 
   await db.put('vademecum_items', updated);
   notifyVademecumListeners();
+  if (!(typeof process !== 'undefined' && process.env.VITEST)) {
+    pushVademecumToRemote().catch(() => {});
+  }
   return updated;
 }
 
@@ -367,6 +388,171 @@ export async function deleteVademecumItem(id: string): Promise<void> {
   const db = await getVademecumDb();
   await db.delete('vademecum_items', id);
   notifyVademecumListeners();
+  if (!(typeof process !== 'undefined' && process.env.VITEST)) {
+    pushVademecumToRemote().catch(() => {});
+  }
+}
+
+/**
+ * Verifica se un elenco di documenti Vademecum contiene personalizzazioni
+ * rispetto ai contenuti predefiniti di fabbrica.
+ */
+export function isVademecumCustomized(items: VademecumItem[]): boolean {
+  if (!items || items.length === 0) return false;
+  if (items.length !== DEFAULT_VADEMECUM_ITEMS.length) return true;
+
+  for (const item of items) {
+    const def = DEFAULT_VADEMECUM_ITEMS.find((d) => d.id === item.id);
+    if (!def) return true;
+    if (item.titolo !== def.titolo) return true;
+    if (item.contenuto !== def.contenuto) return true;
+    if (item.descrizioneBreve !== def.descrizioneBreve) return true;
+    if (item.fotoCopertinaUrl) return true;
+    if (item.pdfDataUrl) return true;
+  }
+  return false;
+}
+
+/**
+ * Carica l'elenco dei documenti Vademecum su Supabase (tabella system_meta)
+ * se l'utente attuale è autenticato come amministratore.
+ */
+export async function pushVademecumToRemote(client: any = supabase, itemsToPush?: VademecumItem[]): Promise<boolean> {
+  try {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      return false;
+    }
+    if (!client || typeof client.from !== 'function') {
+      return false;
+    }
+
+    const { data: { session } } = client.auth && typeof client.auth.getSession === 'function'
+      ? await client.auth.getSession()
+      : { data: { session: null } };
+
+    if (!session?.user) {
+      return false; // Solo gli amministratori autenticati possono scrivere in system_meta
+    }
+
+    let items = itemsToPush;
+    if (!items) {
+      const db = await getVademecumDb();
+      await ensureVademecumDefaults(db);
+      items = await db.getAll('vademecum_items');
+    }
+
+    const { error } = await client.from('system_meta').upsert({
+      key: 'vademecum_items',
+      value: items,
+      updated_at: new Date().toISOString(),
+    });
+
+    if (error) {
+      console.warn('[VademecumSync] Errore push su Supabase:', error.message);
+      return false;
+    }
+
+    return true;
+  } catch (err: any) {
+    console.warn('[VademecumSync] Eccezione pushVademecumToRemote:', err?.message || err);
+    return false;
+  }
+}
+
+/**
+ * Scarica i documenti Vademecum da Supabase e aggiorna IndexedDB locale se necessario.
+ */
+export async function pullVademecumFromRemote(client: any = supabase): Promise<boolean> {
+  try {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      return false;
+    }
+    if (!client || typeof client.from !== 'function') {
+      return false;
+    }
+
+    const db = await getVademecumDb();
+    await ensureVademecumDefaults(db);
+    const localItems = await db.getAll('vademecum_items');
+    const localCustomized = isVademecumCustomized(localItems);
+
+    let fromQuery = client.from('system_meta');
+    if (!fromQuery || typeof fromQuery.select !== 'function') {
+      return false;
+    }
+    let selQuery = fromQuery.select('value, updated_at');
+    if (!selQuery || typeof selQuery.eq !== 'function') {
+      return false;
+    }
+    let eqQuery = selQuery.eq('key', 'vademecum_items');
+    if (!eqQuery || typeof eqQuery.maybeSingle !== 'function') {
+      return false;
+    }
+
+    const { data, error } = await eqQuery.maybeSingle();
+
+    if (error) {
+      console.warn('[VademecumSync] Errore pull da Supabase:', error.message);
+      return false;
+    }
+
+    if (data && Array.isArray(data.value) && data.value.length > 0) {
+      const remoteItems = data.value as VademecumItem[];
+      const remoteUpdatedAt = data.updated_at || '';
+
+      let localMaxUpdated = '';
+      for (const item of localItems) {
+        if (item.updatedAt && item.updatedAt > localMaxUpdated) {
+          localMaxUpdated = item.updatedAt;
+        }
+      }
+
+      // Se locale non è personalizzato (è ancora allo stato default),
+      // oppure se il server ha un timestamp più recente: sovrascrivi locale
+      if (!localCustomized || (remoteUpdatedAt && remoteUpdatedAt > localMaxUpdated)) {
+        // Garantisce che carta_clan e regole_clan siano sempre presenti
+        const finalItems = [...remoteItems];
+        for (const def of DEFAULT_VADEMECUM_ITEMS) {
+          if (!finalItems.some((i) => i.id === def.id)) {
+            finalItems.push(def);
+          }
+        }
+
+        const tx = db.transaction('vademecum_items', 'readwrite');
+        await tx.store.clear();
+        for (const item of finalItems) {
+          await tx.store.put(item);
+        }
+        await tx.done;
+        notifyVademecumListeners();
+        return true;
+      }
+
+      // Se locale è personalizzato ed è più recente del server, e siamo admin: push automatico al server
+      if (localCustomized && localMaxUpdated > remoteUpdatedAt) {
+        await pushVademecumToRemote(client, localItems);
+      }
+    } else {
+      // Supabase non ha ancora il record 'vademecum_items'.
+      // Se il dispositivo locale ha contenuti personalizzati (es. il PC dell'admin),
+      // effettua il seed iniziale sul cloud!
+      if (localCustomized) {
+        await pushVademecumToRemote(client, localItems);
+      }
+    }
+
+    return true;
+  } catch (err: any) {
+    console.warn('[VademecumSync] Eccezione pullVademecumFromRemote:', err?.message || err);
+    return false;
+  }
+}
+
+/**
+ * Sincronizzazione bidirezionale del Vademecum con Supabase
+ */
+export async function syncVademecum(client: any = supabase): Promise<void> {
+  await pullVademecumFromRemote(client);
 }
 
 // Sistema di sottoscrizione per aggiornare la UI in tempo reale al salvataggio

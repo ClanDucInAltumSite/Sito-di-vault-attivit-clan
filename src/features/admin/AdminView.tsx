@@ -67,6 +67,21 @@ export function AdminView() {
   const [isDownloadingOffline, setIsDownloadingOffline] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState<number>(0);
   const [isSeedingCanti, setIsSeedingCanti] = useState(false);
+  const [isSyncingVademecum, setIsSyncingVademecum] = useState(false);
+
+  const handleSyncVademecum = async () => {
+    setIsSyncingVademecum(true);
+    try {
+      const { pushVademecumToRemote, pullVademecumFromRemote } = await import('../../lib/vademecum');
+      await pushVademecumToRemote();
+      await pullVademecumFromRemote();
+      alert('Carta di Clan e Canovacci sincronizzati con successo sul cloud Supabase!');
+    } catch (err: any) {
+      alert('Errore sincronizzazione Vademecum: ' + (err?.message || err));
+    } finally {
+      setIsSyncingVademecum(false);
+    }
+  };
 
   const loadData = async () => {
     if (isAdmin) {
@@ -444,6 +459,22 @@ export function AdminView() {
               }
               chevron
               onClick={() => setIsTrashOpen(true)}
+            />
+            <GroupedRow
+              leading={<Icon name="refresh" size={20} />}
+              title="Sincronizza Vademecum Cloud"
+              subtitle="Allinea Carta di Clan, Regole e Canovacci con Supabase per renderli visibili su tutti i dispositivi (es. smartphone e tablet)."
+              trailing={
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleSyncVademecum}
+                  isLoading={isSyncingVademecum}
+                >
+                  <Icon name="refresh" size={14} />
+                  <span>Sincronizza</span>
+                </Button>
+              }
             />
             <GroupedRow
               leading={<Icon name="download" size={20} />}

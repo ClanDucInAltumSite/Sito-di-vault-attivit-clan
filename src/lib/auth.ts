@@ -128,6 +128,9 @@ export async function loginAdmin(email: string, password: string): Promise<{ suc
       return { success: false, error: I18N.auth.unauthorized };
     }
 
+    // Sincronizza subito il Vademecum (Carta di Clan e Canovacci) con Supabase
+    import('./vademecum').then((m) => m.syncVademecum()).catch(() => {});
+
     return { success: true };
   } catch (_err) {
     return { success: false, error: I18N.auth.errorNetwork };

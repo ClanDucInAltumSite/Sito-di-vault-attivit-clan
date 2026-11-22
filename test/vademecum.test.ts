@@ -116,4 +116,30 @@ describe('Vademecum e Regole del Clan (Carta, Regole, Canovacci)', () => {
     });
     expect(reset.fotoCopertinaUrl).toBeNull();
   });
+
+  it('isVademecumCustomized riconosce correttamente i documenti di fabbrica vs personalizzati', async () => {
+    const { isVademecumCustomized, DEFAULT_VADEMECUM_ITEMS } = await import('../src/lib/vademecum');
+    expect(isVademecumCustomized(DEFAULT_VADEMECUM_ITEMS)).toBe(false);
+
+    const customItems = DEFAULT_VADEMECUM_ITEMS.map((item) =>
+      item.id === 'carta_clan' ? { ...item, titolo: 'Carta di Clan Modificata' } : item
+    );
+    expect(isVademecumCustomized(customItems)).toBe(true);
+
+    const withPhoto = DEFAULT_VADEMECUM_ITEMS.map((item) =>
+      item.id === 'carta_clan' ? { ...item, fotoCopertinaUrl: 'https://example.com/photo.webp' } : item
+    );
+    expect(isVademecumCustomized(withPhoto)).toBe(true);
+  });
+
+  it('pushVademecumToRemote e pullVademecumFromRemote gestiscono scenari non autenticati o offline senza eccezioni', async () => {
+    const { pushVademecumToRemote, pullVademecumFromRemote, syncVademecum } = await import('../src/lib/vademecum');
+    const pushResult = await pushVademecumToRemote();
+    expect(typeof pushResult).toBe('boolean');
+
+    const pullResult = await pullVademecumFromRemote();
+    expect(typeof pullResult).toBe('boolean');
+
+    await expect(syncVademecum()).resolves.toBeUndefined();
+  });
 });

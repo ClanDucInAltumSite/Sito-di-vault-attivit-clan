@@ -876,6 +876,11 @@ export async function exportBackupJson(): Promise<void> {
     backupData.tables[table] = await db.getAll(table);
   }
 
+  try {
+    const { getVademecumItems } = await import('./vademecum');
+    backupData.tables.vademecum_items = await getVademecumItems();
+  } catch {}
+
   const jsonString = JSON.stringify(backupData, null, 2);
   const blob = new Blob([jsonString], { type: 'application/json' });
   const url = URL.createObjectURL(blob);

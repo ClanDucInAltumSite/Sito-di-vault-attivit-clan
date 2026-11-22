@@ -346,6 +346,13 @@ export async function syncNow(
       await performIncrementalSync(client, trigger, serverEpoch);
     }
 
+    // Sincronizzazione Vademecum (Carta di Clan, Regole, Canovacci) con Supabase system_meta
+    if (typeof window !== 'undefined' && !(typeof process !== 'undefined' && process.env.VITEST)) {
+      import('./vademecum')
+        .then((m) => m.syncVademecum(client))
+        .catch(() => {});
+    }
+
     // Auto-download in background degli allegati leggeri (<500 KB) per uso offline
     if (typeof window !== 'undefined' && 'caches' in window) {
       setTimeout(() => {
